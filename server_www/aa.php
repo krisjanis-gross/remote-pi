@@ -6,7 +6,7 @@ ini_set('display_errors', 'On');
 /*
 require_once("static_db.php");
 $static_db = open_static_data_db();
-	*/
+
 	
 	require_once("sensor_log_db.php");
 	flush_sensor_data_to_permanent_storage();
@@ -21,7 +21,7 @@ $static_db = open_static_data_db();
 	
 	$sensor_log_db->close();
 	
-	
+		*/
 
 //$results = $static_db->query("delete from triggers where id = 1;");
 	
