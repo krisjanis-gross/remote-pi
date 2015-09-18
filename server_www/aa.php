@@ -3,6 +3,9 @@
 
 error_reporting(E_ALL);
 ini_set('display_errors', 'On');
+
+
+pirnt ("asdf :) ");
 /*
 require_once("static_db.php");
 $static_db = open_static_data_db();
