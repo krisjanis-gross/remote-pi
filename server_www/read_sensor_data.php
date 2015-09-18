@@ -24,7 +24,7 @@ $all_data = '"__data_timestamp___":"' . date('Y-m-d H:i:s') . '"';
 	else {
 		// produce random dummy reading data
 		$random_data = rand(0,100);
-		$all_data .= '"dummy_data":"' .$random_data . '"';
+		$all_data .= ', "dummy_data":"' .$random_data . '"';
 	}
 	$all_data = "{" . $all_data . "}";
 	//var_dump($all_data);
