@@ -412,7 +412,7 @@ function show_history (change_time_interval) {
 								
 								
 								setInterval(function () {
-																if ((active_page == "historical_data" )and refresh_enabled ) {
+																if ((active_page == "historical_data" ) && refresh_enabled ) {
 																var x = (new Date()).getTime(); // current time
 																
 																//y = Math.random() * 20;
