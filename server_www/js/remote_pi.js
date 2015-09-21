@@ -409,8 +409,10 @@ function show_history (change_time_interval) {
 								var series ;
 								var chart = this;
 								var previous_data_timestamp = 0;
+								
+								
 								setInterval(function () {
-																if (active_page == "historical_data" ) {
+																if ((active_page == "historical_data" )and refresh_enabled ) {
 																var x = (new Date()).getTime(); // current time
 																
 																//y = Math.random() * 20;
@@ -452,6 +454,10 @@ function show_history (change_time_interval) {
 																}
 															
 														}, 1000);
+								
+								
+								
+								
 								}
 							}
 	    	            },
@@ -519,9 +525,9 @@ function perform_refresh () {
 	
 	if (refresh_enabled) {
 		//alert ("doing refresh" + active_page);
-		if (active_page == "historical_data") {
-			show_history ();
-		}
+		//if (active_page == "historical_data") {
+		//	show_history ();
+		//}
 		
 		if (active_page == "realtime_data") {
 			get_realtime_data ();
