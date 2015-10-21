@@ -61,7 +61,7 @@ function sensor_historic_data () {
 	if ( $period == "hour") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 hour')";
 	if ( $period == "3hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 hours')";
 	if ( $period == "6hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-6 hours')";
-	if ( $period == "day") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 day')";
+	if ( $period == "day") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 day') and strftime ("%M", datetime) = '10'"; // every 10th minute
 	if ( $period == "3days") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 days')";
 	if ( $period == "week") $query_datetime_filter = " AND datetime > datetime('now','localtime','-7 days')";
 	if ( $period == "month") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 month')";
@@ -129,7 +129,13 @@ function sensor_historic_data () {
 	}	
 	
 	
-	
+	// rude optimization
+	// do not return 
+	if ( $period == "month") 
+		{
+		
+		
+		}
 	
 	
 		//var_dump($all_sensor_data );
