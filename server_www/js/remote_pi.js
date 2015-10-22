@@ -149,7 +149,7 @@ function get_realtime_data ()
 			  $.each(data, function(key, val) {
 							$( "#sensor_" + key ).bind( "click", /*{id:par_id , name:par_name , value:par_value },*/  
 														function(/*event*/) {
-															edit_parameter(event.data.id, event.data.name, event.data.value)
+															$( "#popupSensorMenu" ).popup( "open" )
 														});
 			  });
 			  
@@ -292,7 +292,7 @@ function refresh_triggers ()
 				
 				$( "#parameter_" + par_id ).bind( "click", {id:par_id , name:par_name , value:par_value },  
 														function(event) {
-															$( "#popupSensorMenu" ).popup( "open" );
+															edit_parameter(event.data.id, event.data.name, event.data.value)
 														});
 				}
 		});		
