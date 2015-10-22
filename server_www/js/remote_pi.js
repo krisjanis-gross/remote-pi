@@ -137,14 +137,21 @@ function get_realtime_data ()
 			  
 			  
 			  $.each(data, function(key, val) {
-				if (key == "__data_timestamp___") items.push('<li data-role="list-divider">' + val + '</li>');
-				else   items.push('<li data-icon="action"><a href="#">' + key + ' : ' + val + '</a></li>');
+				if (key == "__data_timestamp___") 
+					items.push('<li data-role="list-divider">' + val + '</li>');
+				else   
+					items.push('<li data-icon="action"><a id="sensor_' + key + '">' + key + ' : ' + val + '</a></li>');
 			  });
 			 
-			  $('#realtime_tab').html( '<ul data-role="listview" data-split-icon="gear" data-inset="true">' + items.join('') + '</ul>');
-			  
-			 
+			  $('#realtime_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
 			  $("#realtime_tab").trigger("create");
+			  
+			  $.each(data, function(key, val) {
+							$( "#sensor_" + key ).bind( "click", /*{id:par_id , name:par_name , value:par_value },*/  
+														function(/*event*/) {
+															edit_parameter(event.data.id, event.data.name, event.data.value)
+														});
+			  });
 			  
 			})
 		.error(function(jqXHR, textStatus, errorThrown) {
@@ -154,14 +161,8 @@ function get_realtime_data ()
 				alert("incoming Text " + jqXHR.responseText);
 			});
 			//.error(function() { alert("error"); });
-	
-		 
-		// $(":mobile-pagecontainer").pagecontainer( "change", "#data_page" );
+
 	}
-
-
-
-
 
 
 
@@ -291,7 +292,7 @@ function refresh_triggers ()
 				
 				$( "#parameter_" + par_id ).bind( "click", {id:par_id , name:par_name , value:par_value },  
 														function(event) {
-															edit_parameter(event.data.id, event.data.name, event.data.value)
+															$( "#popupSensorMenu" ).popup( "open" );
 														});
 				}
 		});		
