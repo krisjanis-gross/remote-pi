@@ -137,7 +137,7 @@ function get_realtime_data ()
 			  
 			  
 			  $.each(data, function(key, val) {
-				if (key == "__data_timestamp___") items.push('<li data-role="list-divider">' + val + '</li>');
+				if (key == "__data_timestamp___") items.push('<li data-icon="action" data-role="list-divider">' + val + '</li>');
 				else   items.push('<li>' + key + ' : ' + val + '</li>');
 			  });
 			 
