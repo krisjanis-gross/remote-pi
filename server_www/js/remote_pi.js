@@ -138,7 +138,7 @@ function get_realtime_data ()
 			  
 			  $.each(data, function(key, val) {
 				if (key == "__data_timestamp___") items.push('<li data-role="list-divider">' + val + '</li>');
-				else   items.push('<li data-icon="action">' + key + ' : ' + val + '</li>');
+				else   items.push('<li data-icon="action"><a href="#">' + key + ' : ' + val + '</a></li>');
 			  });
 			 
 			  $('#realtime_tab').html( '<ul data-role="listview" data-split-icon="gear" data-inset="true">' + items.join('') + '</ul>');
