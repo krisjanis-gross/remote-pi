@@ -141,7 +141,7 @@ function get_realtime_data ()
 				else   items.push('<li data-icon="action">' + key + ' : ' + val + '</li>');
 			  });
 			 
-			  $('#realtime_tab').html( '<ul data-role="listview" data-split-icon="gear">' + items.join('') + '</ul>');
+			  $('#realtime_tab').html( '<ul data-role="listview" data-split-icon="gear" data-inset="true">' + items.join('') + '</ul>');
 			  
 			 
 			  $("#realtime_tab").trigger("create");
