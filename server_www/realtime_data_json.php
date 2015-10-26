@@ -9,5 +9,13 @@ $the_data = read_thermometers (false);
 var_dump($the_data);
 //print $the_data;
 
+print ("<hr>");
+
+
+$array_of_readings =json_decode($the_data);
+
+
+var_dump($array_of_readings);
+
 
 ?> 
