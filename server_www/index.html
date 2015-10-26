@@ -222,8 +222,8 @@
 			<form>
 				<div style="padding:10px 20px;">
 				  <h3>Sensor Menu</h3>
-		    	  <a href="#" data-role="button" id="single_sensor_history" data-icon="check" >Show History</a>
-		    	  <a href="#" data-role="button" id="sensor_name_form" data-icon="check" >Edit sensor label</a>
+		    	  <a href="#" data-role="button" id="single_sensor_history" data-icon="check" >Show History _ToDo :)</a>
+		    	  <a href="#" data-role="button" id="sensor_name_form" data-icon="check" >Edit sensor label _ToDo</a>
 				</div>
 			</form>
 	</div>	
@@ -252,21 +252,28 @@
   
   
 		
-	<script src="js/remote_pi.js"></script>
-	
-	<script src="js/remote_pi_WEB.js"></script>
-<!--
-	  
-  <script type="text/javascript" src="cordova.js"></script>
+<script src="js/remote_pi.js"></script>
+<script type="text/javascript" src="cordova.js"></script>
+  
+  
+  
+ <!-- 
 	<script src="js/remote_pi_APP.js"></script>
 	<script type="text/javascript" charset="utf-8" src="plugins/io.litehelpers.cordova.sqlite/www/SQLitePlugin.js"></script>
 	
- 
-	
-   
+	<script src="js/remote_pi_WEB.js"></script> 
  -->
+ <script type="text/javascript">
+ var ua = navigator.userAgent.toLowerCase();
+var isAndroid = ua.indexOf("android") > -1; //&& ua.indexOf("mobile");
+if(isAndroid) {
+	document.writeln("<script src='js/remote_pi_APP.js'><\/script>");
+	document.writeln("<script type='text/javascript' charset='utf-8'  src='plugins/io.litehelpers.cordova.sqlite/www/SQLitePlugin.js'><\/script>");
+}
+else {
+	document.writeln("<script type='text/javascript' src='js/remote_pi_WEB.js'><\/script>");
+}
+</script>
  
- 
- 
-    </body>
+</body>
 </html>

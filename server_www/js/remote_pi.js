@@ -140,7 +140,7 @@ function get_realtime_data ()
 				if (key == "__data_timestamp___") 
 					items.push('<li data-role="list-divider">' + val + '</li>');
 				else   
-					items.push('<li data-icon="action"><a id="sensor_' + key + '">' + key + ' : ' + val + '</a></li>');
+					items.push('<li data-icon="gear"><a id="sensor_' + key + '">' + key + ' : ' + val + '</a></li>');
 			  });
 			 
 			  $('#realtime_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
