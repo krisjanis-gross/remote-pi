@@ -17,5 +17,5 @@ $array_of_readings =json_decode($the_data);
 
 var_dump($array_of_readings);
 
-
+print ("<hr>");
 ?> 
