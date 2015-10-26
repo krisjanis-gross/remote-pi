@@ -6,11 +6,8 @@ include("read_thermometers.php");
 $the_data = read_thermometers (false);
 
 
-
-print $the_data;
-
-?>
-
+var_dump($the_data);
+//print $the_data;
 
 
 ?>
