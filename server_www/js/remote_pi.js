@@ -5,6 +5,7 @@ var active_page;
 var refresh_enabled = false;
 var global_time_interval = "3hrs";
 var global_date_range_URL = "";
+var global_single_selected_sensor_id = "";
 var reload_interval = 60000; // 1 minute = 60 000 miliseconds
 var global_parameter_id = 0;
 
@@ -18,8 +19,18 @@ $(document).ready(function()
 	
 $('#realtime_button').click(get_realtime_data);
 $('#history_button').click(function() {
+  global_single_selected_sensor_id = '';
   show_history();
 });
+
+$('#single_sensor_history').click(function() {
+//global_single_selected_sensor_id = selected_sensor_ID;
+show_history();
+$( "#popupSensorMenu" ).popup( "close" );
+});
+
+
+
 $('#action_button').click(refresh_control_buttons);
 $('#triggers_button').click(refresh_triggers);
 
@@ -122,7 +133,7 @@ function send_username_and_password () {
 
 function get_realtime_data ()
 	{
-		var URL = "http://" + target_URL + "/app_realtime_data.php";
+		var URL = "http://" + target_URL + "/realtime_data_json.php";
 		//console.log("*********************************get data started*********************************************");
 		 $('#realtime_tab').html('went for data...' +  $('#realtime_tab').html() );
 		 $("#realtime_tab").trigger("create");
@@ -137,19 +148,20 @@ function get_realtime_data ()
 			  
 			  
 			  $.each(data, function(key, val) {
+				  
 				if (key == "__data_timestamp___") 
-					items.push('<li data-role="list-divider">' + val + '</li>');
+					items.push('<li data-role="list-divider">' + val.value + '</li>');
 				else   
-					items.push('<li data-icon="gear"><a id="sensor_' + key + '">' + key + ' : ' + val + '</a></li>');
+					items.push('<li data-icon="gear"><a id="sensor_' + key + '">' + val.sensor_name + ' : ' + val.value + '</a></li>');
 			  });
 			 
 			  $('#realtime_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
 			  $("#realtime_tab").trigger("create");
 			  
 			  $.each(data, function(key, val) {
-							$( "#sensor_" + key ).bind( "click", /*{id:par_id , name:par_name , value:par_value },*/  
-														function(/*event*/) {
-															$( "#popupSensorMenu" ).popup( "open" )
+							$( "#sensor_" + key ).bind( "click", {sensor_id:key , sensor_name:val.sensor_name },  
+														function(event) {
+															expand_sensor(event.data.sensor_id,event.data.sensor_name)
 														});
 			  });
 			  
@@ -165,7 +177,11 @@ function get_realtime_data ()
 	}
 
 
-
+function expand_sensor(id,name) {
+	$('#sensor_menu_title').html( 'Sensor id: ' +  id + '<br> Sensor Label: ' +  name );
+	global_single_selected_sensor_id = id;
+	$( "#popupSensorMenu" ).popup( "open" )
+}
 function refresh_control_buttons ()
 {
 		$('#pins_tab').html('went for data...' +  $('#pins_tab').html() );
@@ -379,9 +395,9 @@ function show_history (change_time_interval) {
 		
 	}
 	
+	//global_single_selected_sensor_id
 	
-	
-	var URL = "http://" + target_URL + "/app_sensor_historic_data.php?json=ture&period=" + global_time_interval + global_date_range_URL;
+	var URL = "http://" + target_URL + "/app_sensor_historic_data.php?json=ture&period=" + global_time_interval + global_date_range_URL + '&single_sensor_selected='+global_single_selected_sensor_id;
 	
 	 $('#historical_data_tab').html('went for data...' +  $('#historical_data_tab').html() );
 	active_page = "historical_data";

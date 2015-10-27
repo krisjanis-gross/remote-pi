@@ -56,7 +56,7 @@ function sensor_historic_data () {
 	isset($_GET['period']) ? $period = $_GET['period'] : $period = "hour";
 	isset($_GET['date_from']) ? $date_from= $_GET['date_from'] : $date_from= "";
 	isset($_GET['date_to']) ? $date_to= $_GET['date_to'] : $date_to= "";
-	
+	isset($_GET['single_sensor_selected']) ? $single_sensor_selected = $_GET['single_sensor_selected'] : $single_sensor_selected= "";
 	
 	if ( $period == "hour") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 hour')";
 	if ( $period == "3hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 hours')";
@@ -68,9 +68,9 @@ function sensor_historic_data () {
 	if ( $period == "date_range") {
 		if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s')  and strftime ('%M', datetime) = '01'", $date_from, $date_to);
 	}
+	if ($single_sensor_selected <> "") $query_sensor_id_filter = " AND sensor_id = '$single_sensor_selected'";
 	
-	
-	$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_datetime_filter);
+	$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
 	
 	while ($row = $results->fetchArray()) 
 		{ 
@@ -105,7 +105,7 @@ function sensor_historic_data () {
 	// get all data from tempfs
 	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
 	
-	$results2 = $sensor_log_db_tempfs->query('SELECT * FROM sensor_log where 1 ' . $query_datetime_filter);
+	$results2 = $sensor_log_db_tempfs->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
 	
 	while ($row2 = $results2->fetchArray()) 
 		{ 

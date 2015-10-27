@@ -1,5 +1,5 @@
 <? 
-include("sensor_names.php");
+require_once("sensor_names.php");
 
 function read_thermometers ($use_sensor_names = true) {
 
