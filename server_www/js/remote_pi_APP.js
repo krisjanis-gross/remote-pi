@@ -315,6 +315,7 @@ function check_connection()
 {	
 	$('#connection_notification_bar').show();
 	if ((target_URL != "") && (target_URL != null)) 
+		jCription_handshake ();
 		check_target_version();	
 	else $('#connection_status').html("URL required to connect");
 }

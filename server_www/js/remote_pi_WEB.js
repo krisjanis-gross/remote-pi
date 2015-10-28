@@ -38,6 +38,7 @@ $(document).on('pageinit', function() {
 	  }
 	
 	target_URL =  window.location.host;
+	jCription_handshake();
 	$("#header_1").html(target_URL);
 	
 	$("#app_exit").hide();

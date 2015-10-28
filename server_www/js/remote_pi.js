@@ -8,14 +8,31 @@ var global_date_range_URL = "";
 var global_single_selected_sensor_id = "";
 var reload_interval = 60000; // 1 minute = 60 000 miliseconds
 var global_parameter_id = 0;
+var password; 
 
 $(document).ready(function()
 	    { var refreshId = setInterval(function()
 	        {
 	    	perform_refresh ();
 	        }, reload_interval);
+	    
+	    // jcription? 
+	    password = $.jCryption.encrypt("remote_pi", "889977665");
+    
+	    
     });
+
+function jCription_handshake () {
+	alert (target_URL);
+	$.jCryption.authenticate(password, "http://" +  target_URL + "/json_encrypted_API.php?getPublicKey=true",  "http://" +  target_URL + "/json_encrypted_API.php?handshake=true", function(AESKey) {
+		//$("#text,#encrypt,#decrypt,#serverChallenge").attr("disabled",false);
+		//$("#status").html('<span style="font-size: 16px;">Let\'s Rock!</span>');
+	}, function() {
+		alert(" Authentication failed");
+	});
+    
 	
+}
 	
 $('#realtime_button').click(get_realtime_data);
 $('#history_button').click(function() {
