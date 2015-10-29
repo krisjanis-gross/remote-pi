@@ -14,6 +14,10 @@ function process_gpio() {
 	
 	
 }
+function process_gpio2($pin_nr,$command) {
+	
+	if  (is_numeric($pin_nr) and is_numeric($command) ) 	set_pin ($pin_nr,$command);
+}
 
 function set_pin ($pin_nr, $command,$save_db_to_storage = true) {
 		

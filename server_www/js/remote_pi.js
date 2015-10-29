@@ -248,47 +248,7 @@ function refresh_control_buttons ()
 			 
 		
 	}
-	/*	 
-	var URL = "http://" + target_URL + "/app_GPIO_list.php";
 	
-	
-	
-	$.getJSON(URL, function(data) {
-		  var items = [];
-		 
-		  $.each(data, function(key, val) {
-			
-		    items.push('<li><label><span>' + val.description + '</span></label>' + 
-		    '<select name="slider" id="flip-' + key + '" data-role="slider" data-theme="c" >' +
-		    '<option value="0">Off</option>' + 
-		    '<option value="1">On</option> ' +
-		    '</select></li>');
-		  });
-		 
-		  $('#pins_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
-		  
-		  $.each(data, function(key, val) {
-			  $('#flip-' + key).slider();
-			  if ( val.state == 1) $('#flip-' + key).val(1);
-			  if ( val.state == 0) $('#flip-' + key).val(0);
-			  
-			  if ( val.locked == 1) $('#flip-' + key).slider('disable');
-			  
-			  $('#flip-' + key).slider('refresh');
-			  });
-		  
-		  $("#pins_tab").trigger("create");
-		  
-		  $.each(data, function(key, val) {
-				$( "#flip-" + key ).bind( "change", {key : key}, 
-														function(event) {
-															toggle_pin( event.data.key );
-														});
-
-			 });
-		});		
-	
-	*/
 }
 
 
@@ -298,27 +258,30 @@ function refresh_triggers ()
 	active_page = "triggers";
 	change_tab (active_page);
 	
-
-	var URL = "http://" + target_URL + "/app_TRIGGER_list.php";
 	
+	var action = "get_trigger_list";	
+	var data_to_server =  "";
 	
-	$.getJSON(URL, function(data) {
-		  var items = [];
-		  var parameter_array = [];
-		  $.each(data, function(key, val) {
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server);
+	
+	if (data_from_server.response_code == "OK") {
+	var items = [];
+	var parameter_array = [];
+	  $.each(data_from_server.response_data, function(key, val) {
 			
-			var parameters_html = "<br/><span>Trigger parameters:";
-			//alert(typeof(val.parameters));
-			if( val.parameters != null ){
-				$.each(val.parameters, function(parameter_id, parameter_data)  {
-					parameters_html = parameters_html + '<a id="parameter_' + parameter_id + '" class="ui-btn">'+ parameter_data.name + ' = ' + parameter_data.par_value +'</a> ';
+	  var parameters_html = "<br/><span>Trigger parameters:";
+	  //alert(typeof(val.parameters));
+	  if( val.parameters != null ){
+		$.each(val.parameters, function(parameter_id, parameter_data)  {
+				parameters_html = parameters_html + '<a id="parameter_' + parameter_id + '" class="ui-btn">'+ parameter_data.name + ' = ' + parameter_data.par_value +'</a> ';
 					
-					var parameter_object = {
+				var parameter_object = {
 						'parameter_id' : parameter_id,
 						'parameter_name' : parameter_data.name,
 						'parameter_value' : parameter_data.par_value
 					};
-					parameter_array.push(parameter_object);
+				parameter_array.push(parameter_object);
 					
 					
 				});
@@ -338,7 +301,7 @@ function refresh_triggers ()
 		  //$('#trigger_tab').html(items.join(''));
 		  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
 		  
-		  $.each(data, function(key, val) {
+		  $.each(data_from_server.response_data, function(key, val) {
 				  $('#trigger-flip-' + key).slider();
 				  if ( val.state == 1) $('#trigger-flip-' + key).val(1);
 				  if ( val.state == 0) $('#trigger-flip-' + key).val(0);
@@ -347,7 +310,7 @@ function refresh_triggers ()
 		  
 		  $("#trigger_tab").trigger("create");
 					
-		  $.each(data, function(key, val) {
+		  $.each(data_from_server.response_data, function(key, val) {
 				$( "#trigger-flip-" + key ).bind( "change", {key : key}, 
 														function(event) {
 															toggle_trigger( event.data.key );
@@ -368,7 +331,7 @@ function refresh_triggers ()
 															edit_parameter(event.data.id, event.data.name, event.data.value)
 														});
 				}
-		});		
+	}		
 }
 
 function toggle_trigger (id) {
@@ -396,26 +359,23 @@ $.ajax({
 
 function toggle_pin (key) {
 	
-	if($('#flip-' + key).val()==0) command_pin('?command=0&pin_nr=' + key);
-	if($('#flip-' + key).val()==1) command_pin('?command=1&pin_nr=' + key);
+	if($('#flip-' + key).val()==0) command_pin( key , 0);
+	if($('#flip-' + key).val()==1) command_pin( key , 1);
 	
 	
 }
 
-function command_pin (argument )
-	{
-		var URL = "http://" + target_URL + "/app_GPIO_control.php" + argument;
-	$.ajax({
-	       url:URL,
-	       success: function(result) {
-	   // $('#trigger_tab').html(result);
-	      }, // this line is edited later
-	 		error: function(result) {
-	 			alert ("There was an error performing the action!");
-	      } // this line is edited later
-	    });
+function command_pin (pin_id, command ) {
+	var action = "GPIO_control";	
+	var data_to_server =  {
+			'pin_id' : pin_id,
+			'command' : command
+		};
 	
-	}
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server);
+
+}
 
 
 function Validate_date_str(chkdate)

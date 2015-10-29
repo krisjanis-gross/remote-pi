@@ -1,3 +1,5 @@
+// example
+/*
 $('#test_button').click(function() {
 	
 	var data_to_server =  {
@@ -9,6 +11,9 @@ $('#test_button').click(function() {
 	alert(data_from_server.response_code);
 	
 });
+
+*/
+
 
 
 function json_encrypted_request(request_action, data)

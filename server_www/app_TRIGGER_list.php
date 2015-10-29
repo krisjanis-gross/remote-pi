@@ -2,11 +2,6 @@
 header('Cache-Control: no-store, no-cache, must-revalidate');
 require_once("static_db.php");
 
-//error_reporting(E_ALL);
-//ini_set('display_errors', 'On');
-
-//include("app_login_check_silent.php"); 
-
 
 $static_db = open_static_data_db(true);
 $results = $static_db->query('SELECT * FROM triggers');
@@ -21,10 +16,7 @@ while ($row = $results->fetchArray()) {
 $static_db->close();
 print json_encode($output_new);
 
-//
-//  {"1":{"state":"on","description":"Enable heater when temperature is less than target. Disable when more. Contols realy on pin 12","parameters":{"1":{"name":"target temperature","par_value":"21"}}},"2":{"state":"off","description":"Spray Water for X miliseconds when surface humidity is below Y.","parameters":{"2":{"name":"spray time, miliseconds","par_value":"1000"},"3":{"name":"humidity threshold, %","par_value":"65"}}}}
-//  
-//
+
 
 
 function get_parameter_list ($trigger_id)
