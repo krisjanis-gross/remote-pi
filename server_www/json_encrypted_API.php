@@ -1,6 +1,6 @@
 <?php 
-//ini_set('display_errors',1);
-//error_reporting(E_ALL);
+ini_set('display_errors',1);
+error_reporting(E_ALL);
 
 
 //var_dump($_POST);
@@ -14,7 +14,7 @@ $jc->go();
 
 //header('Content-type: text/plain');
 //var_dump($_POST);
-
+$request_from_server_string = "";
  foreach ($_POST as $key => $value) {
             $request_from_server_string =  $key;
         }
@@ -39,7 +39,7 @@ print ("<hr>");
 
 // check if user is logged in
 // if not logged in $response_code = "NOT_LOGGED_IN";
-
+$response_to_client = [];
 
 
 if ($request_action == "action1")
@@ -94,8 +94,7 @@ if ($request_action == "get_realtime_data")
 
 
 
-if ($request_action == "get_GPIO_list")
-{
+if ($request_action == "get_GPIO_list") {
 	$response_code = "OK";
 
 
@@ -161,9 +160,20 @@ if ($request_action == "get_trigger_list")
 	
 }
 
-
-
-
+if ($request_action == "trigger_control")
+{
+	$response_code = "OK";
+    //var_dump($request_data);
+    
+	require_once("static_db.php");
+	$static_db = open_static_data_db();
+	
+	
+	process_trigger($request_data['trigger_id'],$request_data['command']);
+	
+	$response_to_client['response_code'] = $response_code;
+	$response_to_client['response_data'] = "";
+}
 
 
 
@@ -175,10 +185,33 @@ print json_encode($return_data);
 
 
 
+
+
+
+
+
+
+
+function process_trigger($trigger_id,$command) {
+	if  (is_numeric($trigger_id)) 	set_trigger ($trigger_id,$command);
+}
+
+function set_trigger ($trigger_id, $command) {
+	global $static_db;
+	$results = $static_db->query('UPDATE triggers SET `state` = ' . $command . ' where `id` = ' .  $trigger_id  );
+	$static_db->close();
+	save_static_db_in_storage();
+}
+
+
+
+
+
+
 function get_parameter_list ($trigger_id)
 {
 	global $static_db;
-
+	$parameters = [];
 	$results = $static_db->query('SELECT * FROM trigger_parameters where trigger_id = ' . $trigger_id );
 	while ($row = $results->fetchArray()) {
 		$parameter_id = $row['id'];

@@ -335,23 +335,20 @@ function refresh_triggers ()
 }
 
 function toggle_trigger (id) {
-	if($('#trigger-flip-' + id).val()==0) set_trigger('?command=0&trigger_id=' + id);
-	if($('#trigger-flip-' + id).val()==1) set_trigger('?command=1&trigger_id=' + id);
+	if($('#trigger-flip-' + id).val()==0) set_trigger(id,"0");
+	if($('#trigger-flip-' + id).val()==1) set_trigger(id,"1");
 }
 
-function set_trigger (argument )
-{
-	var URL = "http://" + target_URL + "/app_TRIGGER_control.php" + argument;
-$.ajax({
-       url:URL,
-       success: function(result) {
-    	   alert ("done!");
-   // $('#trigger_tab').html(result);
-      }, // this line is edited later
- 		error: function(result) {
- 			alert ("There was an error performing the action!");
-      } // this line is edited later
-    });
+function set_trigger (trigger_id, command )
+{ 
+	var action = "trigger_control";	
+	var data_to_server =  {
+			'trigger_id' : trigger_id,
+			'command' : command
+		};
+	
+	// send the command
+	var data_from_server = json_encrypted_request (action,data_to_server);
 
 }
 
