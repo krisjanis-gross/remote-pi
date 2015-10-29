@@ -128,33 +128,7 @@ function sensor_historic_data () {
 
 	}	
 	
-	
-	// rude optimization
-	// do not return 
-	if ( $period == "month") 
-		{
-		
-		
-		}
-	
-	
-		//var_dump($all_sensor_data );
-		//echo '<br /><br /><br />';
-	/*
-	$time_end = microtime(true);
-	$execution_time = ($time_end - $time_start);
-	$time_start = $time_end;
-	//execution time of the script
-	echo '<b>2. query time :</b> '.$execution_time.' sec<br />';
-	
-*/
-
-
-
 	return $all_sensor_data;
-	
-	
-	
 	
 }
 ?>
