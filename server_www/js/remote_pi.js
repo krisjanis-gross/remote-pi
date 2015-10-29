@@ -600,18 +600,19 @@ function ask_date_range ()
 
 function save_parameter () {
 	var new_value = $('#paremeter_value').val();
-	var URL = "http://" + target_URL + "/app_change_parameter.php?id=" + global_parameter_id + "&new_value=" + new_value;
-	$.ajax({
-	       url:URL,
-	       success: function(result) {
-	    	   refresh_triggers();
-	    	   $( "#popupParameter_change" ).popup( "close" );
-	   // $('#the_remote_content').html(result);
-	      }, // this line is edited later
-	 		error: function(result) {
-	 			alert ("There was an error performing the action!");
-	      } // this line is edited later
-	    });
+	
+	
+	var action = "change_trigger_parameter";	
+	var data_to_server =  {
+			'parameter_id' : global_parameter_id,
+			'new_value' : new_value
+		};
+	
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server);
+	
+	refresh_triggers();
+	$( "#popupParameter_change" ).popup( "close" );
 	
 	
 }

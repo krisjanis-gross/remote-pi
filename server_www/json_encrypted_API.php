@@ -176,6 +176,21 @@ if ($request_action == "trigger_control")
 }
 
 
+if ($request_action == "change_trigger_parameter")
+{
+	$response_code = "OK";
+	//var_dump($request_data);
+	
+	require_once("static_db.php");
+	
+	process_parameter_change($request_data['parameter_id'],$request_data['new_value']) ;
+	
+	
+
+}
+
+
+
 
 //var_dump($response_to_client);
 $return_data["rawdata"] = $jc->encrypt_data ($response_to_client);
@@ -187,9 +202,17 @@ print json_encode($return_data);
 
 
 
+function process_parameter_change($id,$new_value) {
+	
+	if  (is_numeric($id) and is_numeric($new_value)) 
+	{
+		$static_db = open_static_data_db();
+		$results = $static_db->query('UPDATE  `trigger_parameters` SET  `value` =  ' . $new_value . ' WHERE  `id` = ' . $id );
+		$static_db->close();
+		save_static_db_in_storage();
+	}
 
-
-
+}
 
 
 function process_trigger($trigger_id,$command) {
