@@ -23,12 +23,12 @@ $(document).ready(function()
     });
 
 function jCription_handshake () {
-	alert (target_URL);
+	//alert (target_URL);
 	$.jCryption.authenticate(password, "http://" +  target_URL + "/json_encrypted_API.php?getPublicKey=true",  "http://" +  target_URL + "/json_encrypted_API.php?handshake=true", function(AESKey) {
 		//$("#text,#encrypt,#decrypt,#serverChallenge").attr("disabled",false);
 		//$("#status").html('<span style="font-size: 16px;">Let\'s Rock!</span>');
 	}, function() {
-		alert(" Authentication failed");
+		alert("Authentication failed");
 	});
     
 	
@@ -150,48 +150,45 @@ function send_username_and_password () {
 
 function get_realtime_data ()
 	{
-		var URL = "http://" + target_URL + "/realtime_data_json.php";
-		//console.log("*********************************get data started*********************************************");
-		 $('#realtime_tab').html('went for data...' +  $('#realtime_tab').html() );
-		 $("#realtime_tab").trigger("create");
-		 
-		 active_page = "realtime_data";
-		 change_tab (active_page);
-		 
-		$.getJSON(URL, function(data) {
-			  var items = [];
-			 
-			  //if (data == "")
+	
+	 $('#realtime_tab').html('went for data...' +  $('#realtime_tab').html() );
+	 $("#realtime_tab").trigger("create");
+	 
+	 active_page = "realtime_data";
+	 change_tab (active_page);
+	 
+	 
+	 
+	var action = "get_realtime_data";	
+	var data_to_server =  "";
+	
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server);
+	
+	// process result. Load data in UI.
+	if (data_from_server.response_code == "OK") {
+		  var items = [];
+		  $.each(data_from_server.response_data, function(key, val) {
 			  
-			  
-			  $.each(data, function(key, val) {
-				  
-				if (key == "__data_timestamp___") 
+				if (key == "__data_timestamp___") // fist data element that shows the date of the reading.
 					items.push('<li data-role="list-divider">' + val.value + '</li>');
 				else   
 					items.push('<li data-icon="gear"><a id="sensor_' + key + '">' + val.sensor_name + ' : ' + val.value + '</a></li>');
 			  });
-			 
-			  $('#realtime_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
-			  $("#realtime_tab").trigger("create");
-			  
-			  $.each(data, function(key, val) {
-							$( "#sensor_" + key ).bind( "click", {sensor_id:key , sensor_name:val.sensor_name },  
-														function(event) {
-															expand_sensor(event.data.sensor_id,event.data.sensor_name)
-														});
-			  });
-			  
-			})
-		.error(function(jqXHR, textStatus, errorThrown) {
-				//console.log("error " + textStatus);
-				alert("error " + textStatus);
-				//console.log("incoming Text " + jqXHR.responseText);
-				alert("incoming Text " + jqXHR.responseText);
-			});
-			//.error(function() { alert("error"); });
-
+		 
+		  $('#realtime_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
+		  $("#realtime_tab").trigger("create");
+	
+		  $.each(data_from_server.response_data, function(key, val) {
+				$( "#sensor_" + key ).bind( "click", {sensor_id:key , sensor_name:val.sensor_name },  
+											function(event) {
+												expand_sensor(event.data.sensor_id,event.data.sensor_name)
+											});
+		  });
+		  
 	}
+	
+}
 
 
 function expand_sensor(id,name) {
@@ -199,15 +196,59 @@ function expand_sensor(id,name) {
 	global_single_selected_sensor_id = id;
 	$( "#popupSensorMenu" ).popup( "open" )
 }
+
+
 function refresh_control_buttons ()
 {
-		$('#pins_tab').html('went for data...' +  $('#pins_tab').html() );
+	$('#pins_tab').html('went for data...' +  $('#pins_tab').html() );
 				 
-		active_page = "pins";
-		change_tab (active_page);
+	active_page = "pins";
+	change_tab (active_page);
 		 
-		 
-		 
+	var action = "get_GPIO_list";	
+	var data_to_server =  "";
+	
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server);
+	
+	// process result. Load data in UI.
+	if (data_from_server.response_code == "OK") {
+		var items = [];
+		
+		  $.each(data_from_server.response_data, function(key, val) {
+				
+			    items.push('<li><label><span>' + val.description + '</span></label>' + 
+			    '<select name="slider" id="flip-' + key + '" data-role="slider" data-theme="c" >' +
+			    '<option value="0">Off</option>' + 
+			    '<option value="1">On</option> ' +
+			    '</select></li>');
+			  });
+			 
+			  $('#pins_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
+			  
+		 $.each(data_from_server.response_data, function(key, val) {
+				  $('#flip-' + key).slider();
+				  if ( val.state == 1) $('#flip-' + key).val(1);
+				  if ( val.state == 0) $('#flip-' + key).val(0);
+				  
+				  if ( val.locked == 1) $('#flip-' + key).slider('disable');
+				  
+				  $('#flip-' + key).slider('refresh');
+				  });
+			  
+		 $("#pins_tab").trigger("create");
+			  
+		 $.each(data_from_server.response_data, function(key, val) {
+					$( "#flip-" + key ).bind( "change", {key : key}, 
+															function(event) {
+																toggle_pin( event.data.key );
+															});
+
+				 });
+			 
+		
+	}
+	/*	 
 	var URL = "http://" + target_URL + "/app_GPIO_list.php";
 	
 	
@@ -224,7 +265,6 @@ function refresh_control_buttons ()
 		    '</select></li>');
 		  });
 		 
-		  //$('#pins_tab').html(items.join(''));
 		  $('#pins_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
 		  
 		  $.each(data, function(key, val) {
@@ -248,7 +288,7 @@ function refresh_control_buttons ()
 			 });
 		});		
 	
-	
+	*/
 }
 
 
@@ -395,7 +435,8 @@ function Validate_date_str(chkdate)
 }
 
 function show_history (change_time_interval) {
-
+	// process parameters
+	
 	if(!(typeof(change_time_interval)==='undefined')) global_time_interval = change_time_interval;
 	var date_range_for_URL = "";
 	if (change_time_interval == 'date_range') {
