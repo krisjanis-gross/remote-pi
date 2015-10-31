@@ -411,8 +411,10 @@ function show_history (change_time_interval) {
 	}
 	
 	 $('#historical_data_tab').html('went for data...' +  $('#historical_data_tab').html() );
-		active_page = "historical_data";
-		change_tab (active_page);
+	
+	 active_page = "historical_data";
+	
+	 change_tab (active_page);
 		
 		
 		
@@ -433,19 +435,7 @@ function show_history (change_time_interval) {
 	
 	
 	
-if (data_from_server.response_code == "OK") {	
-	//global_single_selected_sensor_id
-	
-	//var URL = "http://" + target_URL + "/app_sensor_historic_data.php?json=ture&period=" + global_time_interval + global_date_range_URL + '&single_sensor_selected='+global_single_selected_sensor_id;
-	
-
-	
-	//$.getJSON(URL, function(result) {
-	//$.ajax({
-	//       url:URL,
-	 //      datatype: "json",
-	//       success: function(result) {
-	    
+if (data_from_server.response_code == "OK") {	   
 	
 	    		Highcharts.setOptions({                                            // This is for all plots, change Date axis to local timezone
 	    	          global : {
@@ -473,16 +463,21 @@ if (data_from_server.response_code == "OK") {
 																//y = Math.random() * 20;
 																//series.addPoint([x, y], true, true);
 															
-																var URL = "http://" + target_URL + "/app_realtime_data.php";
-					
-																$.getJSON(URL, function(data) {
-																	  //var items = []; 
+																
+																var action = "get_realtime_data";	
+																var data_to_server =  "";
+																
+																// get data from server
+																var data_from_server = json_encrypted_request (action,data_to_server);
+																
+																// process result. Load data in UI.
+																if (data_from_server.response_code == "OK") {
 																	  var data_timestamp;
 																	  var add_this_data = true;
-																	  $.each(data, function(key, val) {
+																	  $.each(data_from_server.response_data, function(key, val) {
 																		  
 																		  if (key == "__data_timestamp___") {
-																					data_timestamp = val;
+																					data_timestamp = val.value;
 																					if (data_timestamp == previous_data_timestamp ) {
 																						//alert ("ingore this data");
 																						add_this_data = false;
@@ -493,19 +488,18 @@ if (data_from_server.response_code == "OK") {
 																				}
 																		  else {
 																				  if (add_this_data) {
-																				  var y = parseFloat(val);
+																				  var y = parseFloat(val.value);
 																				  series = chart.get(key);
 																				  series.addPoint([x, y], true, false);
 																				}
 																			}
 																	  });
 																	 
-																	  
-																	})
-																.error(function(jqXHR, textStatus, errorThrown) {
-																		alert("error " + textStatus);
-																		alert("incoming Text " + jqXHR.responseText);
-																	});										
+																
+																
+																}
+
+																									
 																}
 															
 														}, 1000);

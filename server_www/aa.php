@@ -6,6 +6,10 @@ ini_set('display_errors', 'On');
 
 
 print ("asdf :) ");
+
+phpinfo();
+
+
 /*
 require_once("static_db.php");
 $static_db = open_static_data_db();
