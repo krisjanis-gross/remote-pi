@@ -47,6 +47,22 @@ $( "#popupSensorMenu" ).popup( "close" );
 });
 
 
+$('#sensor_name_form').click(function() {
+	//global_single_selected_sensor_id = selected_sensor_ID;
+	$.mobile.changePage("#sensor_data",{ transition: "fade"});
+	$( "#popupSensorMenu" ).popup( "close" );
+	});
+
+
+$('#save_sensor_label').click(function() {
+	//global_single_selected_sensor_id = selected_sensor_ID;
+    var new_label = $('#sensor_data_label').val();
+	//alert ('setting sensor  '  + global_single_selected_sensor_id +  ' name to ' + new_label );
+	
+	set_sensor_label (global_single_selected_sensor_id,new_label);
+	
+	});
+	
 
 $('#action_button').click(refresh_control_buttons);
 $('#triggers_button').click(refresh_triggers);
@@ -194,6 +210,10 @@ function get_realtime_data ()
 function expand_sensor(id,name) {
 	$('#sensor_menu_title').html( 'Sensor id: ' +  id + '<br> Sensor Label: ' +  name );
 	global_single_selected_sensor_id = id;
+	
+	$('#sensor_data_header').html( 'Sensor id: ' +  id );
+	$('#sensor_data_label').val( name );
+	
 	$( "#popupSensorMenu" ).popup( "open" )
 }
 
@@ -633,3 +653,21 @@ function save_parameter () {
 	
 	
 }
+
+
+function set_sensor_label (id, label) {
+	
+
+	var action = "set_sensor_label";	
+	var data_to_server =  {
+			'sensor_id' : id, 
+			'new_label' : label
+		};
+	
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server);
+	
+	get_realtime_data();
+	$.mobile.changePage("#data_page",{ transition: "fade"});
+}
+

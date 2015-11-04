@@ -230,10 +230,65 @@ if ($request_action == "get_historical_data")
 
 
 
+
+
+
+if ($request_action == "set_sensor_label")
+{
+	$response_code = "OK";
+	//var_dump($request_data);
+	$result = "";
+	
+	require_once("static_db.php");
+
+	set_sensor_label($request_data['sensor_id'],$request_data['new_label']) ;
+
+	$response_to_client['response_code'] = $response_code;
+	$response_to_client['response_data'] = $result;
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //var_dump($response_to_client);
 $return_data["rawdata"] = $jc->encrypt_data ($response_to_client);
 
 print json_encode($return_data);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -353,7 +408,18 @@ function sensor_historic_data ($request_data) {
 }
 
 
+function set_sensor_label ($sensor_id, $new_label)
+{
+	$static_db = open_static_data_db();
 
+	$results = $static_db->query("INSERT OR IGNORE INTO sensor_names(id) VALUES('" . $sensor_id . "');");
+	$results = $static_db->query("UPDATE sensor_names SET sensor_name = '" . $new_label . "' WHERE id = '" . $sensor_id . "';");
+	
+	$static_db->close();
+	save_static_db_in_storage();
+	apc_delete('sensor_list');
+	
+}
 
 
 

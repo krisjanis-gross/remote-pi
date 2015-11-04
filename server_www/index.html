@@ -1,45 +1,18 @@
 <!DOCTYPE html>
-<!--
-    Licensed to the Apache Software Foundation (ASF) under one
-    or more contributor license agreements.  See the NOTICE file
-    distributed with this work for additional information
-    regarding copyright ownership.  The ASF licenses this file
-    to you under the Apache License, Version 2.0 (the
-    "License"); you may not use this file except in compliance
-    with the License.  You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing,
-    software distributed under the License is distributed on an
-    "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-     KIND, either express or implied.  See the License for the
-    specific language governing permissions and limitations
-    under the License.
--->
 <html>
     <head>
-        <!--
-        Customize this policy to fit your own app's needs. For more guidance, see:
-            https://github.com/apache/cordova-plugin-whitelist/blob/master/README.md#content-security-policy
-        Some notes:
-            * gap: is required only on iOS (when using UIWebView) and is needed for JS->native communication
-            * https://ssl.gstatic.com is required only on Android and is needed for TalkBack to function properly
-            * Disables use of inline scripts in order to mitigate risk of XSS vulnerabilities. To change this:
-                * Enable inline JS: add 'unsafe-inline' to default-src
-        -->
+		<meta charset="UTF-8"> 
         <meta http-equiv="Content-Security-Policy" content="default-src * data: gap: https://ssl.gstatic.com 'unsafe-inline'; style-src 'self' 'unsafe-inline'; media-src *">
         <meta name="format-detection" content="telephone=no">
         <meta name="msapplication-tap-highlight" content="no">
         <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width">
-         <!--<link rel="stylesheet" type="text/css" href="css/index.css">
-		-->
-		<link rel="stylesheet"  href="css/jquery.mobile-1.4.5.min.css">
-		<link href="css/styles.css" rel="stylesheet"/>
+
+		<link rel="stylesheet" href="css/jquery.mobile-1.4.5.min.css">
+		<link rel="stylesheet" href="css/styles.css" />
 		
 		<script src="js/jquery-2.1.1.js"></script>
 		<script src="js/jquery.mobile-1.4.5.min.js"></script>
-		
+		        
 		<script type="text/javascript" src="js/highcharts/highcharts.js"></script>
 		<script type="text/javascript" src="js/highcharts/modules/exporting.js"></script>
 		
@@ -63,7 +36,7 @@
     
    <!-- WEB login Page ---------------------------------------------------------------------------------> 
  <div data-role="page" id="web_login">
-	<div data-role="header" data-position="fixed"><h1 id="header_1">Login to Raspberry at <IP> </h1></div>
+	<div data-role="header" data-position="fixed"><h1 id="header_1">Login to Raspberry at _IP_ </h1></div>
 	<div role="main" class="ui-content" data-theme='a'>
 		<div>
 					<label>
@@ -140,9 +113,9 @@
 	</div>
 	
     </div><!-- /content -->
-</div><!-- /page -->
+</div><!--  /page -->
 
-</div>
+
 
 <!-- Target Form Page ----------------------------------------------------------------------------------->
     
@@ -223,7 +196,7 @@
 				  <h3 id=sensor_menu_title>Sensor Menu</h3>
 				  
 		    	  <a href="#" data-role="button" id="single_sensor_history" data-icon="search" >Show Sensor readings</a>
-		    	  <a href="#" data-role="button" id="sensor_name_form" data-icon="edit" >Edit sensor label _ToDo</a>
+		    	  <a href="#" data-role="button" id="sensor_name_form" data-icon="edit" >Edit sensor label</a>
 				</div>
 			</form>
 	</div>	
@@ -243,40 +216,62 @@
 	</div>	
    
 </div><!-- /page -->
-
-
-	
-</div>
- 
   <!-- End of  parameter Page  ------------------------------------------------------------------------------->
   
   
-		
-<script src="js/remote_pi.js"></script>
-<script type="text/javascript" src="cordova.js"></script>
-<script type="text/javascript" src="js/jquery.jcryption.3.1.0.js"></script>
- 
   
+ <!-- Sensor data Page ---------------------------------------------------------------------------------> 
+ <div data-role="page" id="sensor_data">
+	<div data-role="header" data-position="fixed">
+		<a href="#data_page"  data-role="button" data-icon="arrow-l" data-transition="fade">Back</a>
+		<h1 id="sensor_data_header">Sensor:</h1>
+	</div>
+	<div role="main" class="ui-content" data-theme='a'>
+		<div>
+					<label>
+						<span>Sensor label</span>
+						<input placeholder="Enter a label for this sensor" type="text" id="sensor_data_label" tabindex="4" value="" required>
+					</label>
+		</div>
+		
+		<div> 
+			<a href="#" data-role="button" id="save_sensor_label" data-icon="lock" >Save</a>
+		</div>
+	</div>
+	
+</div>
+ 
+<!-- End of  sensor data Page  ------------------------------------------------------------------------------->
+ 
+ 
+ 
+<script type="text/javascript" src="js/jquery.jcryption.3.1.0.js"></script>  
+<script type="text/javascript" src="js/json_encrypted_API.js"></script> 
+
+<script type="text/javascript" src="js/remote_pi.js"></script>
+
+ 
+ 
  <!-- 
-	<script src="js/remote_pi_APP.js"></script>
+	 
+	<script src='js/cordova.js'></script>
+  	<script src="js/remote_pi_APP.js"></script>
 	<script type="text/javascript" charset="utf-8" src="plugins/io.litehelpers.cordova.sqlite/www/SQLitePlugin.js"></script>
 	
-	<script src="js/remote_pi_WEB.js"></script> 
  -->
- <script type="text/javascript">
+<script type="text/javascript">
  var ua = navigator.userAgent.toLowerCase();
 var isAndroid = ua.indexOf("android") > -1; //&& ua.indexOf("mobile");
 if(isAndroid) {
-	document.writeln("<script src='js/remote_pi_APP.js'><\/script>");
+	document.writeln("<script src='cordova.js'><\/script>");
 	document.writeln("<script type='text/javascript' charset='utf-8'  src='plugins/io.litehelpers.cordova.sqlite/www/SQLitePlugin.js'><\/script>");
+	document.writeln("<script type='text/javascript' src='js/remote_pi_APP.js'><\/script>");
 }
 else {
 	document.writeln("<script type='text/javascript' src='js/remote_pi_WEB.js'><\/script>");
 }
 </script>
  
- <script src="js/json_encrypted_API.js"></script>   
- 
- 
+  
 </body>
 </html>

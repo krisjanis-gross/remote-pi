@@ -4,11 +4,24 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 'On');
 
+require_once("static_db.php");
+$static_db = open_static_data_db();
 
-print ("asdf :) ");
+$results = $static_db->query('SELECT * FROM sensor_names');
+while ($row = $results->fetchArray()) {
+	var_dump($row);
+}
 
-phpinfo();
+print("<hr>");
+$results = $static_db->query("INSERT OR IGNORE INTO sensor_names(id) VALUES('DHT11_TEMP');");
+$results = $static_db->query('UPDATE sensor_names SET sensor_name = "DHT_Temperature" WHERE id = "DHT11_TEMP";');
 
+$results = $static_db->query('SELECT * FROM sensor_names');
+while ($row = $results->fetchArray()) {
+	var_dump($row);
+}
+
+//UPDATE  `sensor_names` SET  `sensor_name` =  "asdf" WHERE  `id` = "28-031501c40dff";
 
 /*
 require_once("static_db.php");
