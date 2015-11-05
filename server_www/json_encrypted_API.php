@@ -1,6 +1,6 @@
 <?php 
-//ini_set('display_errors',1);
-//error_reporting(E_ALL);
+ini_set('display_errors',1);
+error_reporting(E_ALL);
 
 
 //var_dump($_POST);
@@ -58,7 +58,7 @@ if ($request_action == "action1")
 	
 }
 
-if ($request_action == "get_realtime_data")
+if ($request_action == "get_realtime_data" or  $request_action == "get_realtime_data_series_increment")
 {
 	$response_code = "OK";
 

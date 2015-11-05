@@ -9,6 +9,8 @@ var global_single_selected_sensor_id = "";
 var reload_interval = 60000; // 1 minute = 60 000 miliseconds
 var global_parameter_id = 0;
 var password; 
+var chart;
+var previous_data_timestamp = 0;
 
 $(document).ready(function()
 	    { var refreshId = setInterval(function()
@@ -179,9 +181,11 @@ function get_realtime_data ()
 	var data_to_server =  "";
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 	
-	// process result. Load data in UI.
+}
+
+function get_realtime_data_callback (data_from_server) {
 	if (data_from_server.response_code == "OK") {
 		  var items = [];
 		  $.each(data_from_server.response_data, function(key, val) {
@@ -229,8 +233,13 @@ function refresh_control_buttons ()
 	var data_to_server =  "";
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 	
+	
+	
+}
+
+function refresh_control_buttons_callback (data_from_server) {
 	// process result. Load data in UI.
 	if (data_from_server.response_code == "OK") {
 		var items = [];
@@ -268,9 +277,7 @@ function refresh_control_buttons ()
 			 
 		
 	}
-	
 }
-
 
 function refresh_triggers ()
 {
@@ -283,76 +290,82 @@ function refresh_triggers ()
 	var data_to_server =  "";
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 	
-	if (data_from_server.response_code == "OK") {
-	var items = [];
-	var parameter_array = [];
-	  $.each(data_from_server.response_data, function(key, val) {
-			
-	  var parameters_html = "<br/><span>Trigger parameters:";
-	  //alert(typeof(val.parameters));
-	  if( val.parameters != null ){
-		$.each(val.parameters, function(parameter_id, parameter_data)  {
-				parameters_html = parameters_html + '<a id="parameter_' + parameter_id + '" class="ui-btn">'+ parameter_data.name + ' = ' + parameter_data.par_value +'</a> ';
-					
-				var parameter_object = {
-						'parameter_id' : parameter_id,
-						'parameter_name' : parameter_data.name,
-						'parameter_value' : parameter_data.par_value
-					};
-				parameter_array.push(parameter_object);
-					
-					
-				});
-			}
-			
-			parameters_html = parameters_html + "</span>";
-			
-		    items.push('<li><label><span>' + val.description + '</span></label>' + 
-		    '<select name="slider" id="trigger-flip-' + key + '" data-role="slider" data-theme="a">' +
-		    '<option value="0">Off</option>' + 
-		    '<option value="1">On</option> ' +
-		    '</select>' + 
-		    parameters_html + 
-		    '</li>');
-		  });
-		 
-		  //$('#trigger_tab').html(items.join(''));
-		  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
-		  
-		  $.each(data_from_server.response_data, function(key, val) {
-				  $('#trigger-flip-' + key).slider();
-				  if ( val.state == 1) $('#trigger-flip-' + key).val(1);
-				  if ( val.state == 0) $('#trigger-flip-' + key).val(0);
-				  $('#trigger-flip-' + key).slider('refresh');										
-			  });
-		  
-		  $("#trigger_tab").trigger("create");
-					
-		  $.each(data_from_server.response_data, function(key, val) {
-				$( "#trigger-flip-" + key ).bind( "change", {key : key}, 
-														function(event) {
-															toggle_trigger( event.data.key );
-														});
-
-			 });
-			
-			for(var i in parameter_array)
-				{
-				//alert(parameter_array[i]);
-				var this_par = parameter_array[i];
-				var par_id = this_par['parameter_id'];
-				var par_name = this_par['parameter_name'];
-				var par_value = this_par['parameter_value'];
-				
-				$( "#parameter_" + par_id ).bind( "click", {id:par_id , name:par_name , value:par_value },  
-														function(event) {
-															edit_parameter(event.data.id, event.data.name, event.data.value)
-														});
-				}
-	}		
+		
 }
+
+function refresh_triggers_callback (data_from_server) {
+	if (data_from_server.response_code == "OK") {
+		var items = [];
+		var parameter_array = [];
+		  $.each(data_from_server.response_data, function(key, val) {
+				
+		  var parameters_html = "<br/><span>Trigger parameters:";
+		  //alert(typeof(val.parameters));
+		  if( val.parameters != null ){
+			$.each(val.parameters, function(parameter_id, parameter_data)  {
+					parameters_html = parameters_html + '<a id="parameter_' + parameter_id + '" class="ui-btn">'+ parameter_data.name + ' = ' + parameter_data.par_value +'</a> ';
+						
+					var parameter_object = {
+							'parameter_id' : parameter_id,
+							'parameter_name' : parameter_data.name,
+							'parameter_value' : parameter_data.par_value
+						};
+					parameter_array.push(parameter_object);
+						
+						
+					});
+				}
+				
+				parameters_html = parameters_html + "</span>";
+				
+			    items.push('<li><label><span>' + val.description + '</span></label>' + 
+			    '<select name="slider" id="trigger-flip-' + key + '" data-role="slider" data-theme="a">' +
+			    '<option value="0">Off</option>' + 
+			    '<option value="1">On</option> ' +
+			    '</select>' + 
+			    parameters_html + 
+			    '</li>');
+			  });
+			 
+			  //$('#trigger_tab').html(items.join(''));
+			  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
+			  
+			  $.each(data_from_server.response_data, function(key, val) {
+					  $('#trigger-flip-' + key).slider();
+					  if ( val.state == 1) $('#trigger-flip-' + key).val(1);
+					  if ( val.state == 0) $('#trigger-flip-' + key).val(0);
+					  $('#trigger-flip-' + key).slider('refresh');										
+				  });
+			  
+			  $("#trigger_tab").trigger("create");
+						
+			  $.each(data_from_server.response_data, function(key, val) {
+					$( "#trigger-flip-" + key ).bind( "change", {key : key}, 
+															function(event) {
+																toggle_trigger( event.data.key );
+															});
+
+				 });
+				
+				for(var i in parameter_array)
+					{
+					//alert(parameter_array[i]);
+					var this_par = parameter_array[i];
+					var par_id = this_par['parameter_id'];
+					var par_name = this_par['parameter_name'];
+					var par_value = this_par['parameter_value'];
+					
+					$( "#parameter_" + par_id ).bind( "click", {id:par_id , name:par_name , value:par_value },  
+															function(event) {
+																edit_parameter(event.data.id, event.data.name, event.data.value)
+															});
+					}
+		}
+	
+}
+
 
 function toggle_trigger (id) {
 	if($('#trigger-flip-' + id).val()==0) set_trigger(id,"0");
@@ -368,7 +381,7 @@ function set_trigger (trigger_id, command )
 		};
 	
 	// send the command
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 
 }
 
@@ -390,7 +403,7 @@ function command_pin (pin_id, command ) {
 		};
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 
 }
 
@@ -449,115 +462,112 @@ function show_history (change_time_interval) {
 		};
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
+}
 	
-	
-	
-	
-	
-if (data_from_server.response_code == "OK") {	   
-	
-	    		Highcharts.setOptions({                                            // This is for all plots, change Date axis to local timezone
-	    	          global : {
-	    	              useUTC : false
-	    	          }
-	    	      });
-	    		
-	    		 chart = new Highcharts.Chart({
-	    	            chart: {
-	    	                renderTo: 'historical_data_tab',
-	    	                type: 'spline',
-							events: {
-								load: function () {
+function show_history_callback(data_from_server) {
 
-								// set up the updating of the chart each second
-								var series ;
-								var chart = this;
-								var previous_data_timestamp = 0;
-								
-								
-								setInterval(function () {
-																if ((active_page == "historical_data" ) && refresh_enabled ) {
-																var x = (new Date()).getTime(); // current time
-																
-																//y = Math.random() * 20;
-																//series.addPoint([x, y], true, true);
-															
-																
-																var action = "get_realtime_data";	
-																var data_to_server =  "";
-																
-																// get data from server
-																var data_from_server = json_encrypted_request (action,data_to_server);
-																
-																// process result. Load data in UI.
-																if (data_from_server.response_code == "OK") {
-																	  var data_timestamp;
-																	  var add_this_data = true;
-																	  $.each(data_from_server.response_data, function(key, val) {
-																		  
-																		  if (key == "__data_timestamp___") {
-																					data_timestamp = val.value;
-																					if (data_timestamp == previous_data_timestamp ) {
-																						//alert ("ingore this data");
-																						add_this_data = false;
-																						
-																					}
-																					previous_data_timestamp = data_timestamp;
-																						
-																				}
-																		  else {
-																				  if (add_this_data) {
-																				  var y = parseFloat(val.value);
-																				  series = chart.get(key);
-																				  series.addPoint([x, y], true, false);
-																				}
-																			}
-																	  });
-																	 
-																
-																
-																}
+	if (data_from_server.response_code == "OK") {	   
+		
+		    		Highcharts.setOptions({                                            // This is for all plots, change Date axis to local timezone
+		    	          global : {
+		    	              useUTC : false
+		    	          }
+		    	      });
+		    		
+		    		 chart = new Highcharts.Chart({
+		    	            chart: {
+		    	                renderTo: 'historical_data_tab',
+		    	                type: 'spline',
+								events: {
+									load: function () {
 
-																									
-																}
-															
-														}, 1000);
-								
-								
-								
-								
+									// set up the updating of the chart each second
+	
+									setInterval(function () {
+																	if ((active_page == "historical_data" ) && refresh_enabled ) {
+																																																			
+																	var action = "get_realtime_data_series_increment";	
+																	var data_to_server =  "";
+																	
+																	// get data from server
+																	var data_from_server = json_encrypted_request (action,data_to_server,true);
+																
+
+																										
+																	}
+																
+															}, 2000);
+									
+									
+									
+									
+									}
 								}
-							}
-	    	            },
-	    	            title: {
-	    	                text: 'Graphs'
-	    	            },
-	    	            subtitle: {
-	    	                text: ' enjoy the show  '
-	    	            },
-	    	            xAxis: {
-	    				type: 'datetime',
-	    					dateTimeLabelFormats: {
-	    					day: '%e %b \ %y <br/> %H:%M:%S'
-	    					},
-	    				},
-	    	            yAxis: {
-	    	                title: {
-	    	                    text: 'measurement'
-	    	                },
-	    	              //  min: 0
-	    	            },
+		    	            },
+		    	            title: {
+		    	                text: 'Graphs'
+		    	            },
+		    	            subtitle: {
+		    	                text: ' enjoy the show  '
+		    	            },
+		    	            xAxis: {
+		    				type: 'datetime',
+		    					dateTimeLabelFormats: {
+		    					day: '%e %b \ %y <br/> %H:%M:%S'
+		    					},
+		    				},
+		    	            yAxis: {
+		    	                title: {
+		    	                    text: 'measurement'
+		    	                },
+		    	              //  min: 0
+		    	            },
 
-	    	            
-	    	            series: data_from_server.response_data
-	    	        });
+		    	            
+		    	            series: data_from_server.response_data
+		    	        });
 
-	//    });
+		//    });
+		
+	}
 	
 }
-}
+
+function increment_series_callback (data_from_server) {
 	
+	// process result. Load data in UI.
+	if (data_from_server.response_code == "OK") {
+		  var data_timestamp;
+		  var add_this_data = true;
+		  var series;
+		  var x = (new Date()).getTime(); // current time
+		  $.each(data_from_server.response_data, function(key, val) {
+			  
+			  if (key == "__data_timestamp___") {
+						data_timestamp = val.value;
+						if (data_timestamp == previous_data_timestamp ) {
+							//alert ("ingore this data");
+							add_this_data = false;
+							
+						}
+						previous_data_timestamp = data_timestamp;
+							
+					}
+			  else {
+					  if (add_this_data) {
+					  var y = parseFloat(val.value);
+					  series = chart.get(val.sensor_name);
+					  series.addPoint([x, y], true, false);
+					}
+				}
+		  });
+		 
+	
+	
+	}
+}
+
 
 function change_tab (active_page) {
 	// hide all tabs
@@ -646,7 +656,7 @@ function save_parameter () {
 		};
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 	
 	refresh_triggers();
 	$( "#popupParameter_change" ).popup( "close" );
@@ -665,7 +675,7 @@ function set_sensor_label (id, label) {
 		};
 	
 	// get data from server
-	var data_from_server = json_encrypted_request (action,data_to_server);
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
 	
 	get_realtime_data();
 	$.mobile.changePage("#data_page",{ transition: "fade"});

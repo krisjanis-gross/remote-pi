@@ -16,7 +16,7 @@ $('#test_button').click(function() {
 
 
 
-function json_encrypted_request(request_action, data)
+function json_encrypted_request(request_action, data,async = false)
 {
 	var return_value;
 	
@@ -39,25 +39,45 @@ function json_encrypted_request(request_action, data)
 		url: SERVER_API_URL,
 		dataType: "json",
 		type: "POST",
-		async: false,
+		async: async,
 		data: {
 			jCryption: encryptedString
-		},
-		success: function(response) {
-			return_value =  response.rawdata;
-			return_value = $.jCryption.decrypt(return_value, password);
 		},
 		error:(function(jqXHR, textStatus, errorThrown) {
 			//console.log("error " + textStatus);
 			alert("error " + textStatus);
 			//console.log("incoming Text " + jqXHR.responseText);
 			alert("incoming Text " + jqXHR.responseText);
-		})
+		}),
+		success: function(response) {
+			
+			if (!async) {
+				//alert(async);
+				return_value =  response.rawdata;
+				return_value = $.jCryption.decrypt(return_value, password);
+			}
+			else // async call. call function depending on request_action
+				{
+				//alert (request_data_to_server.request_action);
+				return_value =  response.rawdata;
+				return_value = $.jCryption.decrypt(return_value, password);
+				return_value = JSON.parse(return_value);
+				
+				if (request_data_to_server.request_action == "get_historical_data") show_history_callback(return_value);
+				
+				if (request_data_to_server.request_action == "get_GPIO_list")	refresh_control_buttons_callback(return_value);
+				
+				if (request_data_to_server.request_action == "get_realtime_data")	get_realtime_data_callback(return_value);
+				
+				if (request_data_to_server.request_action == "get_trigger_list")	refresh_triggers_callback(return_value);
+				
+				if (request_data_to_server.request_action == "get_realtime_data_series_increment")	increment_series_callback(return_value);
+				
+				
+			}
+		}
+
 	});
 	
-	
-	return JSON.parse(return_value);
-	
-	
-
+	if (!async) return JSON.parse(return_value);
 }
