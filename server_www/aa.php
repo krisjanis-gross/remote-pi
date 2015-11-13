@@ -4,6 +4,14 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 'On');
 
+print("before:");
+var_dump($_POST["TEST_VALUE"]);
+print("--/////////---");
+$_POST["TEST_VALUE"] = "value_set_by_php_code";
+print("after:");
+var_dump($_POST["TEST_VALUE"]);
+
+/*
 require_once("static_db.php");
 $static_db = open_static_data_db();
 
@@ -20,7 +28,7 @@ $results = $static_db->query('SELECT * FROM sensor_names');
 while ($row = $results->fetchArray()) {
 	var_dump($row);
 }
-
+*/
 //UPDATE  `sensor_names` SET  `sensor_name` =  "asdf" WHERE  `id` = "28-031501c40dff";
 
 /*

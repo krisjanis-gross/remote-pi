@@ -3,22 +3,80 @@
 var WEB_Browser = true;
 var page;
 
-function web_log_in () {
-	var login_result = send_username_and_password();
+$(document).ready(function()
+	    { var refreshId = setInterval(function()
+	        {
+	    	perform_refresh ();
+	        }, reload_interval);
+	    
+	    // jcription? 
+	    target_URL =  window.location.host;
+	    password = $.jCryption.encrypt("remote_pi", "889977665");
+	    jCription_handshake();
+	    
+	    
+		$("#header_1").html(target_URL);
+		$("#app_exit").hide();
+		$("#web_logoff").show();
+		$("#export_link").show();
+		$.mobile.changePage("#web_login",{ transition: "fade"});
+		
+		setTimeout(check_for_session_on_server, 1000); 
+	    
+    });
+
+
+
+
+$('#logon_button').click(try_to_log_in);
+
+
+logoff
+function try_to_log_in () {
 	
-	//alert(login_result);
+	 $('#header_1').html( $('#header_1').html() + ' sending login data' );
+	 
+	 var password = $('#login_password').val();
+	 
+		var action = "try_to_log_in";	
+		var data_to_server =  {
+				'password' : password
+			};
+		
+		// get data from server
+		var data_from_server = json_encrypted_request (action,data_to_server,true);
 	
-	if (login_result == "login_good") {
-		$.mobile.changePage("#data_page",{ transition: "fade"});
-		get_realtime_data ();
+}
+
+function try_to_log_in_callback (data_from_server) {
+	if (data_from_server.response_code == "OK") {
+		 //$('#header_1').html( target_URL + ' session found!' );
+		 $.mobile.changePage("#data_page",{ transition: "fade"});
+		 get_realtime_data ();
 	}
-	else alert (login_result);	
+	else  {
+		 alert(data_from_server.response_data);
+	}
 	
+	
+}
+
+function logoff () {
+	
+	$('#header_1').html( $('#header_1').html() + '  logoff' );
+	  
+	var action = "logoff";	
+	var data_to_server = "";
+		
+		// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
+	
+	$.mobile.changePage("#web_login",{ transition: "fade"});
 }
 
 
 
-
+/*
 
 $( "#list" ).pagecontainer({
   create: function( event, ui ) {
@@ -31,48 +89,48 @@ $(document).on('pageinit', function() {
 	
 	  //alert('Active page\'s ID: ' + page);
 	  if (page == "list")   { 
-		  $.mobile.changePage("#web_login",{ transition: "fade"});
-		 // $( ":mobile-pagecontainer" ).pagecontainer( "change", "#web_login" );
-		  
-		  page = "";
+					 
+					 // $( ":mobile-pagecontainer" ).pagecontainer( "change", "#web_login" );
+					  
+				page = "";
+				
+
 	  }
-	
-	target_URL =  window.location.host;
-	jCription_handshake();
-	
-	$("#header_1").html(target_URL);
-	$("#app_exit").hide();
-	$("#web_logoff").show();
-	$("#export_link").show();
-	
-	
-	
-	var connection_check_statuss = check_if_logged_in();
-
-	//alert (connection_check_statuss);
-/*
-	if (connection_check_statuss == "login_good") {
-		// go to the app.
-		$.mobile.changePage("#data_page",{ transition: "fade"});
-		get_realtime_data ();
-	}
-*/
 });
-
+*/
 /*
 $(document).on('pageshow', '#web_login', function(){ 
      $('#login_password').focus();
 });
 */
 
-function logoff () {
-	var URL = "http://" + target_URL + "/app_login_check.php?logout";
+
+
+
+function check_for_session_on_server (){
+	// checks if there is a session already on the server. 
+	// for example when browser is restarted and the server session is still running fine
+	// then we can continue to work with that session.
 	
-	var request = $.ajax({
-	  url: URL,
-	  async: false
-	});
+	 $('#header_1').html( $('#header_1').html() + ' [checking for existing session...]' );
+	 
+	var action = "check_session_data";	
+	var data_to_server =  "";
+		
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
+	 
 	
-	$.mobile.changePage("#web_login",{ transition: "fade"});
-	//$( ":mobile-pagecontainer" ).pagecontainer( "change", "#web_login" );
+}
+
+function check_for_session_on_server_callback (data_from_server) {
+	if (data_from_server.response_code == "OK") {
+		 $('#header_1').html( target_URL + ' session found!' );
+		 $.mobile.changePage("#data_page",{ transition: "fade"});
+		 get_realtime_data ();
+	}
+	else  {
+		 $('#header_1').html( target_URL + ' Please log in!' );
+	}
+	
 }

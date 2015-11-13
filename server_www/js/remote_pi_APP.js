@@ -4,6 +4,18 @@ var dbCreated = false;
 var WEB_Browser = false;
 var auto_connet_to_target = false;
 
+$(document).ready(function()
+	    { var refreshId = setInterval(function()
+	        {
+	    	perform_refresh ();
+	        }, reload_interval);
+	    
+	    // jcription? 
+	    password = $.jCryption.encrypt("remote_pi", "889977665");
+    
+	    
+    });
+
 var app = {
     // Application Constructor
     initialize: function() {

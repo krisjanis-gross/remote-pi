@@ -12,17 +12,7 @@ var password;
 var chart;
 var previous_data_timestamp = 0;
 
-$(document).ready(function()
-	    { var refreshId = setInterval(function()
-	        {
-	    	perform_refresh ();
-	        }, reload_interval);
-	    
-	    // jcription? 
-	    password = $.jCryption.encrypt("remote_pi", "889977665");
-    
-	    
-    });
+
 
 function jCription_handshake () {
 	//alert (target_URL);
@@ -107,28 +97,7 @@ $('#history_cal').click(function() {
 });
 
 
-function check_if_logged_in () {
-	
-	var URL = "http://" + target_URL + "/app_login_check.php";
-	var return_value;
-	var async_connection = false;
-	
-	var request = $.ajax({
-	  url: URL,
-	  async: async_connection
-	});
-	 
-	request.done(function( msg ) {
-		return_value = msg;
-		//alert( "Request success: " + msg );
-	});
-	 
-	request.fail(function( jqXHR, textStatus ) {
-		return_value =  "Request failed: " + textStatus ;
-	});
-	
-	return return_value;
-}
+
 
 function send_username_and_password () {
 	var URL = "http://" + target_URL + "/app_login_check.php";
@@ -498,9 +467,6 @@ function show_history_callback(data_from_server) {
 																	}
 																
 															}, 2000);
-									
-									
-									
 									
 									}
 								}

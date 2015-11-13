@@ -1,23 +1,8 @@
-// example
-/*
-$('#test_button').click(function() {
+
+function json_encrypted_request(request_action, data, async )
+{  
+	if (typeof(async)==='undefined') async = false;
 	
-	var data_to_server =  {
-			'aaa' : "111",
-			'bbb' : "222"
-		};
-	var data_from_server = json_encrypted_request ("action1",data_to_server);
-	
-	alert(data_from_server.response_code);
-	
-});
-
-*/
-
-
-
-function json_encrypted_request(request_action, data,async = false)
-{
 	var return_value;
 	
 	var request_data_to_server = {
@@ -51,33 +36,47 @@ function json_encrypted_request(request_action, data,async = false)
 		}),
 		success: function(response) {
 			
-			if (!async) {
-				//alert(async);
-				return_value =  response.rawdata;
-				return_value = $.jCryption.decrypt(return_value, password);
+			if (response.error_message == "Jcryption_handshake_required") {
+				alert ("Handshake is missing. Doing the handshake now. Please repeat whatever you were doing.");
+				jCription_handshake();
+				// call the function again? 
 			}
-			else // async call. call function depending on request_action
+			else 
 				{
-				//alert (request_data_to_server.request_action);
-				return_value =  response.rawdata;
-				return_value = $.jCryption.decrypt(return_value, password);
-				return_value = JSON.parse(return_value);
-				
-				if (request_data_to_server.request_action == "get_historical_data") show_history_callback(return_value);
-				
-				if (request_data_to_server.request_action == "get_GPIO_list")	refresh_control_buttons_callback(return_value);
-				
-				if (request_data_to_server.request_action == "get_realtime_data")	get_realtime_data_callback(return_value);
-				
-				if (request_data_to_server.request_action == "get_trigger_list")	refresh_triggers_callback(return_value);
-				
-				if (request_data_to_server.request_action == "get_realtime_data_series_increment")	increment_series_callback(return_value);
-				
-				
-			}
+					
+					
+					return_value =  response.rawdata;
+					return_value = $.jCryption.decrypt(return_value, password);
+					return_value = JSON.parse(return_value);
+					
+					// check user login status
+					
+					
+					
+					if (async) 
+						{
+						
+						
+						if (request_data_to_server.request_action == "get_historical_data") show_history_callback(return_value);
+						
+						if (request_data_to_server.request_action == "get_GPIO_list")	refresh_control_buttons_callback(return_value);
+						
+						if (request_data_to_server.request_action == "get_realtime_data")	get_realtime_data_callback(return_value);
+						
+						if (request_data_to_server.request_action == "get_trigger_list")	refresh_triggers_callback(return_value);
+						
+						if (request_data_to_server.request_action == "get_realtime_data_series_increment")	increment_series_callback(return_value);
+						
+						if (request_data_to_server.request_action == "check_session_data")	check_for_session_on_server_callback(return_value);
+						
+						if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
+						
+						
+					}
+				}
 		}
 
 	});
 	
-	if (!async) return JSON.parse(return_value);
+	if (!async) return return_value;
 }

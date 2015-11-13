@@ -37,7 +37,7 @@ for dir in dirList:
 
 		
 	the_temp_value = read_temp()
-	return_value = return_value + (("%s\"%s\":\"%f\"" ) % (json_val_seperator, dir, the_temp_value))
+	return_value = return_value + (("%s\"%s\":\"%.2f\"" ) % (json_val_seperator, dir, the_temp_value))
 	json_val_seperator = ","
 
 # return_value = "{" + return_value + "}"
