@@ -4,13 +4,37 @@
 error_reporting(E_ALL);
 ini_set('display_errors', 'On');
 
+
+
+
+
+
+require_once("static_db.php");
+$static_db = open_static_data_db();
+
+$results = $static_db->query("insert into login_password values ('harvestgenie');");
+
+
+
+
+$results = $static_db->query('SELECT * FROM login_password');
+while ($row = $results->fetchArray()) {
+	var_dump($row);
+}
+
+
+
+
+
+
+/*
 print("before:");
 var_dump($_POST["TEST_VALUE"]);
 print("--/////////---");
 $_POST["TEST_VALUE"] = "value_set_by_php_code";
 print("after:");
 var_dump($_POST["TEST_VALUE"]);
-
+*/
 /*
 require_once("static_db.php");
 $static_db = open_static_data_db();

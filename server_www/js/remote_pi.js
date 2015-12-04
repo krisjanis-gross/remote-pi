@@ -11,6 +11,7 @@ var global_parameter_id = 0;
 var password; 
 var chart;
 var previous_data_timestamp = 0;
+var global_selected_trigger=0;
 
 
 
@@ -26,6 +27,8 @@ function jCription_handshake () {
 	
 }
 	
+
+
 $('#realtime_button').click(get_realtime_data);
 $('#history_button').click(function() {
   global_single_selected_sensor_id = '';
@@ -55,6 +58,15 @@ $('#save_sensor_label').click(function() {
 	
 	});
 	
+$('#save_trigger').click(function() {
+	//global_single_selected_sensor_id = selected_sensor_ID;
+    var desc = $('#trigger_description').val();
+	//alert ('setting sensor  '  + global_single_selected_sensor_id +  ' name to ' + new_label );
+	
+	save_trigger (global_selected_trigger,desc);
+	
+	});
+
 
 $('#action_button').click(refresh_control_buttons);
 $('#triggers_button').click(refresh_triggers);
@@ -294,12 +306,13 @@ function refresh_triggers_callback (data_from_server) {
 			    '<option value="0">Off</option>' + 
 			    '<option value="1">On</option> ' +
 			    '</select>' + 
+			    '<div><a href="#"  class="ui-btn ui-btn-inline ui-icon-edit ui-btn-icon-left" id="edit_trigger' + key + '" >Edit Trigger</a></div>' +
 			    parameters_html + 
 			    '</li>');
 			  });
 			 
 			  //$('#trigger_tab').html(items.join(''));
-			  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '</ul>');
+			  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '<br/><li><a href="#" data-role="button" id="new_trigger" data-icon="plus">New Trigger</a></li></ul>');
 			  
 			  $.each(data_from_server.response_data, function(key, val) {
 					  $('#trigger-flip-' + key).slider();
@@ -309,12 +322,25 @@ function refresh_triggers_callback (data_from_server) {
 				  });
 			  
 			  $("#trigger_tab").trigger("create");
+			  
+			  // new trigger button 
+			  $('#new_trigger').bind("click" , function() {
+				  open_trigger_details(0,"");
+				})
+				
+
+			
 						
 			  $.each(data_from_server.response_data, function(key, val) {
 					$( "#trigger-flip-" + key ).bind( "change", {key : key}, 
 															function(event) {
 																toggle_trigger( event.data.key );
 															});
+					 // edit trigger buttons.
+					$( "#edit_trigger" + key ).bind( "click", {trigger_id:key , trigger_description:val.description },  
+							function(event) {
+								open_trigger_details(event.data.trigger_id,event.data.trigger_description)
+							});
 
 				 });
 				
@@ -543,6 +569,8 @@ function change_tab (active_page) {
 	$("#trigger_tab").hide();
 	$("#history_graph_menus").hide();
 	
+	
+	
 	if (active_page == "historical_data"){
 		$("#history_graph_menus").show();
 		$("#historical_data_tab").show();
@@ -553,6 +581,7 @@ function change_tab (active_page) {
 	}	
 	if (active_page == "triggers"){
 		$("#trigger_tab").show();
+		
 	}	
 	if (active_page == "pins"){
 		$("#pins_tab").show();
@@ -647,3 +676,36 @@ function set_sensor_label (id, label) {
 	$.mobile.changePage("#data_page",{ transition: "fade"});
 }
 
+function open_trigger_details(id,description){
+	global_selected_trigger = id;
+	// set all values...
+	if (id == 0) // new trigger
+		{
+		
+		$("#trigger_data_header").html("New trigger");
+
+		}
+	
+	else {
+		$("#trigger_data_header").html("Trigger ID: " + id);
+
+	}
+	$('#trigger_description').val(description);
+	
+	$.mobile.changePage("#trigger_data",{ transition: "fade"});
+}
+function save_trigger (id, label) {
+	
+
+	var action = "save_trigger";	
+	var data_to_server =  {
+			'trigger_id' : id, 
+			'description' : label
+		};
+	
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
+	
+	refresh_triggers();
+	$.mobile.changePage("#data_page",{ transition: "fade"});
+}

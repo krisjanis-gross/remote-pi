@@ -56,21 +56,33 @@ function json_encrypted_request(request_action, data, async )
 					if (async) 
 						{
 						
-						
-						if (request_data_to_server.request_action == "get_historical_data") show_history_callback(return_value);
-						
-						if (request_data_to_server.request_action == "get_GPIO_list")	refresh_control_buttons_callback(return_value);
-						
-						if (request_data_to_server.request_action == "get_realtime_data")	get_realtime_data_callback(return_value);
-						
-						if (request_data_to_server.request_action == "get_trigger_list")	refresh_triggers_callback(return_value);
-						
-						if (request_data_to_server.request_action == "get_realtime_data_series_increment")	increment_series_callback(return_value);
-						
-						if (request_data_to_server.request_action == "check_session_data")	check_for_session_on_server_callback(return_value);
-						
-						if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
-						
+						// check for login error before anything else
+						if (return_value.response_code == "Login not good") {
+								if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
+								else {
+										if (request_data_to_server.request_action == "check_session_data" )	check_for_session_on_server_callback(return_value);
+										else{
+											alert("Please log in.");
+											if (WEB_Browser) $.mobile.changePage("#web_login",{ transition: "fade"});
+											else $.mobile.changePage("#target_form",{ transition: "fade"});
+										}
+								}
+						}
+						else { // process callback fucntions
+								if (request_data_to_server.request_action == "get_historical_data") show_history_callback(return_value);
+								
+								if (request_data_to_server.request_action == "get_GPIO_list")	refresh_control_buttons_callback(return_value);
+								
+								if (request_data_to_server.request_action == "get_realtime_data")	get_realtime_data_callback(return_value);
+								
+								if (request_data_to_server.request_action == "get_trigger_list")	refresh_triggers_callback(return_value);
+								
+								if (request_data_to_server.request_action == "get_realtime_data_series_increment")	increment_series_callback(return_value);
+								
+								if (request_data_to_server.request_action == "check_session_data")	check_for_session_on_server_callback(return_value);
+								
+								if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
+						}
 						
 					}
 				}

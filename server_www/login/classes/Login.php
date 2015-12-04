@@ -26,7 +26,9 @@ class Login
     public function __construct()
     {
         // create/read session, absolutely necessary
-        session_start();
+    	if (session_status() == PHP_SESSION_NONE) {
+    		session_start();
+		}
 
         // check the possible login actions:
         // if user tried to log out (happen when user clicks logout button)
@@ -52,6 +54,27 @@ class Login
             $this->errors[] = "Password field was empty.";
         } elseif ( !empty($_POST['user_password'])) {
 
+        	
+        	
+        	
+        	$access_password  = apc_fetch('access_password');
+        	
+        	
+        	if (!$access_password) {
+        		// get password from static DB
+        		$static_db = open_static_data_db();
+        		
+        		$results = $static_db->query('SELECT * FROM login_password');
+        		while ($row = $results->fetchArray()) {
+        			$access_password = $row['Password'];
+        			
+        		}
+        		apc_store('access_password', $access_password);
+        	}
+        	
+        	
+        	//error_log("-------------------------------------" . $access_password);
+        	
             // create a database connection, using the constants from config/db.php (which we loaded in index.php)
            // $this->db_connection = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
@@ -82,7 +105,7 @@ class Login
                     // using PHP 5.5's password_verify() function to check if the provided password fits
                     // the hash of that user's password
                  //   if (password_verify($_POST['user_password'], $result_row->user_password_hash)) {
-                    if ($_POST['user_password'] == "harvestgenie" ) {
+                    if ($_POST['user_password'] == $access_password ) {
 
                         // write user data into PHP SESSION (a file on your server)
                         $_SESSION['user_name'] = "harvestgenie";

@@ -41,7 +41,7 @@
 		<div>
 					<label>
 						<span>Password</span>
-						<input placeholder="Enter your password" type="password" id="login_password" tabindex="4" value="harvestgenie" required>
+						<input placeholder="Enter your password" type="password" id="login_password" tabindex="4" value="" required>
 					</label>
 		</div>
 		
@@ -122,6 +122,21 @@
 <div data-role="page" id="data_page">
 
 <div data-role="panel" id="menu-panel"  data-display="overlay" data-position="left">
+	<div>
+	    <ul data-role="listview" id="history_graph_menus">
+				<li data-icon="clock"><a href="#" id="history_h" data-rel="close" >hour</a></li>
+				<li data-icon="clock"><a href="#" id="history_3h" data-rel="close">3 hours</a></li>
+				<li data-icon="clock"><a href="#" id="history_6h" data-rel="close">6 hours</a></li>
+				<li data-icon="clock"><a href="#" id="history_d" data-rel="close">day</a></li>
+				<li data-icon="clock"><a href="#" id="history_3d" data-rel="close">3 days</a></li>
+				<li data-icon="clock"><a href="#" id="history_w" data-rel="close">week</a></li>
+				<li data-icon="clock"><a href="#" id="history_m" data-rel="close">month</a></li>	
+				<li data-icon="calendar"><a href="#" id="history_cal" data-rel="close"  >custom range</a></li>
+				<li style="display:none;" id="export_link" data-icon="action"><a onclick="export_data()" target="_blank" data-rel="close"  >export data</a></li>
+		</ul>
+	</div>	
+	
+	
     <div>
 	    <ul data-role="listview" id="refresh_menu">
 				<li  data-icon="refresh" ><a data-rel="close" id="refresh_text" href="#">Enable automatic reload</a></li>
@@ -137,19 +152,7 @@
 				<li data-icon="power"><a href="#" onclick="logoff()" data-transition="fade" >Logoff</a></li>
 		</ul>
 	</div>	
-	<div>
-	    <ul data-role="listview" id="history_graph_menus">
-				<li data-icon="clock"><a href="#" id="history_h" data-rel="close" >hour</a></li>
-				<li data-icon="clock"><a href="#" id="history_3h" data-rel="close">3 hours</a></li>
-				<li data-icon="clock"><a href="#" id="history_6h" data-rel="close">6 hours</a></li>
-				<li data-icon="clock"><a href="#" id="history_d" data-rel="close">day</a></li>
-				<li data-icon="clock"><a href="#" id="history_3d" data-rel="close">3 days</a></li>
-				<li data-icon="clock"><a href="#" id="history_w" data-rel="close">week</a></li>
-				<li data-icon="clock"><a href="#" id="history_m" data-rel="close">month</a></li>	
-				<li data-icon="calendar"><a href="#" id="history_cal" data-rel="close"  >custom range</a></li>
-				<li style="display:none;" id="export_link" data-icon="action"><a onclick="export_data()" target="_blank" data-rel="close"  >export data</a></li>
-		</ul>
-	</div>	
+
 </div><!-- /panel -->
 <!-- CONTENT -->
     <div data-role="content">
@@ -235,7 +238,7 @@
 		</div>
 		
 		<div> 
-			<a href="#" data-role="button" id="save_sensor_label" data-icon="lock" >Save</a>
+			<a href="#" data-role="button" id="save_sensor_label" data-icon="check" >Save</a>
 		</div>
 	</div>
 	
@@ -243,7 +246,30 @@
  
 <!-- End of  sensor data Page  ------------------------------------------------------------------------------->
  
+  <!-- Trigger  data Page ---------------------------------------------------------------------------------> 
+ <div data-role="page" id="trigger_data">
+	<div data-role="header" data-position="fixed">
+		<a href="#data_page"  data-role="button" data-icon="arrow-l" data-transition="fade">Back</a>
+		<h1 id="trigger_data_header">Trigger:</h1>
+	</div>
+	<div role="main" class="ui-content" data-theme='a'>
+		<div>
+					<label>
+						<span>Trigger desrciption</span>
+						<input placeholder="Enter a description for this trigger" type="text" id="trigger_description" tabindex="4" value="" required>
+					</label>
+		</div>
+		
+		<div> 
+			<a href="#" data-role="button" id="save_trigger" data-icon="check" >Save</a>
+		</div>
+	</div>
+	
+</div>
  
+<!-- End of  Trigger data Page  ------------------------------------------------------------------------------->
+
+
  
 <script type="text/javascript" src="js/jquery.jcryption.3.1.0.js"></script>  
 <script type="text/javascript" src="js/json_encrypted_API.js"></script> 

@@ -6,120 +6,86 @@
 //var_dump($_POST);
 //print ("<hr>");
 
+// Jcription things come first
+
 require_once 'jcription/sqAES.php';
 require_once 'jcription/jcryption.php';
 
 $jc = new JCryption('keys/rsa_1024_pub.pem', 'keys/rsa_1024_priv.pem');
 $jc->go();
 
-
 // check if there is valid sessin with session key stored
 if (!isset($_SESSION['jCryptionKey'])) // session key is missing. Send response that Jcryption handshake is needed
 {
-	
 	$response_to_client['error_message'] = "Jcryption_handshake_required";
-	//error_log("****************************************Jcryption_handshake_required");
 	print json_encode($response_to_client);
 	exit;
 }
 
-//error_log("****************************************Handshake OK");
-
 
 // decrypt data
 
-//header('Content-type: text/plain');
-//var_dump($_POST);
 $request_from_server_string = "";
  foreach ($_POST as $key => $value) {
             $request_from_server_string =  $key;
         }
         
-//var_dump($request_from_server_string);
 
 $request_from_server_array = json_decode($request_from_server_string, true);
-
-//var_dump($request_from_server_array);
-
 isset ($request_from_server_array['request_action']) ? $request_action = $request_from_server_array['request_action'] : $request_action = "";
-
 isset ($request_from_server_array['request_data'])? $request_data = $request_from_server_array['request_data'] : $request_data = "";
 
-//error_log("/////////////////////////////////////////////////////////" . $request_action);
+
+// Check if web client is logged in and authorized to do anything.
 
 
 
 
-
-// process login parameters before ligin handler is called
-if ($request_action == "try_to_log_in")
+// process login parameters before login handler is called
+if ($request_action == "try_to_log_in") // client is sending login credentials.
 {
 	$password = $request_data['password'];
-	error_log("//////////////////************************ trying to log in with password " . $password);
 	$_POST['user_password']=$password;
 	$_POST["login"] = true;
 	
-	//$response_to_client['response_code'] = $response_code;
-	//$response_to_client['response_data'] = "";
 }
 
 if ($request_action == "logoff")
 {
-	
-	error_log("//////////////////************************ LOGOFF action " );
-	
 	$_GET["logout"] = true;
-
-	//$response_to_client['response_code'] = $response_code;
-	//$response_to_client['response_data'] = "";
 }
 
 
 
-// check if user is logged in. 
+// call the login class 
+require_once 'static_db.php';
 require_once 'login_handler.php';
-$login_statuss = check_login_status();
+$login_status = check_login_status();
 
-error_log("//////////////////************************ login_statuss = " . $login_statuss);
-
-
-
+//error_log("//////////////////************************ login_statuss = " . $login_status);
+//$login_status = "Login not good";
 
 $response_to_client = [];
 
-if (!($login_statuss == "login_good")) // login is required to continue
+if (!($login_status == "login_good")) // login is required to continue
 {
 	// return error message that login is required to continue.
-	$response_to_client['response_code'] = $login_statuss;
-	$response_to_client['response_data'] = $login_statuss;
+	$response_to_client['response_code'] = $login_status;
+	$response_to_client['response_data'] = $login_status;
 	
 	$return_data["rawdata"] = $jc->encrypt_data ($response_to_client);
 	print json_encode($return_data);
 	exit;
 }
 
-if ($request_action == "try_to_log_in" and $login_statuss == "login_good") {
+if ($request_action == "try_to_log_in" and $login_status == "login_good") {
 	$response_to_client['response_code'] = "OK";
 	$response_to_client['response_data'] = "";
 	
 }
 
 
-
-/*
-print ("from client");
-var_dump($request_action);
-var_dump($request_data);
-print ("<hr>");
-*/
-
-
-// check if user is logged in
-// if not logged in $response_code = "NOT_LOGGED_IN";
-
-
-
-
+// process various API requests. 
 
 if ($request_action == "get_realtime_data" or  $request_action == "get_realtime_data_series_increment")
 {
@@ -318,7 +284,23 @@ if ($request_action == "check_session_data")
 	$response_code = "OK";
 	//var_dump($request_data);
 	$result = "";
-error_log ("\\\\\\\\\\\\\\\\\\\\\\\\\\\check_session_data OK///////////////////");
+//error_log ("\\\\\\\\\\\\\\\\\\\\\\\\\\\check_session_data OK///////////////////");
+	$response_to_client['response_code'] = $response_code;
+	$response_to_client['response_data'] = $result;
+
+}
+
+
+if ($request_action == "save_trigger")
+{
+	$response_code = "OK";
+	//var_dump($request_data);
+	$result = "";
+
+	require_once("static_db.php");
+	
+	save_trigger($request_data['trigger_id'],$request_data['description']) ;
+
 	$response_to_client['response_code'] = $response_code;
 	$response_to_client['response_data'] = $result;
 
@@ -518,7 +500,20 @@ function set_trigger ($trigger_id, $command) {
 	save_static_db_in_storage();
 }
 
-
+function save_trigger($trigger_id, $description)
+{
+	$static_db = open_static_data_db();
+	error_log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" . $trigger_id .  $description);
+	if ($trigger_id == 0) // new trigger
+		{$results = $static_db->query('INSERT INTO triggers values (NULL,"' . $description . '",0);');}
+	
+	else
+	{$results = $static_db->query('UPDATE triggers SET `description` = "' . $description . '" where `id` = ' .  $trigger_id . ';' );}
+	
+	$static_db->close();
+	save_static_db_in_storage();
+	
+}
 
 
 
