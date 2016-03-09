@@ -14,12 +14,9 @@ flush_sensor_data_to_permanent_storage();
 $sensor_log_db  = open_sensor_DB_in_STORAGE (true);
 
 
-
-
-
 //isset($_GET['period']) ? $period = $_GET['period'] : $period = "hour";
 isset( $_GET['period']) ? $period =  $_GET['period'] : $period = "hour";
-error_log("XXZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ" . $period);
+//error_log("XXZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ" . $period);
 
 //isset($_GET['date_from']) ? $date_from= $_GET['date_from'] : $date_from= "";
 isset($_GET['date_from']) ? $date_from= $_GET['date_from'] : $date_from= "";
