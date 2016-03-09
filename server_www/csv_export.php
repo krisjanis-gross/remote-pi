@@ -39,7 +39,7 @@ if ( $period == "3days") $query_datetime_filter = " AND datetime > datetime('now
 if ( $period == "week") $query_datetime_filter = " AND datetime > datetime('now','localtime','-7 days') "; // every hour
 if ( $period == "month") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 month') "; // every hour
 if ( $period == "date_range") {
-	if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s')  and strftime ('%%M', datetime) = '01'", $date_from, $date_to);
+	if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s') ", $date_from, $date_to);
 }
 $query_sensor_id_filter = "";
 
