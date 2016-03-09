@@ -1,11 +1,64 @@
+<html>
+    <head>
+		<meta charset="UTF-8"> 
+	</head>
+<body>
+
 <?
 //phpinfo();
 
 error_reporting(E_ALL);
 ini_set('display_errors', 'On');
 
+require_once("sensor_log_db.php");
+flush_sensor_data_to_permanent_storage();
+$sensor_log_db = open_sensor_DB_in_STORAGE ();
+
+$results = $sensor_log_db->query("select distinct sensor_id from sensor_log ;");
+while ($row = $results->fetchArray()) {
+	var_dump($row);
+}
 
 
+/*
+$encrypt['ē'] = 'a';	$encrypt['f'] = 'ā';	$encrypt['g'] = 'b';	$encrypt['ģ'] = 'c';	$encrypt['h'] = 'č';	$encrypt['i'] = 'd';	$encrypt['ī'] = 'e';	$encrypt['j'] = 'ē';	$encrypt['k'] = 'f';	$encrypt['ķ'] = 'g';	$encrypt['l'] = 'ģ';	$encrypt['ļ'] = 'h';	$encrypt['m'] = 'i';	$encrypt['n'] = 'ī';	$encrypt['ņ'] = 'j';	$encrypt['o'] = 'k';	$encrypt['p'] = 'ķ';	$encrypt['r'] = 'l';	$encrypt['s'] = 'ļ';	$encrypt['š'] = 'm';	$encrypt['u'] = 'n';	$encrypt['ū'] = 'ņ';	$encrypt['v'] = 'o';	$encrypt['z'] = 'p';	$encrypt['ž'] = 'r';	$encrypt['a'] = 's';	$encrypt['ā'] = 'š';	$encrypt['b'] = 'u';	$encrypt['c'] = 'ū';	$encrypt['č'] = 'v';	$encrypt['d'] = 'z';	$encrypt['e'] = 'ž';
+
+
+
+$string = "erikam";
+$arr1 = str_split_unicode($string);
+var_dump ($arr1);
+$sifreets_teksts = "";
+$sifreets_burts = "";
+
+foreach ($arr1 as $val) {
+	//var_dump ($val);
+	$burts = $val;
+	//echo($burts);
+	$sifreets_burts = $encrypt[$burts];
+	
+	$sifreets_teksts .= $sifreets_burts;
+}
+
+
+echo($sifreets_teksts);
+
+
+
+function str_split_unicode($str, $l = 0) {
+	if ($l > 0) {
+		$ret = array();
+		$len = mb_strlen($str, "UTF-8");
+		for ($i = 0; $i < $len; $i += $l) {
+			$ret[] = mb_substr($str, $i, $l, "UTF-8");
+		}
+		return $ret;
+	}
+	return preg_split("//u", $str, -1, PREG_SPLIT_NO_EMPTY);
+}
+*/
+
+/*
 
 
 
@@ -23,7 +76,7 @@ while ($row = $results->fetchArray()) {
 }
 
 
-
+*/
 
 
 
@@ -83,7 +136,8 @@ while ($row = $results->fetchArray()) {
     var_dump($row);
 }*/
 
-	/**
+	/*
+	 
 $results = $static_db->query("insert into sensor_names values ('28-000004aa86ba','t_dzeltens') ");	
 $results = $static_db->query("insert into sensor_names values ('28-000004aa901a','t_sarkans') ");	
 $results = $static_db->query("insert into sensor_names values ('28-000004aaa527','t_bruuns') ");	
@@ -170,3 +224,4 @@ while ($row = $results->fetchArray()) {
 */
 
 ?>
+</body>

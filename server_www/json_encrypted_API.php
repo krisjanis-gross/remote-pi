@@ -356,13 +356,13 @@ function sensor_historic_data ($request_data) {
 
 	$sensor_log_db  = open_sensor_DB_in_STORAGE (true);
 
-	/*
+	
 	 $time_end = microtime(true);
 	 $execution_time = ($time_end - $time_start);
 	 $time_start = $time_end;
 	 //execution time of the script
-	 echo '<b>Open DB  Time:</b> '.$execution_time.' sec<br />';
-	 */
+	 error_log ( '<b>++++++++++++++++++++++++++++++++++++++++++++++++++++++++Open DB  Time:</b> '.$execution_time.' sec<br />');
+	 
 
 
 	//handle parameters
@@ -394,38 +394,63 @@ function sensor_historic_data ($request_data) {
 		if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s')  and strftime ('%%M', datetime) = '01'", $date_from, $date_to);
 	}
 	$query_sensor_id_filter = "";
-	if ($single_sensor_selected <> "") $query_sensor_id_filter = " AND sensor_id = '$single_sensor_selected'";
+	
+	
+	$available_sensors = array ();
 
-	$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
-
-	while ($row = $results->fetchArray())
-	{
-
-		$sensor_id = $row['sensor_id'];
-			
-			
-		$datetime = strtotime ($row['datetime']) ;
-		$datetime *= 1000; // convert from Unix timestamp to JavaScript time
-			
-		$sensor_data = (float) $row["value"];
-			
-		//var_dump($row);
-		//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
-		if ($json_result)
-			$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
-			else
-				$all_sensor_data["$sensor_id"][] =  " [$datetime, $sensor_data] ";
-					
-
+	if ($single_sensor_selected <> "") {
+		$available_sensors[] = $single_sensor_selected;
 	}
-	/*
+	else { // must get data for all sensors.
+		$results = $sensor_log_db->query("select distinct sensor_id from sensor_log ;");
+		while ($row = $results->fetchArray()) {
+			$available_sensors[] = $row['sensor_id'];
+		}
+	}
+	
+	
+	
+	// get data for each sensor. 
+	foreach ($available_sensors as $sensor ) 	{
+		$query_sensor_id_filter = " AND sensor_id = '$sensor'";
+		error_log (  '++++++++++++++++++++++++++++++++++++++++++++'.$sensor.' ');
+		
+		$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
+		
+		while ($row = $results->fetchArray())
+		{
+		
+			$sensor_id = $row['sensor_id'];
+				
+				
+			$datetime = strtotime ($row['datetime']) ;
+			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
+				
+			$sensor_data = (float) $row["value"];
+				
+			//var_dump($row);
+			//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
+			if ($json_result)
+				$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
+				else
+					$all_sensor_data["$sensor_id"][] =  " [$datetime, $sensor_data] ";
+						
+		
+		}
+		
+	}
+	
+	
+	
+	
+
 	 $time_end = microtime(true);
 	 $execution_time = ($time_end - $time_start);
 	 $time_start = $time_end;
 	 //execution time of the script
-	 echo '<b>1. query time :</b> '.$execution_time.' sec<br />';
+	 error_log (  '++++++++++++++++++++++++++++++++++++++++++++<b>1. query time :</b> '.$execution_time.' sec<br />');
 
-	 */
+	 
 
 
 	// get all data from tempfs
@@ -453,7 +478,14 @@ function sensor_historic_data ($request_data) {
 					
 
 	}
-
+	
+	$time_end = microtime(true);
+	$execution_time = ($time_end - $time_start);
+	$time_start = $time_end;
+	//execution time of the script
+	error_log (  '++++++++++++++++++++++++++++++++++++++++++++<b>2. process time :</b> '.$execution_time.' sec<br />');
+	
+	
 	return $all_sensor_data;
 
 }
