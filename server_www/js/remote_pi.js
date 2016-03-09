@@ -312,7 +312,7 @@ function refresh_triggers_callback (data_from_server) {
 			  });
 			 
 			  //$('#trigger_tab').html(items.join(''));
-			  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '<br/><li><a href="#" data-role="button" id="new_trigger" data-icon="plus">New Trigger</a></li></ul>');
+			  $('#trigger_tab').html( '<ul data-role="listview">' + items.join('') + '<br/><li><a href="#" data-role="button" id="new_trigger" data-icon="plus">Add New Trigger</a></li></ul>');
 			  
 			  $.each(data_from_server.response_data, function(key, val) {
 					  $('#trigger-flip-' + key).slider();
@@ -590,8 +590,11 @@ function change_tab (active_page) {
 	
 }
 function export_data () {
-	
-	var URL = "http://" + target_URL + "/csv_export.php?&period=" + global_time_interval + global_date_range_URL ;
+	var sensor_selection_url = "";
+	if (global_single_selected_sensor_id != "") { 
+		sensor_selection_url = "&single_sensor_selected=" + global_single_selected_sensor_id;
+	}
+	var URL = "http://" + target_URL + "/csv_export.php?&period=" + global_time_interval + global_date_range_URL + sensor_selection_url ;
 	window.location.href = URL;
 }
 

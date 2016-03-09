@@ -31,7 +31,6 @@ $(document).ready(function()
 $('#logon_button').click(try_to_log_in);
 
 
-logoff
 function try_to_log_in () {
 	
 	 $('#header_1').html( $('#header_1').html() + ' sending login data' );
@@ -75,34 +74,6 @@ function logoff () {
 }
 
 
-
-/*
-
-$( "#list" ).pagecontainer({
-  create: function( event, ui ) {
-	  page = $(':mobile-pagecontainer').pagecontainer('getActivePage')[0].id;
-  }
-});
-
-
-$(document).on('pageinit', function() {
-	
-	  //alert('Active page\'s ID: ' + page);
-	  if (page == "list")   { 
-					 
-					 // $( ":mobile-pagecontainer" ).pagecontainer( "change", "#web_login" );
-					  
-				page = "";
-				
-
-	  }
-});
-*/
-/*
-$(document).on('pageshow', '#web_login', function(){ 
-     $('#login_password').focus();
-});
-*/
 
 
 

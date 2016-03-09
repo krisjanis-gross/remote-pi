@@ -199,7 +199,7 @@ function saveTarget(){
 	check_connection();
 }
 
-function insertTarget(tx){
+function insertTarget(tx) {
 	sql = "INSERT INTO remote_targets (id,title,URL,password,auto_connect) VALUES (null,'"+ $('#tname').val() +"','"+ $('#turl').val() +"','"+ $('#tpass').val() +"','"+ $('#auto_connect').val() +"')";
 	//alert(sql);
 	tx.executeSql(sql, [], function (tx, sql_res){
@@ -221,6 +221,8 @@ function updateTarget(tx){
 	
 }
 
+
+// OLD?
 function check_target_version () {
 	if( (target_URL != "") && (target_URL!=null) ) {
 		var URL = "http://" + target_URL + "/version.php";
@@ -262,98 +264,96 @@ function check_target_version () {
 }	
 }
 
-function check_if_logged_in_APP () {
-	
-	var URL = "http://" + target_URL + "/app_login_check.php";
-	var return_value;
-	var async_connection = true;
-	
-	var request = $.ajax({
-	  url: URL,
-	  async: async_connection,
-	  
-	    beforeSend: function(  ) {
-                // This callback function will trigger before data is sent
-				$('#connection_status').html("Connection check......");
-				$('#connection_notification_bar').show();
-            }
-       //  complete: function() {
-                // This callback function will trigger on data sent/received complete
-                //$.mobile.hidePageLoadingMsg(); // This will hide ajax spinner
-		//		$('#connection_status').html("Connection check done");
-         //   }
-  
-	});
-	
-	request.done(function( msg ) {
-			return_value = msg;
-				if (return_value == "login_good") {
-					login_required = false;
-					$('#connection_status').html("Ready to connect");
-					if (auto_connet_to_target == 1) APP_open_connection();
-				}
-				else {
-					login_required = true;
-					//APP_open_connection ();
-					$('#connection_status').html("return_value");
-					if (auto_connet_to_target == 1) APP_open_connection ();
-				//alert("return_value = " + return_value);
-				}
-				
-		});
-	 
-	request.fail(function( jqXHR, textStatus ) {
-		return_value =  "Request failed: " + textStatus ;
-	});
-	
-	/*if (check_return_value == "login_good") { // all good to connect
-			login_required = false;
-			$('#connection_status').html("Ready to connect");
-			if (auto_connet_to_target == 1) APP_open_connection();
-		}
-		else {
-			 login_required = true;
-			 APP_open_connection ();
-			 $('#connection_status').html("");
-			 if (auto_connet_to_target == 1) APP_open_connection ();
-					 
-		}
-	*/
-	
+
+
+
+
+
+
+
+function APP_check_for_session_on_server_callback (data_from_server) {
+	if (data_from_server.response_code == "OK") {
+		 $('#connection_status').html("Ready to connect");
+		 login_required = false;
+		 //$.mobile.changePage("#data_page",{ transition: "fade"});
+		 //get_realtime_data ();
 	}
+	else  {
+		 $('#connection_status').html( target_URL + ' Please log in!' );
+		 login_required = true;
+	}
+	 if (auto_connet_to_target == 1) APP_open_connection();
+}
+
+
+
+
+
+function APP_check_for_session_on_server (){
+	// checks if there is a session already on the server. 
+	// for example when browser is restarted and the server session is still running fine
+	// then we can continue to work with that session.
+	
+	 $('#connection_status').html( $('#connection_status').html() + 'checking for existing session...' );
+	 
+	var action = "check_session_data_APP";	
+	var data_to_server =  "";
+		
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
+	 
+	
+}
+
+
+
+function APP_open_connection () {
+	
+	 $('#connection_status').html('sending login data' );
+	 
+	 var password = $('#tpass').val();
+	 
+		var action = "try_to_log_in";	
+		var data_to_server =  {
+				'password' : password
+			};
+		
+		// get data from server
+		var data_from_server = json_encrypted_request (action,data_to_server,true);
+	
+}
+
+function try_to_log_in_callback (data_from_server) {
+	if (data_from_server.response_code == "OK") {
+		 //$('#header_1').html( target_URL + ' session found!' );
+		 $.mobile.changePage("#data_page",{ transition: "fade"});
+		 get_realtime_data ();
+	}
+	else  {
+		 alert(data_from_server.response_data);
+	}
+	
+	
+}
+
+
+
 
 
 function check_connection()
 {	
 	$('#connection_notification_bar').show();
 	if ((target_URL != "") && (target_URL != null)) {
-		jCription_handshake ();
-		check_target_version();	
+		//alert ("before handshake"  + target_URL );
+		jCription_handshake (target_URL,password,function () {alert("callback from handshake function!")});
+		//check_target_version();	
+		setTimeout(APP_check_for_session_on_server, 1000); 
 		}
 	else $('#connection_status').html("URL required to connect");
 }
 
-function APP_open_connection () {
-	//$('#connection_status').html("");
 
-	var login_result = send_username_and_password();
-		//alert(login_result);
-		
-	if (login_result == "login_good")
-		{
-			$('#connection_status').html("Connection established");
-			
-			setTimeout( function() {
-        			$.mobile.changePage("#data_page",{ transition: "fade"});
-					get_realtime_data ();
-				}, 100);  // 0.1 seconds
-		}
-	
-	if (login_result != "login_good") 
-			$('#connection_status').html(login_result);
-	
-	
-}
+
 
 
 function toggle_connect_button()   {

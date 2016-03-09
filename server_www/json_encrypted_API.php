@@ -348,7 +348,7 @@ function sensor_historic_data ($request_data) {
 
 
 	//place this before any script you want to calculate time
-	$time_start = microtime(true);
+	//$time_start = microtime(true);
 
 
 	// flush all TMP data to storage.
@@ -356,14 +356,14 @@ function sensor_historic_data ($request_data) {
 
 	$sensor_log_db  = open_sensor_DB_in_STORAGE (true);
 
-	
+	/*
 	 $time_end = microtime(true);
 	 $execution_time = ($time_end - $time_start);
 	 $time_start = $time_end;
 	 //execution time of the script
 	 error_log ( '<b>++++++++++++++++++++++++++++++++++++++++++++++++++++++++Open DB  Time:</b> '.$execution_time.' sec<br />');
 	 
-
+*/
 
 	//handle parameters
 	//isset($_GET['json']) ? $json_result = $_GET['json'] : $json_result = false;
@@ -413,7 +413,7 @@ function sensor_historic_data ($request_data) {
 	// get data for each sensor. 
 	foreach ($available_sensors as $sensor ) 	{
 		$query_sensor_id_filter = " AND sensor_id = '$sensor'";
-		error_log (  '++++++++++++++++++++++++++++++++++++++++++++'.$sensor.' ');
+		//error_log (  '++++++++++++++++++++++++++++++++++++++++++++'.$sensor.' ');
 		
 		$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
 		
@@ -442,7 +442,7 @@ function sensor_historic_data ($request_data) {
 	
 	
 	
-	
+	/*
 
 	 $time_end = microtime(true);
 	 $execution_time = ($time_end - $time_start);
@@ -450,7 +450,7 @@ function sensor_historic_data ($request_data) {
 	 //execution time of the script
 	 error_log (  '++++++++++++++++++++++++++++++++++++++++++++<b>1. query time :</b> '.$execution_time.' sec<br />');
 
-	 
+	 */
 
 
 	// get all data from tempfs
@@ -478,14 +478,14 @@ function sensor_historic_data ($request_data) {
 					
 
 	}
-	
+	/*
 	$time_end = microtime(true);
 	$execution_time = ($time_end - $time_start);
 	$time_start = $time_end;
 	//execution time of the script
 	error_log (  '++++++++++++++++++++++++++++++++++++++++++++<b>2. process time :</b> '.$execution_time.' sec<br />');
 	
-	
+	*/
 	return $all_sensor_data;
 
 }

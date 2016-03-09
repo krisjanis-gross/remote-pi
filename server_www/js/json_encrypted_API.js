@@ -61,11 +61,12 @@ function json_encrypted_request(request_action, data, async )
 								if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
 								else {
 										if (request_data_to_server.request_action == "check_session_data" )	check_for_session_on_server_callback(return_value);
-										else{
-											alert("Please log in.");
-											if (WEB_Browser) $.mobile.changePage("#web_login",{ transition: "fade"});
-											else $.mobile.changePage("#target_form",{ transition: "fade"});
-										}
+										else if (  request_data_to_server.request_action ==  "check_session_data_APP") APP_check_for_session_on_server_callback(return_value);
+												else{
+													alert("Please log in.");
+													if (WEB_Browser) $.mobile.changePage("#web_login",{ transition: "fade"});
+													else $.mobile.changePage("#target_form",{ transition: "fade"});
+												}
 								}
 						}
 						else { // process callback fucntions
@@ -80,6 +81,8 @@ function json_encrypted_request(request_action, data, async )
 								if (request_data_to_server.request_action == "get_realtime_data_series_increment")	increment_series_callback(return_value);
 								
 								if (request_data_to_server.request_action == "check_session_data")	check_for_session_on_server_callback(return_value);
+								
+								if (request_data_to_server.request_action == "check_session_data_APP")	APP_check_for_session_on_server_callback(return_value);
 								
 								if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
 						}
