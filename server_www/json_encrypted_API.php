@@ -409,6 +409,8 @@ function sensor_historic_data ($request_data) {
 	}
 	
 	
+	// get all data from tempfs
+	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
 	
 	// get data for each sensor. 
 	foreach ($available_sensors as $sensor ) 	{
@@ -438,6 +440,33 @@ function sensor_historic_data ($request_data) {
 		
 		}
 		
+		
+		
+		$results2 = $sensor_log_db_tempfs->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
+		
+		while ($row2 = $results2->fetchArray())
+		{
+		
+			$sensor_id = $row2['sensor_id'];
+				
+				
+			$datetime = strtotime ($row2['datetime']) ;
+			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
+				
+			$sensor_data = (float) $row2["value"];
+				
+			//var_dump($row);
+			//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
+			if ($json_result)
+				$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
+				else
+					$all_sensor_data["$sensor_id"][] =  " [$datetime, $sensor_data] ";
+						
+		
+		}
+		
+	
+		
 	}
 	
 	
@@ -453,31 +482,9 @@ function sensor_historic_data ($request_data) {
 	 */
 
 
-	// get all data from tempfs
-	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
+	
 
-	$results2 = $sensor_log_db_tempfs->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
-
-	while ($row2 = $results2->fetchArray())
-	{
-
-		$sensor_id = $row2['sensor_id'];
-			
-			
-		$datetime = strtotime ($row2['datetime']) ;
-		$datetime *= 1000; // convert from Unix timestamp to JavaScript time
-			
-		$sensor_data = (float) $row2["value"];
-			
-		//var_dump($row);
-		//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
-		if ($json_result)
-			$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
-			else
-				$all_sensor_data["$sensor_id"][] =  " [$datetime, $sensor_data] ";
-					
-
-	}
+	
 	/*
 	$time_end = microtime(true);
 	$execution_time = ($time_end - $time_start);
