@@ -35,7 +35,7 @@ function process_custom_pin_hook ()
 		pin_hook ($pin_nr,$command);
 	}
 	
-	
+	  
 	
 }
 
