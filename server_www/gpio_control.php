@@ -10,10 +10,32 @@ function process_gpio() {
 	isset ($_GET['command']) ? $command = $_GET['command'] : $command = "";
 	isset ($_GET['pin_nr']) ? $pin_nr = $_GET['pin_nr'] : $pin_nr = "";
 
-	if  (is_numeric($pin_nr) and is_numeric($command) ) 	set_pin ($pin_nr,$command);
+	if  (is_numeric($pin_nr) and is_numeric($command) ) 	
+		{
+			if ($pin_nr < 100) set_pin ($pin_nr,$command);
+			else // custom function
+				process_custom_pin_hook ($pin_nr,$command);
+		}
+		
 	
 	
 }
+
+function process_custom_pin_hook ()
+{
+	$custom_hook_file = "custom_hook.php";
+	
+	if(is_file($custom_hook_file)){
+		//print ("file is ");
+		require_once ($custom_hook_file);
+		pin_hook ($pin_nr,$command);
+	}
+	
+	
+	
+}
+
+
 function process_gpio2($pin_nr,$command) {
 	
 	if  (is_numeric($pin_nr) and is_numeric($command) ) 	set_pin ($pin_nr,$command);
