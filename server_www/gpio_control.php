@@ -25,7 +25,7 @@ function process_gpio() {
 	
 }
 
-function process_custom_pin_hook ()
+function process_custom_pin_hook ($pin_nr,$command)
 {
 	$custom_hook_file = "custom_hook.php";
 	
