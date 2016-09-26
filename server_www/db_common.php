@@ -7,7 +7,7 @@ function verify_sqlite_file ($file) {
 	// this function checks whether the file is OK. 
 	// there might be better function for this task and this can be replaced later... 
 	
-	error_log ( "checking file " . $file . "<br />");
+//	error_log ( "checking file " . $file . "<br />");
 	$db = new SQLite3($file,SQLITE3_OPEN_READONLY);
 	
 	// try to get table list 

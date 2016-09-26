@@ -72,7 +72,7 @@ function open_sensor_DB_in_STORAGE ($read_only = false) {
 	if ($valid_db_file == null) { // if a valid DB file is not located in storage then we use the template file.
 		global $read_only_folder;
 		global $sensor_log_template_file; 
-		$valid_db_file = $db_storage_folder . "sensor_log_" .  date("_YmdHi") . ".db"; 
+		$valid_db_file = $db_storage_folder . "sensor_log_" .  date("YmdHi") . ".db"; 
 		if (!copy($read_only_folder . $sensor_log_template_file , $valid_db_file )) 
 				error_log ( "failed to copy $sensor_log_db_file_tempfs...\n");
 	}
@@ -140,7 +140,7 @@ function backup_sensor_log_db () {
 				error_log ( "failed to copy $file...\n");
 		}	
 		
-		$new_file_name = $db_storage_folder . $file_name_prefix .  date("_YmdHi") . ".db";  
+		$new_file_name = $db_storage_folder . $file_name_prefix .  date("YmdHi") . ".db";  
 		// rename the newly copied file 
 		//echo ("new file with latest backup = ". $new_file_name );
 		rename ( $tmp_file_name , $new_file_name);
