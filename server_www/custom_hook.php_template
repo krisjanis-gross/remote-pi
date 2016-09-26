@@ -6,7 +6,8 @@
 
 function pin_hook ($pin_nr,$command)
 {
-
+if ($pin_nr == 100)
+	error_log ("YYYYYYYSYSYSSSSSSSSSSSSSSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
 }
 
 

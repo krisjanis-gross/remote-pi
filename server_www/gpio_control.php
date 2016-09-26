@@ -76,10 +76,10 @@ function save_pin_status($pin_nr,$command,$save_db_to_storage) {
 
 }
 	
-function toggle_pin ($pin_nr) {
+function toggle_pin ($pin_nr,$save_db_to_storage = true) {
 	$current_statuss = get_pin_status($pin_nr);
-	if ($current_statuss == 1) set_pin ($pin_nr,0);
-	if ($current_statuss == 0) set_pin ($pin_nr,1);
+	if ($current_statuss == 1) set_pin ($pin_nr,0,$save_db_to_storage);
+	if ($current_statuss == 0) set_pin ($pin_nr,1,$save_db_to_storage);
 }
 
 
