@@ -346,7 +346,7 @@ print json_encode($return_data);
 
 function sensor_historic_data ($request_data) {
 
-
+	$all_sensor_data = '';
 	//place this before any script you want to calculate time
 	//$time_start = microtime(true);
 
