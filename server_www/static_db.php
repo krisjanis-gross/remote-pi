@@ -42,7 +42,7 @@ function save_static_db_in_storage(){
 	
 	// construct file name
 	$new_file_name = $db_storage_folder . $file_name_prefix .  date("_YmdHi") . ".db";  
-	error_log ("saving file to " . $new_file_name);
+	//error_log ("saving file to " . $new_file_name);
 	if (!copy($current_db_file_name , $new_file_name )) {
 				error_log ( "failed to copy $file...\n");
 	}	
