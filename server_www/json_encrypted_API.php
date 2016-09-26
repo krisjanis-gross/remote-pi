@@ -233,7 +233,7 @@ if ($request_action == "get_historical_data")
 	$sensor_data =  sensor_historic_data ($request_data);
 	
 	$result = array();
-	if (is_array ($request_data)) {
+	if (is_array ($sensor_data)) {
 	foreach ($sensor_data as $s_id => $s_data)  {
 		//$dataArr[] = array($s_id, $s_data);
 	
