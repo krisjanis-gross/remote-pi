@@ -77,3 +77,10 @@ padding:1em;*/
 .ui-listview li {
 	white-space:normal !important;
 }
+
+#historical_data_tab
+{
+	   height:100%;
+    width:100%;
+    position:absolute;
+}
