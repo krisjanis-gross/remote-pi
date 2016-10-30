@@ -438,7 +438,7 @@ function show_history (change_time_interval) {
 		
 	}
 	
-	 $('#historical_data_tab').html('went for data...' +  $('#historical_data_tab').html() );
+	 $('#graph').html('went for data...' +  $('#graph').html() );
 	
 	 active_page = "historical_data";
 	
@@ -458,6 +458,8 @@ function show_history (change_time_interval) {
 	
 	// get data from server
 	var data_from_server = json_encrypted_request (action,data_to_server,true);
+	
+	// get sensor_list and add sensor selection buttons.
 }
 	
 function show_history_callback(data_from_server) {
@@ -469,10 +471,11 @@ function show_history_callback(data_from_server) {
 		    	              useUTC : false
 		    	          }
 		    	      });
-		    		
+		    		 desired_height = $( document  ).height();
 		    		 chart = new Highcharts.Chart({
 		    	            chart: {
-		    	                renderTo: 'historical_data_tab',
+		    	                renderTo: 'graph',
+		    	                height: desired_height,
 		    	                type: 'spline',
 								events: {
 									load: function () {
@@ -500,9 +503,9 @@ function show_history_callback(data_from_server) {
 		    	            title: {
 		    	                text: 'Graphs'
 		    	            },
-		    	            subtitle: {
+		    	        /*    subtitle: {
 		    	                text: ' enjoy the show  '
-		    	            },
+		    	            },*/
 		    	            xAxis: {
 		    				type: 'datetime',
 		    					dateTimeLabelFormats: {
@@ -524,6 +527,9 @@ function show_history_callback(data_from_server) {
 		
 	}
 	
+	// draw sensor selection mockup
+	$('#graph_options').html('<form><label><input type="checkbox" name="checkbox-0 ">Check me </label>	</form>');  
+	$("#graph_options").trigger('create');
 }
 
 function increment_series_callback (data_from_server) {
