@@ -11,7 +11,7 @@ $(document).ready(function()
 	        }, reload_interval);
 	    
 	    // jcription? 
-	    password = $.jCryption.encrypt("remote_pi", "889977665");
+	   // password = $.jCryption.encrypt("remote_pi", "889977665");
     
 	    
     });

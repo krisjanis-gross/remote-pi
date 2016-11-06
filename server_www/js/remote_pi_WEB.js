@@ -11,8 +11,8 @@ $(document).ready(function()
 	    
 	    // jcription? 
 	    target_URL =  window.location.host;
-	    password = $.jCryption.encrypt("remote_pi", "889977665");
-	    jCription_handshake();
+	    //password = $.jCryption.encrypt("remote_pi", "889977665");
+	   // jCription_handshake();
 	    
 	    
 		$("#header_1").html(target_URL);

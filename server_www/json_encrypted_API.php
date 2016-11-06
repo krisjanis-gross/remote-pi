@@ -1,6 +1,6 @@
 <?php 
-//ini_set('display_errors',1);
-//error_reporting(E_ALL);
+ini_set('display_errors',1);
+error_reporting(E_ALL);
 
 
 //var_dump($_POST);
@@ -8,37 +8,40 @@
 
 // Jcription things come first
 
-require_once 'jcription/sqAES.php';
-require_once 'jcription/jcryption.php';
+//require_once 'jcription/sqAES.php';
+//require_once 'jcription/jcryption.php';
 
-$jc = new JCryption('keys/rsa_1024_pub.pem', 'keys/rsa_1024_priv.pem');
-$jc->go();
+//$jc = new JCryption('keys/rsa_1024_pub.pem', 'keys/rsa_1024_priv.pem');
+//$jc->go();
 
 // check if there is valid sessin with session key stored
-if (!isset($_SESSION['jCryptionKey'])) // session key is missing. Send response that Jcryption handshake is needed
+/*if (!isset($_SESSION['jCryptionKey'])) // session key is missing. Send response that Jcryption handshake is needed
 {
 	$response_to_client['error_message'] = "Jcryption_handshake_required";
 	print json_encode($response_to_client);
 	exit;
 }
-
+*/
 
 // decrypt data
-
+/*
 $request_from_server_string = "";
  foreach ($_POST as $key => $value) {
             $request_from_server_string =  $key;
         }
-        
+        */
+//error_log( print_r($_POST,TRUE) );
 
-$request_from_server_array = json_decode($request_from_server_string, true);
+$request_data_json = $_POST["request_data"];
+
+$request_from_server_array = json_decode($request_data_json, true);
 isset ($request_from_server_array['request_action']) ? $request_action = $request_from_server_array['request_action'] : $request_action = "";
 isset ($request_from_server_array['request_data'])? $request_data = $request_from_server_array['request_data'] : $request_data = "";
 
 
 // Check if web client is logged in and authorized to do anything.
-
-
+//error_log( print_r($request_from_server_array,TRUE) );
+//error_log( print_r($request_action,TRUE) );
 
 
 // process login parameters before login handler is called
@@ -73,7 +76,8 @@ if (!($login_status == "login_good")) // login is required to continue
 	$response_to_client['response_code'] = $login_status;
 	$response_to_client['response_data'] = $login_status;
 	
-	$return_data["rawdata"] = $jc->encrypt_data ($response_to_client);
+	// $return_data["rawdata"] = $jc->encrypt_data ($response_to_client);
+	$return_data["rawdata"] = $response_to_client;
 	print json_encode($return_data);
 	exit;
 }
@@ -309,14 +313,48 @@ if ($request_action == "save_trigger")
 
 
 
+if ($request_action == "get_sensor_list")
+{
+	require_once("sensor_names.php");
+	require_once("sensor_log_db.php");
+	
+	
 
+	$sensor_data =  sensor_id_list_per_period ($request_data);
+	
+	$result = array();
+	if (is_array ($sensor_data)) {
+	foreach ($sensor_data as $s_id)  {
+		//$dataArr[] = array($s_id, $s_data);
+	
+		$data_row  = array();
+		$sensor_name = get_sensor_name_by_id($s_id);
+		$data_row['name'] = $sensor_name;
+		$data_row['id'] = $s_id;
+		//$data_row['data'] = $s_data;
+		array_push($result, $data_row);
+	
+	}
+	}
+	
+	//print json_encode($result, JSON_NUMERIC_CHECK);
+	
+	
+	
+	
+	
+	$response_code = "OK";
+	$response_to_client['response_code'] = $response_code;
+	$response_to_client['response_data'] = $result;
+
+}
 
 
 
 
 
 //var_dump($response_to_client);
-$return_data["rawdata"] = $jc->encrypt_data ($response_to_client);
+$return_data["rawdata"] = $response_to_client;
 
 print json_encode($return_data);
 
@@ -339,6 +377,49 @@ print json_encode($return_data);
 
 
 
+function sensor_id_list_per_period () {
+	$sensor_log_db  = open_sensor_DB_in_STORAGE (true);
+
+	isset( $request_data['period']) ? $period =  $request_data['period'] : $period = "hour";
+
+	//isset($_GET['date_from']) ? $date_from= $_GET['date_from'] : $date_from= "";
+	isset($request_data['date_from']) ? $date_from= $request_data['date_from'] : $date_from= "";
+
+	isset($request_data['date_to']) ? $date_to= $request_data['date_to'] : $date_to= "";
+	isset($request_data['date_to']) ? $date_to= $request_data['date_to'] : $date_to= "";
+
+
+	if ( $period == "hour") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 hour')";
+	if ( $period == "3hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 hours')";
+	if ( $period == "6hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-6 hours')";
+	if ( $period == "day") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 day')"; 
+	if ( $period == "3days") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 days') ";
+	if ( $period == "week") $query_datetime_filter = " AND datetime > datetime('now','localtime','-7 days') "; 
+	if ( $period == "month") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 month')"; 
+	if ( $period == "date_range") {
+		if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s')  ", $date_from, $date_to);
+	}
+	
+	$available_sensors = array ();
+
+
+	$results = $sensor_log_db->query("select distinct sensor_id from sensor_log ;");
+	while ($row = $results->fetchArray()) {
+		$available_sensors[] = $row['sensor_id'];
+	}
+
+	// get all data from tempfs
+	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
+
+	$results2 = $sensor_log_db_tempfs->query("select distinct sensor_id from sensor_log ;");
+	while ($row = $results2->fetchArray()) {
+		if( !in_array($row['sensor_id'],$available_sensors)) array_push($available_sensors, $row['sensor_id']);
+		//$available_sensors[] = $row['sensor_id'];
+	}
+
+	return $available_sensors;
+
+}
 
 
 
@@ -347,6 +428,9 @@ print json_encode($return_data);
 
 function sensor_historic_data ($request_data) {
 
+	//error_log ($request_data['selected_sensor_ids']);
+	
+	
 	$all_sensor_data = '';
 	//place this before any script you want to calculate time
 	//$time_start = microtime(true);
@@ -381,9 +465,6 @@ function sensor_historic_data ($request_data) {
 	isset($request_data['date_to']) ? $date_to= $request_data['date_to'] : $date_to= "";
 	
 	
-	//isset($_GET['single_sensor_selected']) ? $single_sensor_selected = $_GET['single_sensor_selected'] : $single_sensor_selected= "";
-	isset($request_data['single_sensor_selected']) ? $single_sensor_selected = $request_data['single_sensor_selected'] : $single_sensor_selected= "";
-
 	if ( $period == "hour") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 hour')";
 	if ( $period == "3hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 hours')";
 	if ( $period == "6hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-6 hours')";
@@ -394,25 +475,40 @@ function sensor_historic_data ($request_data) {
 	if ( $period == "date_range") {
 		if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s')  and strftime ('%%M', datetime) = '01'", $date_from, $date_to);
 	}
-	$query_sensor_id_filter = "";
+	
+	
+	//error_log(print_r($request_data,TRUE));
 	
 	
 	$available_sensors = array ();
 
-	if ($single_sensor_selected <> "") {
-		$available_sensors[] = $single_sensor_selected;
+	//isset($_GET['single_sensor_selected']) ? $single_sensor_selected = $_GET['single_sensor_selected'] : $single_sensor_selected= "";
+	if (isset($request_data['single_sensor_selected'])) {
+		if ($request_data['single_sensor_selected'] <> "")
+			$available_sensors[] = $request_data['single_sensor_selected'];
+	}	
+	//error_log(print_r($request_data,TRUE));
+	if (isset($request_data['selcected_sensors'])) {  // prepare data selection only for the selected sensors
+		$selected_sensors_array = json_decode ($request_data['selcected_sensors']);
+		foreach ($selected_sensors_array as $sensor)
+			$available_sensors[] = $sensor;
+				
 	}
-	else { // must get data for all sensors.
+		
+	
+	
+
+	if (empty($available_sensors)) {
 		$results = $sensor_log_db->query("select distinct sensor_id from sensor_log ;");
 		while ($row = $results->fetchArray()) {
 			$available_sensors[] = $row['sensor_id'];
 		}
 	}
-	
+	//error_log(print_r($available_sensors,TRUE));
 	
 	// get all data from tempfs
 	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
-	
+	$query_sensor_id_filter = "";
 	// get data for each sensor. 
 	foreach ($available_sensors as $sensor ) 	{
 		$query_sensor_id_filter = " AND sensor_id = '$sensor'";
@@ -470,30 +566,7 @@ function sensor_historic_data ($request_data) {
 		
 	}
 	
-	
-	
-	/*
 
-	 $time_end = microtime(true);
-	 $execution_time = ($time_end - $time_start);
-	 $time_start = $time_end;
-	 //execution time of the script
-	 error_log (  '++++++++++++++++++++++++++++++++++++++++++++<b>1. query time :</b> '.$execution_time.' sec<br />');
-
-	 */
-
-
-	
-
-	
-	/*
-	$time_end = microtime(true);
-	$execution_time = ($time_end - $time_start);
-	$time_start = $time_end;
-	//execution time of the script
-	error_log (  '++++++++++++++++++++++++++++++++++++++++++++<b>2. process time :</b> '.$execution_time.' sec<br />');
-	
-	*/
 	return $all_sensor_data;
 
 }
@@ -543,7 +616,7 @@ function set_trigger ($trigger_id, $command) {
 function save_trigger($trigger_id, $description)
 {
 	$static_db = open_static_data_db();
-	error_log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" . $trigger_id .  $description);
+	//error_log(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" . $trigger_id .  $description);
 	if ($trigger_id == 0) // new trigger
 		{$results = $static_db->query('INSERT INTO triggers values (NULL,"' . $description . '",0);');}
 	

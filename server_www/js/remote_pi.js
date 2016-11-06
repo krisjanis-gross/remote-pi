@@ -13,7 +13,7 @@ var chart;
 var previous_data_timestamp = 0;
 var global_selected_trigger=0;
 
-
+var global_selected_sensor_ids = [];
 
 function jCription_handshake () {
 	//alert (target_URL);
@@ -445,15 +445,17 @@ function show_history (change_time_interval) {
 	 change_tab (active_page);
 		
 		
-		
-		
+	
+	 // pass also global_selected_sensor_ids
+	var selected_sensors = JSON.stringify(global_selected_sensor_ids)	;	
 	var action = "get_historical_data";	
 	var data_to_server =  {
 			'period' : global_time_interval,
 			'date_from' : date_from,
-			'date_to':date_to,
-			'single_sensor_selected':global_single_selected_sensor_id
-			
+			'date_to' : date_to,
+			'single_sensor_selected' : global_single_selected_sensor_id,
+			'selcected_sensors' : selected_sensors
+				
 		};
 	
 	// get data from server
@@ -471,7 +473,7 @@ function show_history_callback(data_from_server) {
 		    	              useUTC : false
 		    	          }
 		    	      });
-		    		 desired_height = $( document  ).height();
+		    		 desired_height = $( window  ).height();
 		    		 chart = new Highcharts.Chart({
 		    	            chart: {
 		    	                renderTo: 'graph',
@@ -527,9 +529,114 @@ function show_history_callback(data_from_server) {
 		
 	}
 	
+	get_sensor_list ();
+	
+}
+
+
+
+
+function get_sensor_list ()
+{
+	/*
+	if(!(typeof(change_time_interval)==='undefined')) global_time_interval = change_time_interval;
+	var date_range_for_URL = "";
+	if (change_time_interval == 'date_range') {
+		var date_from = $('#custom_date_from').val();
+		if (!Validate_date_str(date_from)) return false;
+
+		var date_to = $('#custom_date_to').val();
+		if (!Validate_date_str(date_to)) return false;
+		// validate dates.
+		
+		$( "#popup_custom_period" ).popup( "close" );
+		
+		global_date_range_URL = '&date_from=' + date_from + '&date_to=' + date_to;
+		
+	}
+	*/
+	 $('#graph_options').html('went for data...' +  $('#graph_options').html() );
+	
+	
+	
+	
 	// draw sensor selection mockup
-	$('#graph_options').html('<form><label><input type="checkbox" name="checkbox-0 ">Check me </label>	</form>');  
-	$("#graph_options").trigger('create');
+	// get_sensor_list
+	var action = "get_sensor_list";	
+	var data_to_server =  {/*
+			'period' : global_time_interval  ,
+			'date_from' : date_from,
+			'date_to':date_to*/
+			
+		};
+	
+	// get data from server
+	var data_from_server = json_encrypted_request (action,data_to_server,true);
+	
+}
+
+
+function get_sensor_list_callback (data_from_server) {
+	if (data_from_server.response_code == "OK") {
+		//$('#graph_options').html('<form><label><input type="checkbox" name="checkbox-0 ">Check me </label>	</form>');  
+		//$("#graph_options").trigger('create');
+		
+		
+		  
+		var items = [];
+		var checked = "";
+		  $.each(data_from_server.response_data, function(key, val) {
+
+			  if (global_selected_sensor_ids.indexOf(val.id) >= 0 ) {
+				  checked = ' checked ';
+			  }
+			  else {
+				  checked = '  ';
+			  }
+				items.push('<label><input type="checkbox"  id="sensor_checkbox-' + val.id + '"  name="' + val.id + '"  ' + checked + '>' + val.name + '</label>	');
+			  });
+			 
+		  
+		  $('#graph_options').html('<form><fieldset data-role="controlgroup">	' + items.join('') + ' </fieldset></form>');  
+		  
+		  
+		  // select checkboxes according to previous selecion
+
+		 
+	  
+		 $("#graph_options").trigger("create");
+			
+
+		 $.each(data_from_server.response_data, function(key, val) {
+					$( "#sensor_checkbox-" + val.id ).bind( "change",  
+															function(event) {
+																	var sensor_id_to_check = $(this).attr("id");
+																	sensor_id_to_check = sensor_id_to_check.replace("sensor_checkbox-", "");
+																	var new_value = $(this).prop('checked');
+																	
+																	if (new_value == true) {
+																		if (global_selected_sensor_ids.indexOf(sensor_id_to_check) === -1) {
+																				global_selected_sensor_ids.push(sensor_id_to_check);
+																	    	}  
+																	}
+																	else {
+																		global_selected_sensor_ids = global_selected_sensor_ids.filter(function(e) { return e !== sensor_id_to_check })
+																		
+																	}
+	
+															});
+
+				 });
+		 
+
+		
+	}
+	
+}
+
+function mark_sensor_checkbox (key)
+{
+	alert (key);
 }
 
 function increment_series_callback (data_from_server) {
@@ -556,7 +663,9 @@ function increment_series_callback (data_from_server) {
 					  if (add_this_data) {
 					  var y = parseFloat(val.value);
 					  series = chart.get(val.sensor_name);
-					  series.addPoint([x, y], true, false);
+					  if (series) {
+						  series.addPoint([x, y], true, false);
+					  }
 					}
 				}
 		  });

@@ -11,11 +11,11 @@ function json_encrypted_request(request_action, data, async )
 		};
 
     var request_data_to_server_string = JSON.stringify(request_data_to_server)	;
-	var encryptedString = $.jCryption.encrypt(request_data_to_server_string, password);
+	//var encryptedString = $.jCryption.encrypt(request_data_to_server_string, password);
 	
-	var encrypted_data =  {
-			"jCryption": encryptedString
-	};
+	//var encrypted_data =  {
+	//		"jCryption": encryptedString
+	//};
 	
 	var SERVER_API_URL = "http://" + target_URL + "/json_encrypted_API.php";
 	
@@ -26,7 +26,8 @@ function json_encrypted_request(request_action, data, async )
 		type: "POST",
 		async: async,
 		data: {
-			jCryption: encryptedString
+//			jCryption: encryptedString
+			request_data: request_data_to_server_string
 		},
 		error:(function(jqXHR, textStatus, errorThrown) {
 			//console.log("error " + textStatus);
@@ -46,8 +47,8 @@ function json_encrypted_request(request_action, data, async )
 					
 					
 					return_value =  response.rawdata;
-					return_value = $.jCryption.decrypt(return_value, password);
-					return_value = JSON.parse(return_value);
+					//return_value = $.jCryption.decrypt(return_value, password);
+					//return_value = JSON.parse(return_value);
 					
 					// check user login status
 					
@@ -85,6 +86,8 @@ function json_encrypted_request(request_action, data, async )
 								if (request_data_to_server.request_action == "check_session_data_APP")	APP_check_for_session_on_server_callback(return_value);
 								
 								if (request_data_to_server.request_action == "try_to_log_in")	try_to_log_in_callback(return_value);
+								
+								if (request_data_to_server.request_action == "get_sensor_list")	get_sensor_list_callback(return_value);
 						}
 						
 					}
