@@ -11,5 +11,13 @@ if ($pin_nr == 100)
 }
 
 
+function trigger_hook ($trigger_id, $command)
+{
+if ($trigger_id == 1)
+	error_log ("YYYYYYYSYSYSSSSSSSSSSSSSSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+
+
+
+}
 
 ?>

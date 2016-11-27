@@ -611,6 +611,16 @@ function set_trigger ($trigger_id, $command) {
 	$results = $static_db->query('UPDATE triggers SET `state` = ' . $command . ' where `id` = ' .  $trigger_id  );
 	$static_db->close();
 	save_static_db_in_storage();
+	
+	
+	
+	$custom_hook_file = "custom_hook.php";
+	
+	if(is_file($custom_hook_file)){
+		//print ("file is ");
+		require_once ($custom_hook_file);
+		trigger_hook ($trigger_id, $command);
+	}
 }
 
 function save_trigger($trigger_id, $description)
