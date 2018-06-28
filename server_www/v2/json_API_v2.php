@@ -19,7 +19,7 @@ else {
 		echo "Not called properly with request_type parameter!";
 }
 
-var_dump($postdata);
+//var_dump($postdata);
 
 
 switch ($request_action) {
