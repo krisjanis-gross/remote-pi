@@ -8,7 +8,7 @@ error_reporting(E_ALL);
 
 // TODO some API KEY CHECKS to validate the user...
 
-var_dump($request_parameters);
+var_dump($_POST);
 // parse parameters
 $request_parameters = $_POST["request_parameters"];
 $request_parameters = json_decode($request_parameters, true);
