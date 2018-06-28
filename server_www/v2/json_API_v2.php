@@ -8,13 +8,18 @@ error_reporting(E_ALL);
 
 // TODO some API KEY CHECKS to validate the user...
 
-var_dump($_POST);
-// parse parameters
-$request_parameters = $_POST["request_parameters"];
-$request_parameters = json_decode($request_parameters, true);
-isset ($request_parameters['request_action']) ? $request_action = $request_parameters['request_action'] : $request_action = "";
-isset ($request_parameters['request_data'])? $request_data = $request_parameters['request_data'] : $request_data = "";
 
+$postdata = file_get_contents("php://input");
+if (isset($postdata)) {
+	$request_parameters = json_decode($postdata);
+	$request_action = $request->request_action;
+  $request_data = $request->request_data;
+}
+else {
+		echo "Not called properly with request_type parameter!";
+}
+
+var_dump($postdata);
 
 
 switch ($request_action) {
