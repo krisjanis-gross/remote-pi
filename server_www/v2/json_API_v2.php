@@ -12,8 +12,8 @@ error_reporting(E_ALL);
 $postdata = file_get_contents("php://input");
 if (isset($postdata)) {
 	$request_parameters = json_decode($postdata);
-	$request_action = $request->request_action;
-  $request_data = $request->request_data;
+	$request_action = $request_parameters->request_action;
+  $request_data = $request_parameters->request_data;
 }
 else {
 		echo "Not called properly with request_type parameter!";
