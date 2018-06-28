@@ -8,7 +8,7 @@ error_reporting(E_ALL);
 
 // TODO some API KEY CHECKS to validate the user...
 
-
+var_dump($request_parameters);
 // parse parameters
 $request_parameters = $_POST["request_parameters"];
 $request_parameters = json_decode($request_parameters, true);
@@ -22,6 +22,7 @@ switch ($request_action) {
         $response_data['version'] = '0.2';
         $return_data['response_code'] = "OK";
         $return_data['response_data'] = $response_data;
+        return_data_to_client($return_data);
         break;
     case 1:
         echo "i equals 1";
@@ -31,7 +32,12 @@ switch ($request_action) {
         break;
 }
 
-print json_encode($return_data)
+function return_data_to_client($return_data) {
+  print json_encode($return_data);
+
+}
+
+
 
 
 
