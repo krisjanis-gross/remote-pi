@@ -19,7 +19,7 @@ isset ($request_parameters['request_data'])? $request_data = $request_parameters
 
 switch ($request_action) {
     case "version_check":
-        $response_data['version'] = '0.2'
+        $response_data['version'] = '0.2';
         $return_data['response_code'] = "OK";
         $return_data['response_data'] = $response_data;
         break;
