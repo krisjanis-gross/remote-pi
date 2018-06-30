@@ -29,8 +29,9 @@ switch ($request_action) {
         $return_data['response_data'] = $response_data;
         return_data_to_client($return_data);
         break;
-    case 1:
-        echo "i equals 1";
+    case "get_realtime_data":
+				$return_data = getRealtimeData();
+        return_data_to_client($return_data);
         break;
     case 2:
         echo "i equals 2";
@@ -57,6 +58,37 @@ function return_data_to_client($return_data) {
 }
 
 
+
+function getRealtimeData () {
+
+  global $include_path;
+
+	require_once($include_path . "read_thermometers.php");
+	require_once($include_path . "sensor_names.php");
+
+	$the_data = read_thermometers (false);
+
+	$array_of_readings = json_decode($the_data);
+
+	$sensor_name_list = get_sensor_name_list();
+
+	foreach ($array_of_readings as $key => $value)
+		{
+			$sensor_id = $key;
+			//foreach ($sensor_list as $key => $value)
+			if (isset( $sensor_name_list[$key])) $sensor_array['sensor_name'] = $sensor_name_list[$key];
+			else $sensor_array['sensor_name'] = $key;
+			$sensor_array['value'] = $value;
+
+			$output_new[$sensor_id] = $sensor_array;
+
+		}
+	$response_to_client['response_code'] = "OK";
+	$response_to_client['response_data'] = $output_new;
+
+  return $response_to_client;
+
+}
 
 
 
