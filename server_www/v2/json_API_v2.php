@@ -80,11 +80,16 @@ function getRealtimeData () {
 			else $sensor_array['sensor_name'] = $key;
 			$sensor_array['value'] = $value;
 
-			$output_new[$sensor_id] = $sensor_array;
+
+
+      if ($key == "__data_timestamp___")   $data_timestamp = $value; // not added to list
+      else $output_new[$sensor_id] = $sensor_array; // added to list
+
 
 		}
 	$response_to_client['response_code'] = "OK";
-	$response_to_client['response_data'] = $output_new;
+	$response_to_client['response_data']['timestamp'] = $data_timestamp;
+  $response_to_client['response_data']['data'] = $output_new;
 
   return $response_to_client;
 
