@@ -76,6 +76,7 @@ function getRealtimeData () {
 		{
 			$sensor_id = $key;
 			//foreach ($sensor_list as $key => $value)
+      $sensor_array['sensorID'] = $sensor_id;
 			if (isset( $sensor_name_list[$key])) $sensor_array['sensor_name'] = $sensor_name_list[$key];
 			else $sensor_array['sensor_name'] = $key;
 			$sensor_array['value'] = $value;
@@ -88,6 +89,7 @@ function getRealtimeData () {
 
 		}
 	$response_to_client['response_code'] = "OK";
+
 	$response_to_client['response_data']['timestamp'] = $data_timestamp;
   $response_to_client['response_data']['data'] = $output_new;
 
