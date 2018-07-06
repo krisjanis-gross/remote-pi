@@ -102,8 +102,10 @@ function getRealtimeData () {
 
 function getGpioList() {
   global $include_path;
+	require_once($include_path . "db_common.php");
 	require_once($include_path . "static_db.php");
-	require_once ($include_path . "db_common.php");
+
+
 	$static_db = open_static_data_db(true);
 
 	$results = $static_db->query('select * from pins;');
