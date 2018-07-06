@@ -102,6 +102,7 @@ function getRealtimeData () {
 
 function getGpioList() {
   global $include_path;
+
 	require_once($include_path . "db_common.php");
 	require_once($include_path . "static_db.php");
 
@@ -112,10 +113,10 @@ function getGpioList() {
 
 	$gpio_data_array = array();
 	while ($row = $results->fetchArray()) {
-		$gpio_data_element['id'] = $row['id'];
-		$gpio_data_element['state'] = $row['enabled'];
-		$gpio_data_element['locked'] = $row['locked'];
-		$gpio_data_element['description'] = $row['name'];
+		$gpio_data_element['relayID'] = $row['id'];
+		$gpio_data_element['relayState'] = $row['enabled'];
+		$gpio_data_element['relayIsLocked'] = $row['locked'];
+		$gpio_data_element['relayDescription'] = $row['name'];
 
 		array_push($gpio_data_array, $gpio_data_element );
 

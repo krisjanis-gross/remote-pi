@@ -1,16 +1,19 @@
 <?
+global $db_storage_folder;
+global $read_only_folder;
+global $tempfs_work_folder;
 $db_storage_folder = "/media/usbdrive/sqlite_data/";
 $read_only_folder = "/var/www/sqlite_db_templates/";
 $tempfs_work_folder = "/tmp/";
 
 function verify_sqlite_file ($file) {
-	// this function checks whether the file is OK. 
-	// there might be better function for this task and this can be replaced later... 
-	
+	// this function checks whether the file is OK.
+	// there might be better function for this task and this can be replaced later...
+
 //	error_log ( "checking file " . $file . "<br />");
 	$db = new SQLite3($file,SQLITE3_OPEN_READONLY);
-	
-	// try to get table list 
+
+	// try to get table list
 	$results = $db->query("SELECT * FROM sqlite_master WHERE type='table';");
 	$db->close();
 	if ($results == false) {
@@ -19,10 +22,10 @@ function verify_sqlite_file ($file) {
 	}
 	else return true;
 	//else while ($row = $results->fetchArray())     var_dump($row);
-	
+
 }
-	
-	
+
+
 /**
      * Get an array that represents directory tree
      * @param string $directory     Directory path
@@ -30,7 +33,7 @@ function verify_sqlite_file ($file) {
      * @param bool $listDirs         Include directories on listing
      * @param bool $listFiles         Include files on listing
      * @param regex $include         Include only paths that matches this regex
-     */	
+     */
 function directoryToArray($directory, $recursive = true, $listDirs = false, $listFiles = true, $include = '') {
         $arrayItems = array();
         $skipByExclude = false;
@@ -61,8 +64,8 @@ function directoryToArray($directory, $recursive = true, $listDirs = false, $lis
         closedir($handle);
         }
         return $arrayItems;
- }	
-	
+ }
+
 
 /**
      * Get an array that represents directory tree
@@ -104,7 +107,7 @@ function directoryToArray($directory, $recursive = true, $listDirs = false, $lis
         }
         return $arrayItems;
     }
-	
+
 */
 
 
