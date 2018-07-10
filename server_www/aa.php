@@ -65,7 +65,7 @@ function str_split_unicode($str, $l = 0) {
 require_once("static_db.php");
 $static_db = open_static_data_db();
 
-$results = $static_db->query("insert into pins values (123,'testpin',0,1);");
+$results = $static_db->query("insert into pins values (49,'testpin2',0,1);");
 
 
 

@@ -33,10 +33,14 @@ switch ($request_action) {
 				$return_data = getRealtimeData();
         return_data_to_client($return_data);
         break;
-				case "get_GPIO_list":
-						$return_data = getGpioList();
-		        return_data_to_client($return_data);
+	 case "get_GPIO_list":
+				$return_data = getGpioList();
+		    return_data_to_client($return_data);
 		    break;
+	 case "set_GPIO_pin":
+		 		$return_data = setGpioPin();
+		 		return_data_to_client($return_data);
+		 		break;
 }
 
 function return_data_to_client($return_data) {
@@ -119,7 +123,6 @@ function getGpioList() {
 		$gpio_data_element['relayDescription'] = $row['name'];
 
 		array_push($gpio_data_array, $gpio_data_element );
-
 	}
 	$static_db->close();
 
@@ -130,5 +133,19 @@ function getGpioList() {
 
 }
 
+function  setGpioPin () {
 
+	global $request_data;
+	global $include_path;
+	require_once($include_path . "static_db.php");
+	require_once($include_path ."gpio_control.php");
+//	var_dump($request_data);
+	process_gpio2($request_data->pin_id,$request_data->command);
+
+	$response_to_client['response_code'] = "OK";
+
+	return $response_to_client;
+
+
+}
  ?>
