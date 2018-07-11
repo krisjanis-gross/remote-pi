@@ -41,6 +41,11 @@ switch ($request_action) {
 		 		$return_data = setGpioPin();
 		 		return_data_to_client($return_data);
 		 		break;
+	case "get_Trigger_list":
+		 		$return_data = getTriggerList();
+		 		return_data_to_client($return_data);
+		 		break;
+
 }
 
 function return_data_to_client($return_data) {
@@ -148,4 +153,51 @@ function  setGpioPin () {
 
 
 }
+
+function getTriggerList () {
+	global $include_path;
+
+	require_once($include_path . "db_common.php");
+	require_once($include_path . "static_db.php");
+
+	global $static_db;
+	$static_db = open_static_data_db(true);
+	$results = $static_db->query('SELECT * FROM triggers');
+
+
+	$trigger_data_array = array();
+	while ($row = $results->fetchArray()) {
+		$trigger_data_element['triggerID'] = $row['id'];
+		$trigger_data_element['triggerState'] = $row['state'];
+		$trigger_data_element['triggerDescription'] = $row['description'];
+		$trigger_data_element['triggerParameters'] = get_parameter_list($row['id']);
+
+		array_push($trigger_data_array, $trigger_data_element );
+	}
+	$static_db->close();
+
+	$response_to_client['response_code'] = "OK";
+	$response_to_client['response_data']['data'] = $trigger_data_array;
+
+	return $response_to_client;
+
+}
+
+
+function get_parameter_list ($trigger_id)
+{
+	global $static_db;
+	$parameters = [];
+	$results = $static_db->query('SELECT * FROM trigger_parameters where trigger_id = ' . $trigger_id );
+	while ($row = $results->fetchArray()) {
+		$parameter_id = $row['id'];
+		$parameter_array["name"]= $row['parameter_name'];
+		$parameter_array["par_value"]= $row['value'];
+
+		$parameters[$parameter_id] = $parameter_array;
+	}
+	return $parameters;
+}
+
+
  ?>
