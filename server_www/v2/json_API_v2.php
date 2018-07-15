@@ -187,16 +187,16 @@ function getTriggerList () {
 function get_parameter_list ($trigger_id)
 {
 	global $static_db;
-	$parameters = [];
+  $parameter_array = array();
 	$results = $static_db->query('SELECT * FROM trigger_parameters where trigger_id = ' . $trigger_id );
 	while ($row = $results->fetchArray()) {
-		$parameter_id = $row['id'];
-		$parameter_array["name"]= $row['parameter_name'];
-		$parameter_array["par_value"]= $row['value'];
+		$parameter_array_element['ParameterID'] = $row['id'];
+		$parameter_array_element["ParameterName"]= $row['parameter_name'];
+		$parameter_array_element["ParameterValue"]= $row['value'];
 
-		$parameters[$parameter_id] = $parameter_array;
+		array_push($parameter_array, $parameter_array_element );
 	}
-	return $parameters;
+	return $parameter_array;
 }
 
 
