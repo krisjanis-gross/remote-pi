@@ -8,20 +8,20 @@ require_once ("db_common.php");
 
 $static_db_file_name = "static_data.db";
 $static_db_file_pattern = "/static_data/";
-	
+
 function open_static_data_db ($read_only = false) {
 
-	global $static_db_file_name; 
-	global $tempfs_work_folder; 
-	
-	
+	global $static_db_file_name;
+	global $tempfs_work_folder;
+
+
 	$static_data_db_file = $tempfs_work_folder . $static_db_file_name;
-	
+  //error_log("static_data_db_file ==" . $static_data_db_file);
 	// check if DB file is in place.
-	if (!file_exists ( $static_data_db_file )) 
-		get_static_db_file_from_storage ($static_db_file_name); 
+	if (!file_exists ( $static_data_db_file ))
+		get_static_db_file_from_storage ($static_db_file_name);
 		//if the file is not there then get the file from Storage or Read Only storage.
-	
+
 	// open the data base and return the db object
 	if ($read_only) $static_db = new SQLite3($static_data_db_file,SQLITE3_OPEN_READONLY);
 	else $static_db = new SQLite3($static_data_db_file);
@@ -37,25 +37,31 @@ function save_static_db_in_storage(){
 
 	$file_name_prefix = "static_data";
 
-	// current db file name 
+	// current db file name
 	$current_db_file_name = $tempfs_work_folder . $static_db_file_name;
-	
+
 	// construct file name
-	$new_file_name = $db_storage_folder . $file_name_prefix .  date("_YmdHi") . ".db";  
+	$new_file_name = $db_storage_folder . $file_name_prefix .  date("_YmdHi") . ".db";
 	//error_log ("saving file to " . $new_file_name);
 	if (!copy($current_db_file_name , $new_file_name )) {
 				error_log ( "failed to copy $file...\n");
-	}	
+	}
 }
 
 
 function get_static_db_file_from_storage ($db_file_name) {
-		
+
 		global $db_storage_folder;
 		global $read_only_folder;
 		global $tempfs_work_folder;
 		global $static_db_file_pattern;
-		
+
+
+error_log("<><><><><><funtion get_static_db_file_from_storage");
+error_log("<><><><><>< d_storage_folder=" . $db_storage_folder  );
+error_log("<><><><><>< tempfs_work_folder=" . $tempfs_work_folder  );
+
+
 		$valid_db_file = null;
 			// get file list from Storage location.
 		$db_file_list = directoryToArray($db_storage_folder,false,false,true,$static_db_file_pattern);
@@ -63,7 +69,7 @@ function get_static_db_file_from_storage ($db_file_name) {
 		// sort the list so that the newest files come first
 		arsort ($db_file_list);
 
-		// try to open files in starting with the newest. If a valid db file is found then it is used. 
+		// try to open files in starting with the newest. If a valid db file is found then it is used.
 		foreach ($db_file_list as $file) {
 			if (verify_sqlite_file($file)) // file found
 				{
@@ -71,7 +77,7 @@ function get_static_db_file_from_storage ($db_file_name) {
 				$valid_db_file = $file;
 				break;
 				}
-			
+
 			// try to open file
 		}
 
@@ -82,9 +88,8 @@ function get_static_db_file_from_storage ($db_file_name) {
 
 		// copy file to tempfs
 		if (!copy($valid_db_file, $tempfs_work_folder . $db_file_name )) {
-			error_log ( "failed to copy $file...\n");
+			error_log ( "failed to copy $valid_db_file...\n");
 		}
-
 }
 
 ?>
