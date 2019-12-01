@@ -6,7 +6,9 @@
 require_once ("db_common.php");
 
 
+global $static_db_file_name;
 $static_db_file_name = "static_data.db";
+global $static_db_file_pattern;
 $static_db_file_pattern = "/static_data/";
 
 function open_static_data_db ($read_only = false) {
@@ -16,7 +18,11 @@ function open_static_data_db ($read_only = false) {
 
 
 	$static_data_db_file = $tempfs_work_folder . $static_db_file_name;
+<<<<<<< HEAD
   //error_log("static_data_db_file ==" . $static_data_db_file);
+=======
+
+>>>>>>> 8338c35a36c2bd7143931f062733fa12eb9e42d5
 	// check if DB file is in place.
 	if (!file_exists ( $static_data_db_file ))
 		get_static_db_file_from_storage ($static_db_file_name);
@@ -56,12 +62,15 @@ function get_static_db_file_from_storage ($db_file_name) {
 		global $tempfs_work_folder;
 		global $static_db_file_pattern;
 
+<<<<<<< HEAD
 
 error_log("<><><><><><funtion get_static_db_file_from_storage");
 error_log("<><><><><>< d_storage_folder=" . $db_storage_folder  );
 error_log("<><><><><>< tempfs_work_folder=" . $tempfs_work_folder  );
 
 
+=======
+>>>>>>> 8338c35a36c2bd7143931f062733fa12eb9e42d5
 		$valid_db_file = null;
 			// get file list from Storage location.
 		$db_file_list = directoryToArray($db_storage_folder,false,false,true,$static_db_file_pattern);

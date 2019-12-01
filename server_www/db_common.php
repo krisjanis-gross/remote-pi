@@ -1,7 +1,15 @@
 <?
+<<<<<<< HEAD
 
 $db_storage_folder =  "/media/usbdrive/sqlite_data/";
 $read_only_folder =  "/var/www/sqlite_db_templates/";
+=======
+global $db_storage_folder;
+global $read_only_folder;
+global $tempfs_work_folder;
+$db_storage_folder = "/media/usbdrive/sqlite_data/";
+$read_only_folder = "/var/www/sqlite_db_templates/";
+>>>>>>> 8338c35a36c2bd7143931f062733fa12eb9e42d5
 $tempfs_work_folder = "/tmp/";
 
 function verify_sqlite_file ($file) {
