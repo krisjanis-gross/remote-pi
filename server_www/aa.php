@@ -9,8 +9,24 @@
 
 error_reporting(E_ALL);
 ini_set('display_errors', 'On');
+
+
+
+
+$cars['header'] = "fasdfasdf";
+$cars['data'] = array("Volvo","BMW","Toyota");
+var_dump($cars);
+print ("<br/><br/><br/>" );
+
+
+$cars_json = json_encode ($cars);
+var_dump ($cars_json );
+
+
+
+
 /*
-require_once("sensor_log_db.php");
+require_once("db_sensor_log_functions.php");
 flush_sensor_data_to_permanent_storage();
 $sensor_log_db = open_sensor_DB_in_STORAGE ();
 
@@ -59,24 +75,25 @@ function str_split_unicode($str, $l = 0) {
 */
 
 
+/*
 
 
-
-require_once("static_db.php");
+require_once("db_app_data_functions.php");
 $static_db = open_static_data_db();
 
-$results = $static_db->query("insert into pins values (49,'testpin2',0,1);");
+$results = $static_db->query("update pins set name = 'Varsts 1' where id =  11; ");
 
 
 
 
-$results = $static_db->query('SELECT * FROM login_password');
+$results = $static_db->query('SELECT * FROM pins');
 while ($row = $results->fetchArray()) {
 	var_dump($row);
+	print ("<br/>");
 }
 
 
-
+*/
 
 
 
@@ -89,7 +106,7 @@ print("after:");
 var_dump($_POST["TEST_VALUE"]);
 */
 /*
-require_once("static_db.php");
+require_once("db_app_data_functions.php");
 $static_db = open_static_data_db();
 
 $results = $static_db->query('SELECT * FROM sensor_names');
@@ -109,11 +126,11 @@ while ($row = $results->fetchArray()) {
 //UPDATE  `sensor_names` SET  `sensor_name` =  "asdf" WHERE  `id` = "28-031501c40dff";
 
 /*
-require_once("static_db.php");
+require_once("db_app_data_functions.php");
 $static_db = open_static_data_db();
 
 
-	require_once("sensor_log_db.php");
+	require_once("db_sensor_log_functions.php");
 	flush_sensor_data_to_permanent_storage();
 	$sensor_log_db = open_sensor_DB_in_STORAGE ();
 
@@ -146,7 +163,7 @@ $results = $static_db->query("update pins set name = 'Relejs 1' where id = 11;")
 $results = $static_db->query("update pins set name = 'Miglas vaarsts' where id = 12;");
 
 
-	require_once("sensor_log_db.php");
+	require_once("db_sensor_log_functions.php");
 	$sensor_log_db = open_sensor_DB_in_STORAGE ();
 $sensor_log_db->query("delete from sensor_log where 1;");
 

@@ -1,7 +1,7 @@
 <?php
 //require_once("db.php");
-require_once("sensor_names.php");
-require_once("sensor_log_db.php");
+require_once("functions_sensors.php");
+require_once("db_sensor_log_functions.php");
 	
 // header
 $csv_export = 'Sensor ID;Sensor Name;Datetime;Value';

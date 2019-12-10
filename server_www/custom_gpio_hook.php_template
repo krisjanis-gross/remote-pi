@@ -1,0 +1,16 @@
+<?
+
+
+// remove the _template and you can write custom functions to be called after some default functions.
+
+
+function pin_hook ($pin_nr,$command)
+{
+if ($pin_nr == 100)
+	error_log ("pin # 100 custom function called");
+}
+
+
+
+
+?>

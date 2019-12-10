@@ -1,14 +1,15 @@
 <?php
 // include some files
-$include_path = "";
-require_once("static_db.php");
-require_once ($include_path . "sensor_log_db.php");
+
+$API_VERSION  = '0.2';
+
+$config_API_KEY = "new-key"; // todo - read from config
+
+require_once("db_app_data_functions.php");
+require_once ("db_sensor_log_functions.php");
 
 ini_set('display_errors',1);
 error_reporting(E_ALL);
-
-
-// TODO some API KEY CHECKS to validate the user...
 
 
 $postdata = file_get_contents("php://input");
@@ -16,10 +17,21 @@ if (isset($postdata)) {
 	$request_parameters = json_decode($postdata);
 	if (isset($request_parameters->request_action)) $request_action = $request_parameters->request_action; else $request_action = null;
 	if (isset($request_parameters->request_data))  $request_data = $request_parameters->request_data;
+	if (isset($request_parameters->API_key))  $request_API_key = $request_parameters->API_key; else $request_API_key = null;
 }
 else {
 		echo "Not called properly with request_type parameter!";
+		die();
 }
+
+
+// check API key.
+if ($request_API_key <> $config_API_KEY ) {
+	echo ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
+	error_log ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
+	die();
+}
+
 
 //var_dump($postdata);
 //error_log("zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz request_action" . $request_action);
@@ -27,7 +39,7 @@ else {
 
 switch ($request_action) {
     case "version_check":
-        $response_data['version'] = '0.2';
+        $response_data['version'] = $API_VERSION;
         $return_data['response_code'] = "OK";
         $return_data['response_data'] = $response_data;
         return_data_to_client($return_data);
@@ -94,43 +106,37 @@ function return_data_to_client($return_data) {
 
 
 function get_sensor_data () {
+	require_once("functions_sensors.php");
+  $sensor_name_list = get_sensor_name_list();
 
-  global $include_path;
+	$sensor_data = apc_fetch('sensor_data', $sensor_data);
 
-	require_once($include_path . "read_thermometers.php");
-	require_once($include_path . "sensor_names.php");
-
-	$the_data = read_thermometers (false);
-
-	$array_of_readings = json_decode($the_data);
-
-	$sensor_name_list = get_sensor_name_list();
-
+	$array_of_readings = $sensor_data["data"];
 	foreach ($array_of_readings as $key => $value)
-		{
-			$sensor_array['id'] =  $key;
-			//foreach ($sensor_list as $key => $value)
-			if (isset( $sensor_name_list[$key])) $sensor_array['sensor_name'] = $sensor_name_list[$key];
-			else $sensor_array['sensor_name'] = $key;
-			$sensor_array['value'] = $value;
+			{
+				$sensor_id = $value['id'];
+				$output_sensor_array['id'] =  $sensor_id;
+				//foreach ($sensor_list as $key => $value)
+				if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$key];
+				else $output_sensor_array['sensor_name'] = $sensor_id;
 
-			// tod- refactor
-			if( $sensor_array['id'] == "__data_timestamp___") {
-				$data_timestam =  $value;
+				$output_sensor_array['value'] = $value['value'];
+
+				// tod- refactor
+				//if( $sensor_array['id'] == "__data_timestamp___") {
+				//	$data_timestam =  $value;
+				//}
+				$output_new[] = $output_sensor_array;
 			}
-			else $output_new[] = $sensor_array;
 
-		}
-	$response_to_client['response_code'] = "OK";
-	$response_data_array['timestamp'] = $data_timestam;
+		$response_to_client['response_code'] = "OK";
+		$response_data_array['timestamp'] = $sensor_data["timestamp"];
 		$response_data_array['data']= $output_new;
-	$response_to_client['response_data'] =  $response_data_array;
+		$response_to_client['response_data'] =  $response_data_array;
 
-  return $response_to_client;
+	  return $response_to_client;
 
 }
-
-
 
 
 
@@ -163,10 +169,8 @@ function get_GPIO_list ()  {
 
 function set_GPIO_pin ($request_data)
 {
-	global $include_path;
-
-	require_once($include_path . "static_db.php");
-	require_once($include_path ."gpio_control.php");
+	require_once("db_app_data_functions.php");
+	require_once("functions_gpio_control.php");
 
 	//error_log("setting pin : " . $request_data->pin_id . " to " .  $request_data->command );
 	process_gpio2($request_data->pin_id,$request_data->command);
@@ -178,6 +182,7 @@ function set_GPIO_pin ($request_data)
 
 function set_trigger_state ($request_data)
 {
+	require_once("functions_triggers.php");
  	$trigger_id = $request_data->triggerID;
 	$command = $request_data->command;
   if  (is_numeric($trigger_id)) 	set_trigger ($trigger_id,$command);
@@ -188,24 +193,7 @@ function set_trigger_state ($request_data)
 }
 
 
-function set_trigger ($trigger_id, $command) {
 
-	require_once("static_db.php");
-	$static_db = open_static_data_db(false);
-	$results = $static_db->query('UPDATE triggers SET `state` = ' . $command . ' where `id` = ' .  $trigger_id  );
-	$static_db->close();
-	save_static_db_in_storage();
-
-
-
-	$custom_hook_file = "custom_hook.php";
-
-	if(is_file($custom_hook_file)){
-		//print ("file is ");
-		require_once ($custom_hook_file);
-		trigger_hook ($trigger_id, $command);
-	}
-}
 
 
 function setParameterValue($request_data) {
@@ -223,7 +211,7 @@ function setParameterValue($request_data) {
 
 
 function process_parameter_change($id,$new_value) {
-  require_once("static_db.php");
+  require_once("db_app_data_functions.php");
 
 	if  (is_numeric($id) and is_numeric($new_value))
 	{
@@ -239,12 +227,8 @@ function process_parameter_change($id,$new_value) {
 
 function  get_historic_data($request_data)
 {
-	global $include_path;
-		//error_log($request_data->period);
 
-	require_once ($include_path . "sensor_names.php");
-	//require_once ($include_path . "db_common.php");
-
+	require_once ("functions_sensors.php");
 
 	$sensor_data =  sensor_historic_data ($request_data->period, $request_data->selected_sensors);
 
@@ -410,8 +394,8 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 
 function get_sensor_list ($request_data)
 {
-	require_once("sensor_names.php");
-	require_once("sensor_log_db.php");
+	require_once("functions_sensors.php");
+	require_once("db_sensor_log_functions.php");
 //error_log("ddddddddddddddddget_sensor_listdddddddddddddddget_sensor_listddddget_sensor_listdddddddddddddddddddddddddd");
 
 
@@ -492,7 +476,7 @@ function sensor_id_list_per_period ($data_period) {
 
 function get_trigger_list ()
 {
-	require_once("static_db.php");
+	require_once("db_app_data_functions.php");
 
 
 	$static_db = open_static_data_db(true);
@@ -523,7 +507,7 @@ function get_trigger_list ()
 
 function get_parameter_list ($trigger_id)
 {
-	require_once("static_db.php");
+	require_once("db_app_data_functions.php");
 	$static_db = open_static_data_db(true);
 
 	$parameters  = array();
