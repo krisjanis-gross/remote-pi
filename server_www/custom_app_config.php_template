@@ -1,0 +1,10 @@
+<?
+// app config.
+
+// token used for API calls
+$config_API_KEY = "new-key";
+
+// other parameters
+$sensor_reading_db_log_interval = 60 ; // seconds
+
+?>

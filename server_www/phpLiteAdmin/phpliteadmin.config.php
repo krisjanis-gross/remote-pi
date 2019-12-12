@@ -1,4 +1,4 @@
-<?php 
+<?php
 //
 // This is sample configuration file
 //
@@ -10,7 +10,15 @@
 // Please see https://bitbucket.org/phpliteadmin/public/wiki/Configuration for more details
 
 //password to gain access
-$password = 'token';
+
+
+/// set the password = to API key
+$config_file = "../custom_app_config.php";
+if(is_file($config_file)){
+	require_once ($config_file);
+	$password = $config_API_KEY;
+}
+//$password = 'token';
 
 //directory relative to this file to search for databases (if false, manually list databases in the $databases variable)
 $directory = '/tmp/';
@@ -79,4 +87,3 @@ $debug = false;
 
 // the user is allowed to create databases with only these extensions
 $allowed_extensions = array('db','db3','sqlite','sqlite3');
-

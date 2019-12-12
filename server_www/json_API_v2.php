@@ -3,7 +3,18 @@
 
 $API_VERSION  = '0.2';
 
-$config_API_KEY = "new-key"; // todo - read from config
+
+$config_file = "custom_app_config.php";
+if(is_file($config_file)){
+	require_once ($config_file);
+}
+else // some default config
+{
+	$config_API_KEY = "new-key";
+	$sensor_reading_db_log_interval = 60 ;
+}
+
+
 
 require_once("db_app_data_functions.php");
 require_once ("db_sensor_log_functions.php");
@@ -336,13 +347,21 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 
 		$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
 
+
+		$reset = date_default_timezone_get();
+		date_default_timezone_set('UTC');
+	//	$stamp = strtotime($dateStr);
+
+
 		while ($row = $results->fetchArray())
 		{
 
 			$sensor_id = $row['sensor_id'];
 
-
+			// $row['datetime'] - already includes time zone ajustment (see how data was inserted in the table)
 			$datetime = strtotime ($row['datetime']) ;
+		//	error_log("ddddddddddddddddddddddddatetime = " . $row['datetime']);
+		//	error_log("uuuuuuuuuuuuuuuuuuuuuuuunixtime = " . $datetime);
 			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
 
 			$sensor_data = (float) $row["value"];
@@ -382,7 +401,7 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 
 		}
 
-
+	 date_default_timezone_set($reset);
 
 	}
 
