@@ -11,7 +11,7 @@ error_reporting(E_ALL);
 ini_set('display_errors', 'On');
 
 
-
+/*
 
 $cars['header'] = "fasdfasdf";
 $cars['data'] = array("Volvo","BMW","Toyota");
@@ -22,15 +22,31 @@ print ("<br/><br/><br/>" );
 $cars_json = json_encode ($cars);
 var_dump ($cars_json );
 
+*/
 
+$config_file = "custom_app_config.php";
+if(is_file($config_file)){
+	require_once ($config_file);
+}
+
+
+require_once("db_sensor_log_functions.php");
+flush_sensor_data_to_permanent_storage();
+backup_sensor_log_db ();
+purge_sensor_data_history();
 
 
 /*
-require_once("db_sensor_log_functions.php");
-flush_sensor_data_to_permanent_storage();
 $sensor_log_db = open_sensor_DB_in_STORAGE ();
 
-$results = $sensor_log_db->query("select distinct sensor_id from sensor_log ;");
+$results = $sensor_log_db->query("alter table sensor_log add 'dataSaveLevel'	INTEGER NOT NULL DEFAULT 1 ;");
+while ($row = $results->fetchArray()) {
+	var_dump($row);
+}
+
+$temp_db = open_sensor_log_db_in_TEMPFS_ ();
+
+$results = $temp_db->query("alter table sensor_log add 'dataSaveLevel'	INTEGER NOT NULL DEFAULT 1 ;");
 while ($row = $results->fetchArray()) {
 	var_dump($row);
 }

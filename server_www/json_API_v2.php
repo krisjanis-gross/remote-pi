@@ -307,10 +307,10 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 	if ( $period == "hour") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 hour')";
 	if ( $period == "3hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 hours')";
 	if ( $period == "6hrs") $query_datetime_filter = " AND datetime > datetime('now','localtime','-6 hours')";
-	if ( $period == "day") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 day') and strftime ('%M', datetime) like '_1'"; // every 10 minutes
-	if ( $period == "3days") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 days') and strftime ('%M', datetime) = '01'"; // every hour
-	if ( $period == "week") $query_datetime_filter = " AND datetime > datetime('now','localtime','-7 days') and strftime ('%M', datetime) = '01'"; // every hour
-	if ( $period == "month") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 month') and strftime ('%M', datetime) = '01'"; // every hour
+	if ( $period == "day") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 day')"; //
+	if ( $period == "3days") $query_datetime_filter = " AND datetime > datetime('now','localtime','-3 days')"; //
+	if ( $period == "week") $query_datetime_filter = " AND datetime > datetime('now','localtime','-7 days')"; //
+	if ( $period == "month") $query_datetime_filter = " AND datetime > datetime('now','localtime','-1 month')"; //
 	if ( $period == "date_range") {
 		if ( ($date_from <> "") AND ($date_to <> "") ) $query_datetime_filter = sprintf(" AND datetime >= datetime('%s') AND datetime <= datetime('%s')  and strftime ('%%M', datetime) = '01'", $date_from, $date_to);
 	}

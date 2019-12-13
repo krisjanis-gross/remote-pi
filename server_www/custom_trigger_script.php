@@ -74,8 +74,10 @@ function process_trigger_1()
 		//error_log ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% DISABLE INTERNET AND TRIGGER NOW:");
 		// disable trigger
 		set_trigger(1,0);
+		global $trigger_log_data;
+		$trigger_log_data = true;
 		}
-
+ 
 
   $minutes_remaining = round ( ($X - $elapsed_time_since_start) / 60   , 0);
   add_sensor_reading("E_minutes_remaining", $minutes_remaining);

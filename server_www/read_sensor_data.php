@@ -4,9 +4,17 @@
 
 //if ( $_SERVER['REMOTE_ADDR'] != '127.0.0.1' ) exit; // designed to be called locally by scheduler
 
+$config_file = "custom_app_config.php";
+if(is_file($config_file)){
+	require_once ($config_file);
+}
+
+
+
 $log_data_now = false;
 $sensor_reading_db_log_interval = 60 ; // seconds
 
+$trigger_log_data = false;
 
 //OLD
 //$all_data = '"__data_timestamp___":"' . date('Y-m-d H:i:s') . '"';
@@ -92,21 +100,46 @@ $sensor_reading_db_log_interval = 60 ; // seconds
 // 4. Data log in DB                                    /////////////////////
 /////////////////////////////////////////////////////////////////////////////
 
+//// 4.1 determine
+
+/*flow for each reading save
+1) if trigger_event -> long term save
+     else if long term timer hit -> long_term_save
+             else if mid term timer hit -> mid term save
+                     else if  allDataSaveIntervalMinues  is hit-> default save.
+*/
+
+$data_save_LEVEL = 0; // 0 = no save; 1 = default save; 2 = mid term save; 3 = long term save;
 $timestamp_now = microtime(true);
-if (!$log_data_now) {
-   // data should be logged every $sensor_reading_db_log_interval seconds
-
-   // get last execution time
-   $db_save_timestamp = apc_fetch('db_save_timestamp');
-   if (!$db_save_timestamp) $db_save_timestamp = 0;
-
-   //  decide if it is time to go again ;)
-   $elapsed_time_since_last_save = $timestamp_now  - $db_save_timestamp;
-   if ($elapsed_time_since_last_save > $sensor_reading_db_log_interval) $log_data_now = true;
-}
 
 
-if ($log_data_now) { // save sensor readings in DB ?
+if ($trigger_log_data)  {
+					$data_save_LEVEL = 3;
+					apc_store('longTermTriggerTimestamp',$timestamp_now);
+					apc_store('midTermTriggerTimestamp',$timestamp_now);
+					apc_store('allDataTriggerTimestamp',$timestamp_now);
+				 }// long term save
+   elseif (check_trigger_timer_hit('longTermTriggerTimestamp',$longTermSaveIntervalSeconds)) {
+   	 					$data_save_LEVEL = 3; // long term save
+							// save timestamp
+							apc_store('longTermTriggerTimestamp',$timestamp_now);
+							apc_store('midTermTriggerTimestamp',$timestamp_now);
+							apc_store('allDataTriggerTimestamp',$timestamp_now);
+      				}
+	 			elseif (check_trigger_timer_hit('midTermTriggerTimestamp',$midTermSaveIntervalSeconds)) {
+	 						$data_save_LEVEL = 2; // mid term save
+							apc_store('midTermTriggerTimestamp',$timestamp_now);
+							apc_store('allDataTriggerTimestamp',$timestamp_now);
+	 						}
+							elseif (check_trigger_timer_hit('allDataTriggerTimestamp',$allDataSaveIntervalSeconds)) {
+									$data_save_LEVEL = 1; // mid term save
+									apc_store('allDataTriggerTimestamp',$timestamp_now);
+							}
+
+//error_log ("////////////////////// data_save_LEVEL $data_save_LEVEL");
+// log data with this data_save_LEVEL
+
+if ($data_save_LEVEL > 0) { // save sensor readings in DB ?
 	//print "process cron ";
 	apc_store('db_save_timestamp',$timestamp_now);
 
@@ -118,12 +151,15 @@ if ($log_data_now) { // save sensor readings in DB ?
 	foreach ($sensor_data["data"]  as $key => $value) {
 	  $sensor_id = $value['id'];
 	  $measurement = $value['value'];
-	  $insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $sensor_data["timestamp"] . "'," . $measurement .")";
+	  $insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $sensor_data["timestamp"] . "'," . $measurement .", " . $data_save_LEVEL . ")";
 	//	error_log("---------------------------------------- $insert_query -------------------");
 		$results = $sensor_log_db->query($insert_query);
 	}
 	$sensor_log_db->close();
 
+	/////////////////////////////////////////////////////////////////////////////
+	// backup in permanent storage every n-th time this script is executed    ///
+	/////////////////////////////////////////////////////////////////////////////
 
 	// backup every n-th time this script is executed
 	$nth = 60;
@@ -135,10 +171,30 @@ if ($log_data_now) { // save sensor readings in DB ?
 	if ($cron_counter > $nth) {
 
 		flush_sensor_data_to_permanent_storage ();
+		purge_sensor_data_history();
 		backup_sensor_log_db ();
 		$cron_counter = 0;
 	}
 	apc_store('cron_counter', $cron_counter);
+}
+
+
+
+
+
+
+function check_trigger_timer_hit ($timestampName,$interval) {
+	// get last execution time
+	$db_save_timestamp = apc_fetch($timestampName);
+	if (!$db_save_timestamp) $db_save_timestamp = 0;
+
+	global $timestamp_now;
+
+	//  decide if it is time to go again ;)
+	$elapsed_time_since_last_timer_hit = $timestamp_now  - $db_save_timestamp;
+	if ($elapsed_time_since_last_timer_hit > $interval) return true;
+  else return false;
+
 }
 
 ?>

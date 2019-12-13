@@ -25,8 +25,9 @@ function flush_sensor_data_to_permanent_storage (){
 		$sensor_id = $row["sensor_id"];
 		$datetime = $row["datetime"];
 		$value = $row["value"];
+		$data_save_LEVEL = $row["dataSaveLevel"];
 
-		$insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $datetime . "',". $value .")";
+		$insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $datetime . "',". $value .   ",  "  . $data_save_LEVEL .  ")";
 	//	print ("<br /> Insert query  = $insert_query <br/ >");
 		$insert_result = $storage_db->query($insert_query);
 
@@ -72,7 +73,8 @@ function open_sensor_DB_in_STORAGE ($read_only = false) {
 	if ($valid_db_file == null) { // if a valid DB file is not located in storage then we use the template file.
 		global $read_only_folder;
 		global $sensor_log_template_file;
-		$valid_db_file = $db_storage_folder . "sensor_log_" .  date("YmdHi") . ".db";
+		global $file_name_prefix;
+		$valid_db_file = $db_storage_folder . $file_name_prefix .  date("YmdHi") . ".db";
 		if (!copy($read_only_folder . $sensor_log_template_file , $valid_db_file ))
 				error_log ( "failed to copy $sensor_log_db_file_tempfs...\n");
 	}
@@ -160,6 +162,34 @@ function backup_sensor_log_db () {
 //		else print ("keeping file" . $file . "<br/ > ");
 
 	}
+
+}
+
+
+function purge_sensor_data_history ()
+
+{
+
+global $allDataSaveDays;
+global $midTermSaveDays;
+global $longTermSaveDays;
+
+
+$purge_query1 = "delete from sensor_log where datetime < datetime('now','localtime','-$longTermSaveDays days');";
+//error_log("ppppppppppppppppppppppppppppppppppppppurge $purge_query1" );
+$purge_query2 = "delete from sensor_log where datetime < datetime('now','localtime','-$midTermSaveDays days') AND dataSaveLevel < 3;";
+//error_log("ppppppppppppppppppppppppppppppppppppppurge2 $purge_query2" );
+$purge_query3 = "delete from sensor_log where datetime < datetime('now','localtime','-$allDataSaveDays days') AND dataSaveLevel < 2;";
+//error_log("ppppppppppppppppppppppppppppppppppppppurge2 $purge_query3" );
+
+
+	$storage_db  = open_sensor_DB_in_STORAGE ();
+	$result1 = $storage_db->query($purge_query1);
+  $result2 = $storage_db->query($purge_query2);
+  $result3 = $storage_db->query($purge_query3);
+	$storage_db->close();
+
+
 
 }
 ?>
