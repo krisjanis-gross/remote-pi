@@ -8,7 +8,7 @@ $config_API_KEY = "new-key";
 $sensor_reading_db_log_interval = 60 ; // seconds
 
 // sensor data save parameters
-$allDataSaveDays = 1;
+$allDataSaveHours = 3;
 $allDataSaveIntervalSeconds = 1 * 60; // 1 minute
 
 $midTermSaveDays = 90;

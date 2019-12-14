@@ -34,9 +34,10 @@ require_once("db_sensor_log_functions.php");
 flush_sensor_data_to_permanent_storage();
 backup_sensor_log_db ();
 purge_sensor_data_history();
+//$db->exec("vacuum");
 
 
-/*
+/* upgrade script to v21
 $sensor_log_db = open_sensor_DB_in_STORAGE ();
 
 $results = $sensor_log_db->query("alter table sensor_log add 'dataSaveLevel'	INTEGER NOT NULL DEFAULT 1 ;");

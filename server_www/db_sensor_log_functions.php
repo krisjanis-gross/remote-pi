@@ -170,7 +170,7 @@ function purge_sensor_data_history ()
 
 {
 
-global $allDataSaveDays;
+global $allDataSaveHours;
 global $midTermSaveDays;
 global $longTermSaveDays;
 
@@ -179,7 +179,7 @@ $purge_query1 = "delete from sensor_log where datetime < datetime('now','localti
 //error_log("ppppppppppppppppppppppppppppppppppppppurge $purge_query1" );
 $purge_query2 = "delete from sensor_log where datetime < datetime('now','localtime','-$midTermSaveDays days') AND dataSaveLevel < 3;";
 //error_log("ppppppppppppppppppppppppppppppppppppppurge2 $purge_query2" );
-$purge_query3 = "delete from sensor_log where datetime < datetime('now','localtime','-$allDataSaveDays days') AND dataSaveLevel < 2;";
+$purge_query3 = "delete from sensor_log where datetime < datetime('now','localtime','-$allDataSaveHours hours') AND dataSaveLevel < 2;";
 //error_log("ppppppppppppppppppppppppppppppppppppppurge2 $purge_query3" );
 
 
