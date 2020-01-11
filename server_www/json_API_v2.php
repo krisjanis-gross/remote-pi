@@ -87,6 +87,11 @@ switch ($request_action) {
 				$return_data = setParameterValue($request_data);
 		    return_data_to_client($return_data);
 				break;
+				case "getDeviceConfig":
+				$return_data = getDeviceConfig($request_data);
+				return_data_to_client($return_data);
+				break;
+
 }
 
 function return_data_to_client($return_data) {
@@ -128,7 +133,7 @@ function get_sensor_data () {
 				$sensor_id = $value['id'];
 				$output_sensor_array['id'] =  $sensor_id;
 				//foreach ($sensor_list as $key => $value)
-				if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$key];
+				if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
 				else $output_sensor_array['sensor_name'] = $sensor_id;
 
 				$output_sensor_array['value'] = $value['value'];
@@ -175,7 +180,34 @@ function get_GPIO_list ()  {
 	return $response_to_client;
 }
 
+function getDeviceConfig ($request_data) {
+  global $allDataSaveHours;
+  global $allDataSaveIntervalSeconds;
+	global $midTermSaveDays;
+	global $midTermSaveIntervalSeconds;
+	global $longTermSaveDays;
+	global $longTermSaveIntervalSeconds;
 
+
+
+	$device_config['allDataSaveHours'] = $allDataSaveHours;
+	$device_config['allDataSaveIntervalSeconds'] = $allDataSaveIntervalSeconds;
+
+	$device_config['midTermSaveDays'] = $midTermSaveDays;
+	$device_config['midTermSaveIntervalSeconds'] = $midTermSaveIntervalSeconds;
+
+	$device_config['longTermSaveDays'] = $longTermSaveDays;
+	$device_config['longTermSaveIntervalSeconds'] = $longTermSaveIntervalSeconds;
+
+//error_log("---------------------getDeviceConfig : " . $allDataSaveHours . "    " .  $allDataSaveIntervalSeconds );
+
+  $response_to_client['response_data'] = $device_config;
+
+	$response_to_client['response_code'] = "OK";
+
+	return $response_to_client;
+
+}
 
 
 function set_GPIO_pin ($request_data)
@@ -251,7 +283,7 @@ function  get_historic_data($request_data)
 				$data_row  = array();
 				$sensor_name = get_sensor_name_by_id($s_id);
 				$data_row['name'] = $sensor_name;
-				$data_row['id'] = $sensor_name;
+				$data_row['id'] = $s_id;
 				$data_row['data'] = $s_data;
 				$data_row['type'] = 'spline';
 				array_push($result, $data_row);
