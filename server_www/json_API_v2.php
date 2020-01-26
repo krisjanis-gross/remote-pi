@@ -19,9 +19,10 @@ else // some default config
 require_once("db_app_data_functions.php");
 require_once ("db_sensor_log_functions.php");
 
+/*
 ini_set('display_errors',1);
 error_reporting(E_ALL);
-
+*/
 
 $postdata = file_get_contents("php://input");
 if (isset($postdata)) {
@@ -87,8 +88,16 @@ switch ($request_action) {
 				$return_data = setParameterValue($request_data);
 		    return_data_to_client($return_data);
 				break;
-				case "getDeviceConfig":
+		case "getDeviceConfig":
 				$return_data = getDeviceConfig($request_data);
+				return_data_to_client($return_data);
+				break;
+		case "setPinConfig":
+				$return_data = setPinConfig($request_data);
+				return_data_to_client($return_data);
+				break;
+		case "setSensorName":
+				$return_data = setSensorName($request_data);
 				return_data_to_client($return_data);
 				break;
 
@@ -572,6 +581,54 @@ function get_parameter_list ($trigger_id)
 	return $parameters;
 }
 
+
+function setPinConfig($request_data) {
+
+	$pinID = $request_data->pinID;
+	$newPinId = $request_data->newPinId;
+	$pinDescription = $request_data->pinDescription;
+
+ if (is_numeric($newPinId) && is_numeric($pinID))
+ {
+     if ($pinID == 0)  // insert new value
+		  	{
+					require_once("db_app_data_functions.php");
+					$static_db = open_static_data_db();
+					$results = $static_db->query('INSERT INTO pins VALUES (' . $newPinId . ', "'   . $pinDescription . '" ,0,0) ' );
+					 $static_db->close();
+				}
+			else // UPDATE
+			  {
+					require_once("db_app_data_functions.php");
+					$static_db = open_static_data_db();
+					$results = $static_db->query('UPDATE pins SET id = '. $newPinId .' , name = "'.  $pinDescription  .'" where id = '. $pinID .';');
+ 				 $static_db->close();
+				}
+
+
+ }
+
+ $response_to_client['response_code'] = "OK";
+ $response_to_client['response_data'] = "";
+	return $response_to_client;
+}
+
+
+function setSensorName  ($request_data) {
+	$sensorID = $request_data->sensorID;
+	$sensorName = $request_data->sensorName;
+  //error_log("///////////////////// SET SENSOR NAME id =   $sensorID   name =   $sensorName  ");
+
+	require_once("db_app_data_functions.php");
+	$static_db = open_static_data_db();
+	$results = $static_db->query('UPDATE sensor_names SET sensor_name = "'.  $sensorName  .'" where id = "'. $sensorID .'";');
+	$static_db->close();
+  apc_delete('sensor_list');
+
+	$response_to_client['response_code'] = "OK";
+	$response_to_client['response_data'] = "";
+	return $response_to_client;
+}
 
 
  ?>

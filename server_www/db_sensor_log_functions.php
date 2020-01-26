@@ -76,7 +76,7 @@ function open_sensor_DB_in_STORAGE ($read_only = false) {
 		global $file_name_prefix;
 		$valid_db_file = $db_storage_folder . $file_name_prefix .  date("YmdHi") . ".db";
 		if (!copy($read_only_folder . $sensor_log_template_file , $valid_db_file ))
-				error_log ( "failed to copy $sensor_log_db_file_tempfs...\n");
+				error_log ( "failed to copy default sensor log DB file to storage $sensor_log_db_file_tempfs...\n");
 	}
 //error_log($valid_db_file);
 	if ($read_only) $db = new SQLite3($valid_db_file,SQLITE3_OPEN_READONLY);
@@ -149,21 +149,11 @@ function backup_sensor_log_db () {
 
 	}
 
-	// delete archive files that alre older than N
-//	echo ("doing delete here <br />");
-	$number_of_files_to_keep = 10;
-	$current_file_nr = 0;
-	 foreach ($db_file_list as $file) {
-		$current_file_nr++;
-		if ($current_file_nr > $number_of_files_to_keep){
-//			print ("deleting file". $file . "<br />");
-			unlink($file);
-		}
-//		else print ("keeping file" . $file . "<br/ > ");
-
-	}
+	// delete archive files that are  older than N
+	purgeBackupFiles($db_file_list, 10);
 
 }
+
 
 
 function purge_sensor_data_history ()
