@@ -1,4 +1,4 @@
-<?
+<?php
 
 	$value_seperator = "";
 	// read ds18b20 sensor data

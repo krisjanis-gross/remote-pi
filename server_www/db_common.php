@@ -1,4 +1,4 @@
-<?
+<?php
 
 $db_storage_folder =  "/media/usbdrive/sqlite_data/";
 $read_only_folder =  "/var/www/sqlite_db_templates/";

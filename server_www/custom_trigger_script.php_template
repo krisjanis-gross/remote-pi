@@ -1,4 +1,4 @@
-<?
+<?php
 require_once("db_app_data_functions.php");
 require_once("db_sensor_log_functions.php");
 require_once("functions_gpio_control.php");
@@ -78,7 +78,7 @@ function process_trigger_1()
 		$trigger_log_data = true;
 		}
 
- 
+
   $minutes_remaining = round ( ($X - $elapsed_time_since_start) / 60   , 0);
   add_sensor_reading("E_minutes_remaining", $minutes_remaining);
 

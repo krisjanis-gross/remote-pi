@@ -1,4 +1,4 @@
-<?
+<?php
 
 
 function send_monitor_signal () {

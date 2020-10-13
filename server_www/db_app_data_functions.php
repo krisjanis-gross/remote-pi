@@ -1,4 +1,4 @@
-<?
+<?php
 require_once ("db_common.php");
 
 $static_db_file_name = "static_data.db";
