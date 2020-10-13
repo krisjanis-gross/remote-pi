@@ -39,7 +39,7 @@ if ($trigger_id == 1 && $command == 1) {
 	process_custom_pin_hook (101, 1); // enable pin 101
 	// mark start time
 	$timestamp_now = microtime(true);
-	apc_store('internet_on_timestamp',$timestamp_now);
+	apcu_store('internet_on_timestamp',$timestamp_now);
 }
 if ($trigger_id == 1 && $command == 0) {
 	// action to do on trigger 1 enable event
@@ -65,7 +65,7 @@ function process_trigger_1()
 	$X =  $X * 60;  // set to minutes
 
 	// if time is expired then switch off pin 101 and trigger.
-	$internet_on_timestamp = apc_fetch('internet_on_timestamp');
+	$internet_on_timestamp = apcu_fetch('internet_on_timestamp');
     if (!$internet_on_timestamp) $internet_on_timestamp = 0;
 	$timestamp_now = microtime(true);
 	$elapsed_time_since_start = $timestamp_now  - $internet_on_timestamp;
@@ -126,7 +126,7 @@ function process_trigger_2()
    // check timeout
 
    // get last execution time + pause
-   $last_run_timestamp = apc_fetch('last_run_trigger_2');
+   $last_run_timestamp = apcu_fetch('last_run_trigger_2');
    if (!$last_run_timestamp) $last_run_timestamp = 0;
    // get time now
    $timestamp_now = microtime(true);
@@ -141,7 +141,7 @@ function process_trigger_2()
         if ($surface_hum_data < $mitruma_robeza) {
 //         print "<br />gogogo";
 
-           apc_store('last_run_trigger_2',$timestamp_now);
+           apcu_store('last_run_trigger_2',$timestamp_now);
 
             set_pin (11, 1, false);
 

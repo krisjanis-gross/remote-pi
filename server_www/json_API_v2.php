@@ -134,7 +134,7 @@ function get_sensor_data () {
 	require_once("functions_sensors.php");
   $sensor_name_list = get_sensor_name_list();
 
-	$sensor_data = apc_fetch('sensor_data', $sensor_data);
+	$sensor_data = apcu_fetch('sensor_data', $sensor_data);
 
 	$array_of_readings = $sensor_data["data"];
 	foreach ($array_of_readings as $key => $value)

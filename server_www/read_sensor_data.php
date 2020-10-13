@@ -85,12 +85,12 @@ $trigger_log_data = false;
 	/////////////////////////////////////////////////////////////////////////////
   // 3. Save sensor readings to APC for other scripts    /////////////////////
 	/////////////////////////////////////////////////////////////////////////////
-  apc_store('sensor_data', $sensor_data);
+  apcu_store('sensor_data', $sensor_data);
 
 // OLD
 //	$latest_sensor_data['timestamp'] = date('Y-m-d H:i:s');
 //	$latest_sensor_data['data'] = $all_data;
-//	apc_store('latest_sensor_data', $latest_sensor_data);
+//	apcu_store('latest_sensor_data', $latest_sensor_data);
 // OLD_end
 
 
@@ -115,25 +115,25 @@ $timestamp_now = microtime(true);
 
 if ($trigger_log_data)  {
 					$data_save_LEVEL = 3;
-					apc_store('longTermTriggerTimestamp',$timestamp_now);
-					apc_store('midTermTriggerTimestamp',$timestamp_now);
-					apc_store('allDataTriggerTimestamp',$timestamp_now);
+					apcu_store('longTermTriggerTimestamp',$timestamp_now);
+					apcu_store('midTermTriggerTimestamp',$timestamp_now);
+					apcu_store('allDataTriggerTimestamp',$timestamp_now);
 				 }// long term save
    elseif (check_trigger_timer_hit('longTermTriggerTimestamp',$longTermSaveIntervalSeconds)) {
    	 					$data_save_LEVEL = 3; // long term save
 							// save timestamp
-							apc_store('longTermTriggerTimestamp',$timestamp_now);
-							apc_store('midTermTriggerTimestamp',$timestamp_now);
-							apc_store('allDataTriggerTimestamp',$timestamp_now);
+							apcu_store('longTermTriggerTimestamp',$timestamp_now);
+							apcu_store('midTermTriggerTimestamp',$timestamp_now);
+							apcu_store('allDataTriggerTimestamp',$timestamp_now);
       				}
 	 			elseif (check_trigger_timer_hit('midTermTriggerTimestamp',$midTermSaveIntervalSeconds)) {
 	 						$data_save_LEVEL = 2; // mid term save
-							apc_store('midTermTriggerTimestamp',$timestamp_now);
-							apc_store('allDataTriggerTimestamp',$timestamp_now);
+							apcu_store('midTermTriggerTimestamp',$timestamp_now);
+							apcu_store('allDataTriggerTimestamp',$timestamp_now);
 	 						}
 							elseif (check_trigger_timer_hit('allDataTriggerTimestamp',$allDataSaveIntervalSeconds)) {
 									$data_save_LEVEL = 1; // mid term save
-									apc_store('allDataTriggerTimestamp',$timestamp_now);
+									apcu_store('allDataTriggerTimestamp',$timestamp_now);
 							}
 
 //error_log ("////////////////////// data_save_LEVEL $data_save_LEVEL");
@@ -141,7 +141,7 @@ if ($trigger_log_data)  {
 
 if ($data_save_LEVEL > 0) { // save sensor readings in DB
 
-	apc_store('db_save_timestamp',$timestamp_now);
+	apcu_store('db_save_timestamp',$timestamp_now);
 
 	// open sensor log DB for writing
 	require_once("db_sensor_log_functions.php");
@@ -163,7 +163,7 @@ if ($data_save_LEVEL > 0) { // save sensor readings in DB
 
 	// backup every n-th time this script is executed
 	$nth = 60;
-	$cron_counter = apc_fetch('cron_counter');
+	$cron_counter = apcu_fetch('cron_counter');
 
 	if (!$cron_counter) $cron_counter = 1;
 	else  $cron_counter++;
@@ -175,7 +175,7 @@ if ($data_save_LEVEL > 0) { // save sensor readings in DB
 		backup_sensor_log_db ();
 		$cron_counter = 0;
 	}
-	apc_store('cron_counter', $cron_counter);
+	apcu_store('cron_counter', $cron_counter);
 
 
 	/////////////////////////////////////////////////////////////////////////////
@@ -194,7 +194,7 @@ if ($data_save_LEVEL > 0) { // save sensor readings in DB
 
 function check_trigger_timer_hit ($timestampName,$interval) {
 	// get last execution time
-	$db_save_timestamp = apc_fetch($timestampName);
+	$db_save_timestamp = apcu_fetch($timestampName);
 	if (!$db_save_timestamp) $db_save_timestamp = 0;
 
 	global $timestamp_now;

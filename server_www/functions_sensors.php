@@ -15,7 +15,7 @@ function get_sensor_name_by_id ($sensor_id) {
 
 function get_sensor_name_list () {
 
-	$sensor_list = apc_fetch('sensor_list');
+	$sensor_list = apcu_fetch('sensor_list');
 	//var_dump($sensor_list);
 
 	if (!$sensor_list) // if not available in APC then read the list from DB, then save the list in APC
@@ -32,7 +32,7 @@ function get_sensor_name_list () {
 				// save the sensor list in APC
 			}
 			$static_db->close();
-			apc_store('sensor_list', $sensor_list);
+			apcu_store('sensor_list', $sensor_list);
 	}
 
 	return $sensor_list;
