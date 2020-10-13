@@ -139,8 +139,8 @@ if ($trigger_log_data)  {
 //error_log ("////////////////////// data_save_LEVEL $data_save_LEVEL");
 // log data with this data_save_LEVEL
 
-if ($data_save_LEVEL > 0) { // save sensor readings in DB ?
-	//print "process cron ";
+if ($data_save_LEVEL > 0) { // save sensor readings in DB
+
 	apc_store('db_save_timestamp',$timestamp_now);
 
 	// open sensor log DB for writing
@@ -176,6 +176,15 @@ if ($data_save_LEVEL > 0) { // save sensor readings in DB ?
 		$cron_counter = 0;
 	}
 	apc_store('cron_counter', $cron_counter);
+
+
+	/////////////////////////////////////////////////////////////////////////////
+	// send signal to external monitor  (if configured and enabled)           ///
+	/////////////////////////////////////////////////////////////////////////////
+  	require_once("functions_monitor.php");
+ 		send_monitor_signal ();
+
+
 }
 
 
