@@ -1,7 +1,7 @@
 <?php
 
 $db_storage_folder =  "/media/usbdrive/sqlite_data/";
-$read_only_folder =  "/var/www/sqlite_db_templates/";
+$read_only_folder =  "/var/www/html/sqlite_db_templates/";
 $tempfs_work_folder = "/tmp/";
 $bad_folder = "bad/";
 

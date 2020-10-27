@@ -6,17 +6,25 @@ function send_monitor_signal () {
   global $montiror_URL; // "https://helloworld-evonpsrdjq-ew.a.run.app/";
   global $monitor_enabled; //  = true;
   global $monitor_API_key; //   = "new-key";
+  global $monitor_node_ID;
+  global $monitor_node_NAME;
 
   if ($monitor_enabled) {
-    $data =
+    $sensor_readings_array = get_sensor_readings_for_monitor ();
+    $data = [
+      "API_key" => $monitor_API_key,
+      "node_id" => $monitor_node_ID,
+      "node_name" => $monitor_node_NAME,
+      "sensor_data" => $sensor_readings_array
+    ];
 
+    $data_JSON = json_encode($data);
 
+    //  error_log("mmmmmmmmmmmmmmmmmmm sending monitor signal mmmmmmmmmmmmmmmmmmmmmmmm $montiror_URL");
 
-
-          $curl = curl_init();
-
+      $curl = curl_init();
       curl_setopt_array($curl, array(
-        CURLOPT_URL => "https://helloworld-evonpsrdjq-ew.a.run.app/",
+        CURLOPT_URL => $montiror_URL,
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_ENCODING => "",
         CURLOPT_MAXREDIRS => 10,
@@ -24,24 +32,44 @@ function send_monitor_signal () {
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
         CURLOPT_CUSTOMREQUEST => "POST",
-        CURLOPT_POSTFIELDS =>"{\r\n    \"API_key\":\"new-key\",\r\n    \"node_id\":\"55666443\",\r\n    \"node_name\":\"devtest1\",\r\n    \"sensor_data\": \r\n        [\r\n            {\r\n                \"sensorID\":\"sensor1111\",\r\n                \"sensorValue\":\"54\",\r\n                \"datetime\":\"december 24\"\r\n            },\r\n                        {\r\n                \"sensorID\":\"sensor1222\",\r\n                \"sensorValue\":\"545\",\r\n                \"datetime\":\"december 24\"\r\n            }\r\n        ]\r\n    \r\n\r\n}",
+        CURLOPT_POSTFIELDS => $data_JSON,
         CURLOPT_HTTPHEADER => array(
           "Content-Type: text/plain"
         ),
       ));
 
       $response = curl_exec($curl);
-
       curl_close($curl);
-      echo $response;
-
-
-
-
+//      echo $response;
   }
 }
 
 
+function get_sensor_readings_for_monitor () {
+  require_once("functions_sensors.php");
+  $sensor_name_list = get_sensor_name_list();
+
+	$sensor_data = apcu_fetch('sensor_data', $sensor_data);
+
+	$array_of_readings = $sensor_data["data"];
+	foreach ($array_of_readings as $key => $value)
+			{
+				$sensor_id = $value['id'];
+				$output_sensor_array['id'] =  $sensor_id;
+				//foreach ($sensor_list as $key => $value)
+				if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
+				else $output_sensor_array['sensor_name'] = $sensor_id;
+
+				$output_sensor_array['value'] = $value['value'];
+
+				// tod- refactor
+				//if( $sensor_array['id'] == "__data_timestamp___") {
+				//	$data_timestam =  $value;
+				//}
+				$output_new[] = $output_sensor_array;
+			}
+  return $output_new;
+}
 
 
 ?>
