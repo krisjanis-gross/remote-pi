@@ -135,25 +135,26 @@ function get_sensor_data () {
   $sensor_name_list = get_sensor_name_list();
 
 	$sensor_data = apcu_fetch('sensor_data', $sensor_data);
+  $output_new[] = array ();
+  if ($sensor_data) {
+  	$array_of_readings = $sensor_data["data"];
+  	foreach ($array_of_readings as $key => $value)
+  			{
+  				$sensor_id = $value['id'];
+  				$output_sensor_array['id'] =  $sensor_id;
+  				//foreach ($sensor_list as $key => $value)
+  				if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
+  				else $output_sensor_array['sensor_name'] = $sensor_id;
 
-	$array_of_readings = $sensor_data["data"];
-	foreach ($array_of_readings as $key => $value)
-			{
-				$sensor_id = $value['id'];
-				$output_sensor_array['id'] =  $sensor_id;
-				//foreach ($sensor_list as $key => $value)
-				if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
-				else $output_sensor_array['sensor_name'] = $sensor_id;
+  				$output_sensor_array['value'] = $value['value'];
 
-				$output_sensor_array['value'] = $value['value'];
-
-				// tod- refactor
-				//if( $sensor_array['id'] == "__data_timestamp___") {
-				//	$data_timestam =  $value;
-				//}
-				$output_new[] = $output_sensor_array;
-			}
-
+  				// tod- refactor
+  				//if( $sensor_array['id'] == "__data_timestamp___") {
+  				//	$data_timestam =  $value;
+  				//}
+  				$output_new[] = $output_sensor_array;
+  			}
+    }
 		$response_to_client['response_code'] = "OK";
 		$response_data_array['timestamp'] = $sensor_data["timestamp"];
 		$response_data_array['data']= $output_new;
@@ -393,7 +394,7 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 		date_default_timezone_set('UTC');
 	//	$stamp = strtotime($dateStr);
 
-
+    $all_sensor_data = array();
 		while ($row = $results->fetchArray())
 		{
 
