@@ -1,31 +1,44 @@
 <?php
+function 	read_sensor_data_custom ()  {
 
-	$value_seperator = "";
 	// read ds18b20 sensor data
 	$DS18B20_reading = exec ("sudo python /home/pi/remote_pi/read_DS18B20_thermometers.py");
 	if ($DS18B20_reading <> "")	{
-		$all_data = $DS18B20_reading ;
-		$value_seperator = ",";
-
+    $DS18B20_reading = "{" . $DS18B20_reading . "}";
 		/// must be tested.
-		$DS18B20_readings = json_decode($DS18B20_reading);
-		// foreach ...
-	  // add_sensor_reading($sensor_id,$readingvalue);
+		$DS18B20_reading = json_decode($DS18B20_reading);
+    //error_log ("$$$$$$$$$$$$$$$$$$$$$$ DS18B20_reading = $DS18B20_reading");
+
+    foreach ( $DS18B20_reading as $key => $value) {
+
+   // error_log ("kkkkkkkkkkkkkkkkkey $key");
+   // error_log ("vvvvvvvvvvvvvvvalue $value");
+    // chech if value is in "reasonable" range. e.g. not an error.
+    if ($value > -50 && $value < 200){
+          add_sensor_reading($key,$value);
+      }
+    }
 
 	}
-	//var_dump($all_data);
+
+
+
+}
+
+
+
+
+
+
+/*
 
 	// read surface hum. data
 	$surface_hum_data = exec ("sudo python /home/pi/remote_pi/ads_average_reading.py");
 	if ($surface_hum_data != "") {
 	//	$all_data = str_replace ("}", "" , $all_data );
-		$all_data =  $all_data  . $value_seperator .  '"surf_hum_1":"' . $surface_hum_data;
-		$value_seperator = ",";
-
 		add_sensor_reading("surf_hum_1",$surface_hum_data);
 
 	}
-	//var_dump($all_data);
 
 
 	// read DHT11 sensor data
@@ -41,6 +54,6 @@
 
 	}
 
-	$all_data = "{" . $all_data . "}";
+*/
 
 ?>

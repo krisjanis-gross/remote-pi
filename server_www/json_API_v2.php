@@ -135,7 +135,7 @@ function get_sensor_data () {
   $sensor_name_list = get_sensor_name_list();
 
 	$sensor_data = apcu_fetch('sensor_data', $sensor_data);
-  $output_new[] = array ();
+  $output_new = (array) null; 
   if ($sensor_data) {
   	$array_of_readings = $sensor_data["data"];
   	foreach ($array_of_readings as $key => $value)
