@@ -135,7 +135,7 @@ function get_sensor_data () {
   $sensor_name_list = get_sensor_name_list();
 
 	$sensor_data = apcu_fetch('sensor_data', $sensor_data);
-  $output_new = (array) null; 
+  $output_new = (array) null;
   if ($sensor_data) {
   	$array_of_readings = $sensor_data["data"];
   	foreach ($array_of_readings as $key => $value)
@@ -332,8 +332,6 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 */
 
 	//handle parameters
-	//isset($_GET['json']) ? $json_result = $_GET['json'] : $json_result = false;
-	$json_result = true;
 	// data period and other parameters.
 
 	//isset($_GET['period']) ? $period = $_GET['period'] : $period = "hour";
@@ -377,76 +375,77 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 		}
 	}
 	else $available_sensors = $selected_sensors;
-	//error_log(print_r($available_sensors,TRUE));
+//	error_log(print_r($available_sensors,TRUE));
 
-	// get all data from tempfs
+
+
+
+
+
+
+	// get all sensor data from both db-s
 	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
 	$query_sensor_id_filter = "";
+  $all_sensor_data = (array) null;
 	// get data for each sensor.
 	foreach ($available_sensors as $sensor ) 	{
-		$query_sensor_id_filter = " AND sensor_id = '$sensor'";
-		 //error_log (  '++++++++++++++++++++++++++++++++++++++++++++'.$sensor.' ');
-
-		$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
+        		$query_sensor_id_filter = " AND sensor_id = '$sensor'";
+        		$results = $sensor_log_db->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
 
 
-		$reset = date_default_timezone_get();
-		date_default_timezone_set('UTC');
-	//	$stamp = strtotime($dateStr);
-
-    $all_sensor_data = array();
-		while ($row = $results->fetchArray())
-		{
-
-			$sensor_id = $row['sensor_id'];
-
-			// $row['datetime'] - already includes time zone ajustment (see how data was inserted in the table)
-			$datetime = strtotime ($row['datetime']) ;
-		//	error_log("ddddddddddddddddddddddddatetime = " . $row['datetime']);
-		//	error_log("uuuuuuuuuuuuuuuuuuuuuuuunixtime = " . $datetime);
-			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
-
-			$sensor_data = (float) $row["value"];
-
-			//var_dump($row);
-			//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
-			if ($json_result)
-				$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
-				else
-					$all_sensor_data["$sensor_id"][] =  " [$datetime, $sensor_data] ";
+        		$reset = date_default_timezone_get();
+        		date_default_timezone_set('UTC');
 
 
-		}
+        		while ($row = $results->fetchArray())
+        		{
+
+                			$sensor_id = $row['sensor_id'];
+
+                			// $row['datetime'] - already includes time zone ajustment (see how data was inserted in the table)
+                			$datetime = strtotime ($row['datetime']) ;
+                		//	error_log("ddddddddddddddddddddddddatetime = " . $row['datetime']);
+                		//	error_log("uuuuuuuuuuuuuuuuuuuuuuuunixtime = " . $datetime);
+                			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
+
+                			$sensor_data = (float) $row["value"];
+
+                			//var_dump($row);
+                			//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
+
+               				$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
 
 
 
-		$results2 = $sensor_log_db_tempfs->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
-
-		while ($row2 = $results2->fetchArray())
-		{
-
-			$sensor_id = $row2['sensor_id'];
+        		}
 
 
-			$datetime = strtotime ($row2['datetime']) ;
-			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
+            // query from temp DB
+        		$results2 = $sensor_log_db_tempfs->query('SELECT * FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter);
 
-			$sensor_data = (float) $row2["value"];
+        		while ($row2 = $results2->fetchArray())
+        		{
 
-			//var_dump($row);
-			//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
-			if ($json_result)
-				$all_sensor_data["$sensor_id"][]  = array($datetime, $sensor_data);
-				else
-					$all_sensor_data["$sensor_id"][] =  " [$datetime, $sensor_data] ";
+        			$sensor_id = $row2['sensor_id'];
 
 
-		}
+        			$datetime = strtotime ($row2['datetime']) ;
+        			$datetime *= 1000; // convert from Unix timestamp to JavaScript time
+
+        			$sensor_data = (float) $row2["value"];
+
+        			//var_dump($row);
+        			//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
+
+      				$all_sensor_data[$sensor_id][]  = array($datetime, $sensor_data);
+
+
+
+        		}
 
 	 date_default_timezone_set($reset);
 
 	}
-
 
 	return $all_sensor_data;
 
