@@ -310,9 +310,6 @@ function  get_historic_data($request_data)
 function sensor_historic_data ($data_period,$selected_sensors) {
 
 	//error_log ($request_data['selected_sensor_ids']);
-
-
-	$all_sensor_data = '';
 	//place this before any script you want to calculate time
 	//$time_start = microtime(true);
 
@@ -320,7 +317,6 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 	// flush all TMP data to storage.
 	//flush_sensor_data_to_permanent_storage();
 
-	$sensor_log_db  = open_sensor_DB_in_STORAGE (true);
 
 	/*
 	 $time_end = microtime(true);
@@ -368,11 +364,19 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 	}
 
 
-	if (empty($selected_sensors)) {
+	$sensor_log_db  = open_sensor_DB_in_STORAGE (true);
+  $sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
+
+	if (empty($selected_sensors)) {  // get list of all sensors
 		$results = $sensor_log_db->query("select distinct sensor_id from sensor_log ;");
 		while ($row = $results->fetchArray()) {
 			$available_sensors[] = $row['sensor_id'];
 		}
+		$results_tempfs = $sensor_log_db_tempfs->query("select distinct sensor_id from sensor_log ;");
+		while ($row_tempfs = $results_tempfs->fetchArray()) {
+			$available_sensors[] = $row_tempfs['sensor_id'];
+		}
+		$available_sensors = array_unique($available_sensors);
 	}
 	else $available_sensors = $selected_sensors;
 //	error_log(print_r($available_sensors,TRUE));
@@ -384,7 +388,7 @@ function sensor_historic_data ($data_period,$selected_sensors) {
 
 
 	// get all sensor data from both db-s
-	$sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
+
 	$query_sensor_id_filter = "";
   $all_sensor_data = (array) null;
 	// get data for each sensor.
