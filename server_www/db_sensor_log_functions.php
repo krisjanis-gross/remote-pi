@@ -127,7 +127,7 @@ function backup_sensor_log_db () {
 
 	// sort the list so that the newest files come first
 	arsort ($db_file_list);
-  error_log( print_r( $db_file_list, true ) );
+  //error_log( print_r( $db_file_list, true ) );
 	// try to open files in starting with the newest. If a valid db file is found then it is used.
 	foreach ($db_file_list as $file) {
 		if (verify_sqlite_file($file)) // file found
@@ -162,7 +162,7 @@ function backup_sensor_log_db () {
 	// sort the list so that the newest files come first
 	arsort ($db_file_list2);
 
-  error_log( print_r( $db_file_list2, true ) );
+//  error_log( print_r( $db_file_list2, true ) );
 
 	// delete archive files that are  older than N
 	purgeBackupFiles($db_file_list2, 50);

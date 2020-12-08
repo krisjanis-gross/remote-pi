@@ -7,9 +7,9 @@ function get_sensor_name_by_id ($sensor_id) {
 	$sensor_list = get_sensor_name_list();
 
 	//return the sensor name if that is found in the list. Othervise return the sensor ID
-
-	return  (array_key_exists($sensor_id, $sensor_list)) ?  $sensor_list[$sensor_id] : $sensor_id;
-
+	if ($sensor_list) {
+     return  (array_key_exists($sensor_id, $sensor_list)) ?  $sensor_list[$sensor_id] : $sensor_id;
+  }
 	//return  ($sensor_list[$sensor_id] != null) ? $sensor_list[$sensor_id] : $sensor_id;
 }
 
