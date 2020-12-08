@@ -3,6 +3,7 @@
 //ini_set('display_errors', 'On');
 
 require_once ("db_common.php");
+require_once ("db_app_data_functions.php");
 
 $sensor_log_template_file =  "sensor_log_template.db";
 $sensor_log_db_file_name = "sensor_log_tmp_db.db";
@@ -114,6 +115,7 @@ function backup_sensor_log_db () {
 	global $db_storage_folder;
 	global $log_db_file_pattern;
 	global $file_name_prefix;
+	global $static_db_file_pattern;
 
 	$tmp_file_name =  $db_storage_folder . "s_log_backup_tmp.db";
 
@@ -155,7 +157,7 @@ function backup_sensor_log_db () {
 
 
 	// purge static data db files.
-	require_once ("db_app_data_functions.php");
+
   $db_file_list2 = directoryToArray($db_storage_folder,false,false,true,$static_db_file_pattern);
 	// sort the list so that the newest files come first
 	arsort ($db_file_list2);
