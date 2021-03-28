@@ -1,4 +1,4 @@
-<?
+<?php
 require_once("db_app_data_functions.php");
 require_once("db_sensor_log_functions.php");
 require_once("functions_gpio_control.php");

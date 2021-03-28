@@ -1,4 +1,4 @@
-<?
+<?php
 // app config.
 
 // token used for API calls
@@ -19,9 +19,9 @@ $longTermSaveIntervalSeconds = 60 * 60; // 1 hour
 
 // monitoring parameters
 $montiror_URL = "https://helloworld-evonpsrdjq-ew.a.run.app/";
-$monitor_enabled = false;
-$monitor_API_key = "new-key";
-$monitor_node_ID = "00001";
+$monitor_enabled = true;
+$monitor_API_key = "rb82975298457hk";
+$monitor_node_ID = 111111111;
 $monitor_node_NAME = "betras-katlumaja";
 
 

@@ -1,4 +1,4 @@
-<?
+<?php
 
 function 	read_sensor_data_custom ()  {
 	// read ds18b20 sensor data

@@ -1,0 +1,3 @@
+sudo nano /etc/rc.local
+add line 
+python /home/pi/remote_pi/button_1.py &
