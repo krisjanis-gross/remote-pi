@@ -39,12 +39,21 @@ function trigger_hook ($trigger_id, $command)
     if ($trigger_id == 2 && $command == 1) {
       lock_pin(16);lock_pin(29);lock_pin(31);
       set_pin (16, 1,false); // iesleedz ventilatoru
+      add_sensor_reading("ventilatora_relejs_16",20);
+      global $trigger_log_data;
+      $trigger_log_data = true;
     }
     if ($trigger_id == 2 && $command == 0) {
       unlock_pin(16);unlock_pin(29);unlock_pin(31);
       set_pin(16,0,false);
       set_pin(29,0,false);
       set_pin(31,0,false);
+      
+     add_sensor_reading("ventilatora_relejs_16",0);
+     add_sensor_reading("ledusskapja_dzesesanas_relejs_18",0);
+     add_sensor_reading("sild_relejs_31",0);
+      global $trigger_log_data;
+      $trigger_log_data = true;
     }
 
 
@@ -141,7 +150,7 @@ error_log ("zavesana:DHT11_HUMIDITY  = $DHT11_HUMIDITY; dzesetaja_temp = $dzeset
 			set_pin (31, $heating_action,false);
 			
 			if ($previous_pin_status <> $heating_action) 	
-         {  add_sensor_reading("sild_relejs",$heating_action * 15);
+         {  add_sensor_reading("sild_relejs_31",$heating_action * 15);
             global $trigger_log_data;
       	    $trigger_log_data = true;
          
@@ -175,7 +184,7 @@ function ledusskapja_dzesesana ()
                         set_pin (18, $_action,false);
 
                         if ($previous_pin_status <> $_action)    
-                                 {  add_sensor_reading("ledusskapja_dzesesanas_relejs",$_action * 4);
+                                 {  add_sensor_reading("ledusskapja_dzesesanas_relejs_18",$_action * 4);
                                     global $trigger_log_data;
      	                              $trigger_log_data = true;
                          }
