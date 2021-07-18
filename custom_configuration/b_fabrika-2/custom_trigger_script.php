@@ -34,13 +34,11 @@ if ($trigger1_go)   process_trigger_zavesana();
 function trigger_hook ($trigger_id, $command)
 {
     if ($trigger_id == 1 && $command == 1) {
-      lock_pin(12);lock_pin(16);lock_pin(18);
-      set_pin (12, 1,false); // iesleedz ventilatoru
+      lock_pin(12);lock_pin(18);
     }
     if ($trigger_id == 1 && $command == 0) {
-      unlock_pin(12);unlock_pin(16);unlock_pin(18);
+    unlock_pin(12);unlock_pin(18);
       set_pin(12,0,false);
-      set_pin(16,0,false);
       set_pin(18,0,false);
       
     }
@@ -93,11 +91,11 @@ $gaiss_augshaa = get_sensor_reading ('dht_temperature') ;
  
  if (isset ($cooling_action )) {
 			
-			$previous_pin_status = get_pin_status (16);
-			set_pin (16, $cooling_action,false);
+			$previous_pin_status = get_pin_status (12);
+			set_pin (12, $cooling_action,false);
 			
 			if ($previous_pin_status <> $cooling_action) 
-        {  add_sensor_reading("dzes_relejs_16", $cooling_action * 10);
+        {  add_sensor_reading("dzes_relejs_12", $cooling_action * 10);
       	   global $trigger_log_data;
       	   $trigger_log_data = true;
         }
