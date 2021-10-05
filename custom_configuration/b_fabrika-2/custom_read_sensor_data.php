@@ -1,80 +1,209 @@
 <?php
+//error_reporting(E_ALL);
+//ini_set('display_errors', 'On');
 
-function 	read_sensor_data_custom ()  {
-	// read ds18b20 sensor data
-	$DS18B20_reading = exec ("python2 /home/pi/remote_pi/read_DS18B20_thermometers.py");
-	if ($DS18B20_reading <> "")	{
-    $DS18B20_reading = "{" . $DS18B20_reading . "}";
-		/// must be tested.
-		$DS18B20_readings = json_decode($DS18B20_reading);
-    //error_log ($DS18B20_reading);
-    
-    foreach ( $DS18B20_readings as $key => $value) {
-    
-   // error_log ("kkkkkkkkkkkkkkkkkey $key");
-   // error_log ("vvvvvvvvvvvvvvvalue $value");
-    // chech if value is in "reasonable" range. e.g. not an error.
-    if ($value > -50 && $value < 200){
-          add_sensor_reading($key,$value);
-      }
-    }
-		
+//if ( $_SERVER['REMOTE_ADDR'] != '127.0.0.1' ) exit; // designed to be called locally by scheduler
+
+$config_file = "custom_app_config.php";
+if(is_file($config_file)){
+	require_once ($config_file);
+}
+
+
+
+$log_data_now = false;
+$sensor_reading_db_log_interval = 60 ; // seconds
+
+$trigger_log_data = false;
+
+//OLD
+//$all_data = '"__data_timestamp___":"' . date('Y-m-d H:i:s') . '"';
+
+
+
+	/////////////////////////////////////////////////////////////////////////////
+  // 1. Get all sensor data ///////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+	// each customized setup can have different sensors/data sources.
+	// This script is checking if these sources are configured in file custom_read_sensor_data.php by checking if the file exists.
+	// Originally this file is called custom_read_sensor_data.php_template.
+	// User has to rename this file and configure desired data sources.
+	// if the file is not present, we show a "dummy" sensor with random reading.
+
+	$custom_sensor_data_file = "custom_read_sensor_data.php";
+	$sensor_data["timestamp"] = date('Y-m-d H:i:s') ;
+	$sensor_data["data"] = [];
+
+
+
+	if(is_file($custom_sensor_data_file)){
+		include ($custom_sensor_data_file);
+		read_sensor_data_custom ();
 	}
-	
- 
- 
-   // read dht22 sensor
-   $i = 0;
-   do {
-      $dht22_reading = exec ("python /home/pi/remote_pi/read_DHT_sensor.py");
-     // error_log ("$$$$$$$$$$$$$$$$$$$$$$ dht22_reading = $dht22_reading");
-      $i = $i + 1;
-       }
-   while ( ($i <= 10) AND ($dht22_reading == "error"));
-
-  if ($dht22_reading <> "error") {
-    $dht22_reading = json_decode($dht22_reading);
-    //error_log( print_r( $dht22_reading, true ) );
-     foreach ( $dht22_reading as $key => $value) {
-
-   // error_log ("kkkkkkkkkkkkkkkkkey $key");
-   // error_log ("vvvvvvvvvvvvvvvalue $value");
-    // chech if value is in "reasonable" range. e.g. not an error.
-    if ($value > -50 && $value < 200){
-          add_sensor_reading($key,$value);
-      }
-    }
-
-  }
- 
-  
-  
-  
- 
-  // calculate gaisa mitruma pakaape and add as a reading
- require_once("functions_triggers.php");
- $FI = get_sensor_reading ('dht_humidity') ;
- $t = get_sensor_reading ('dht_temperature') ;
- 
- if (is_numeric($FI) AND is_numeric($t) ){
-		$T = 273 + $t ;
-		$P_ws = (exp(77.345 + 0.0057 * $T - 7235/$T)) / pow ($T,8.2);
-		$P_w = ($FI/100) * $P_ws;
-		$P_a = 101325;
-		$X_result = (0.628 * ($P_w / ($P_a - $P_w))) ;
-		$X_result = round ($X_result * 10000 , 2);
-		//error_log ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% T = " . $T . "  P_ws = ". $P_ws. "  FI = " . $FI . "  P_w = " . $P_w. "  P_a = ". $P_a. "  X_result = ". $X_result );
-   add_sensor_reading("gaisa_mitruma_pakaape",$X_result);
+	else {
+		// produce random dummy reading data
+		$random_data = rand(0,100);
+		add_sensor_reading("dummy_data",$random_data);
+	//	$all_data .= ', "dummy_data":"' .$random_data . '"';
 	}
- 
- 
- 
- 
+//	$all_data = "{" . $all_data . "}";
+
+/*
+ error_log("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&");
+ error_log($all_data);
+ error_log(json_encode($sensor_data));
+*/
+	function add_sensor_reading($sensor_key,$reading_value) {
+		global $sensor_data;
+		$sensor_reading['id'] =  $sensor_key;
+		$sensor_reading['value'] =  $reading_value;
+		$sensor_data["data"][] = $sensor_reading;
+//	$new_sensor_reading[$sensor_key] = $reading_value;
+//		array_push ( $sensor_data["data"] , $new_sensor_reading );
+	}
+
+
+
+
+
+
+
+	/////////////////////////////////////////////////////////////////////////////
+  // 2. Process triggers    ///////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+
+	// trigger script template: custom_trigger_script.php_template
+	// Use has to rename this file to custom_trigger_script.php and implement the triggers there...
+	$trigger_script_file = "custom_trigger_script.php";
+	if(is_file($trigger_script_file)){
+			include ($trigger_script_file);
+  		run_triggers();
+	}
+
+
+
+	/////////////////////////////////////////////////////////////////////////////
+  // 3. Save sensor readings to APC for other scripts    /////////////////////
+	/////////////////////////////////////////////////////////////////////////////
+  apcu_store('sensor_data', $sensor_data);
+
+// OLD
+//	$latest_sensor_data['timestamp'] = date('Y-m-d H:i:s');
+//	$latest_sensor_data['data'] = $all_data;
+//	apcu_store('latest_sensor_data', $latest_sensor_data);
+// OLD_end
+
+
+
+
+/////////////////////////////////////////////////////////////////////////////
+// 4. Data log in DB                                    /////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
+//// 4.1 determine
+
+/*flow for each reading save
+1) if trigger_event -> long term save
+     else if long term timer hit -> long_term_save
+             else if mid term timer hit -> mid term save
+                     else if  allDataSaveIntervalMinues  is hit-> default save.
+*/
+
+$data_save_LEVEL = 0; // 0 = no save; 1 = default save; 2 = mid term save; 3 = long term save;
+$timestamp_now = microtime(true);
+
+
+if ($trigger_log_data)  {
+					$data_save_LEVEL = 3;
+					apcu_store('longTermTriggerTimestamp',$timestamp_now);
+					apcu_store('midTermTriggerTimestamp',$timestamp_now);
+					apcu_store('allDataTriggerTimestamp',$timestamp_now);
+				 }// long term save
+   elseif (check_trigger_timer_hit('longTermTriggerTimestamp',$longTermSaveIntervalSeconds)) {
+   	 					$data_save_LEVEL = 3; // long term save
+							// save timestamp
+							apcu_store('longTermTriggerTimestamp',$timestamp_now);
+							apcu_store('midTermTriggerTimestamp',$timestamp_now);
+							apcu_store('allDataTriggerTimestamp',$timestamp_now);
+      				}
+	 			elseif (check_trigger_timer_hit('midTermTriggerTimestamp',$midTermSaveIntervalSeconds)) {
+	 						$data_save_LEVEL = 2; // mid term save
+							apcu_store('midTermTriggerTimestamp',$timestamp_now);
+							apcu_store('allDataTriggerTimestamp',$timestamp_now);
+	 						}
+							elseif (check_trigger_timer_hit('allDataTriggerTimestamp',$allDataSaveIntervalSeconds)) {
+									$data_save_LEVEL = 1; // mid term save
+									apcu_store('allDataTriggerTimestamp',$timestamp_now);
+							}
+
+//error_log ("////////////////////// data_save_LEVEL $data_save_LEVEL");
+// log data with this data_save_LEVEL
+
+if ($data_save_LEVEL > 0) { // save sensor readings in DB
+
+	apcu_store('db_save_timestamp',$timestamp_now);
+
+	// open sensor log DB for writing
+	require_once("db_sensor_log_functions.php");
+	$sensor_log_db = open_sensor_log_db_in_TEMPFS_ ();
+
+	// log sensor reading data in DB.
+	foreach ($sensor_data["data"]  as $key => $value) {
+	  $sensor_id = $value['id'];
+	  $measurement = $value['value'];
+	  $insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $sensor_data["timestamp"] . "'," . $measurement .", " . $data_save_LEVEL . ")";
+	//	error_log("---------------------------------------- $insert_query -------------------");
+		$results = $sensor_log_db->query($insert_query);
+	}
+	$sensor_log_db->close();
+
+	/////////////////////////////////////////////////////////////////////////////
+	// backup in permanent storage every n-th time this script is executed    ///
+	/////////////////////////////////////////////////////////////////////////////
+
+	// backup every n-th time this script is executed
+	$nth = 60;
+	$cron_counter = apcu_fetch('cron_counter');
+
+	if (!$cron_counter) $cron_counter = 1;
+	else  $cron_counter++;
+
+	if ($cron_counter > $nth) {
+
+		flush_sensor_data_to_permanent_storage ();
+		purge_sensor_data_history();
+		backup_sensor_log_db ();
+		$cron_counter = 0;
+	}
+	apcu_store('cron_counter', $cron_counter);
+
+
+	/////////////////////////////////////////////////////////////////////////////
+	// send signal to external monitor  (if configured and enabled)           ///
+	/////////////////////////////////////////////////////////////////////////////
+  	require_once("functions_monitor.php");
+ 		send_monitor_signal ();
+
 
 }
 
 
+
+
+
+
+function check_trigger_timer_hit ($timestampName,$interval) {
+	// get last execution time
+	$db_save_timestamp = apcu_fetch($timestampName);
+	if (!$db_save_timestamp) $db_save_timestamp = 0;
+
+	global $timestamp_now;
+
+	//  decide if it is time to go again ;)
+	$elapsed_time_since_last_timer_hit = $timestamp_now  - $db_save_timestamp;
+	if ($elapsed_time_since_last_timer_hit > $interval) return true;
+  else return false;
+
+}
+
 ?>
-
-
-
