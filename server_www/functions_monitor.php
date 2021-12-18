@@ -41,6 +41,54 @@ function send_monitor_signal () {
       $response = curl_exec($curl);
       curl_close($curl);
 //      echo $response;
+
+
+// monitor v2
+
+
+
+ $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app" ;
+//global $monitor_enabled; //  = true;
+//global $monitor_API_key; //   = "new-key";
+//global $monitor_node_ID;
+
+if ($monitor_enabled) {
+  //$sensor_readings_array = get_sensor_readings_for_monitor ();
+  $data = [
+    "api_key" => $monitor_API_key,
+    "node_id" => $monitor_node_ID,
+  ];
+
+  $data_JSON = json_encode($data);
+
+  //  error_log("mmmmmmmmmmmmmmmmmmm sending monitor signal mmmmmmmmmmmmmmmmmmmmmmmm $montiror_URL");
+
+    $curl = curl_init();
+    curl_setopt_array($curl, array(
+      CURLOPT_URL => $monitor_url_v2,
+      CURLOPT_RETURNTRANSFER => true,
+      CURLOPT_ENCODING => "",
+      CURLOPT_MAXREDIRS => 10,
+      CURLOPT_TIMEOUT => 0,
+      CURLOPT_FOLLOWLOCATION => true,
+      CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+      CURLOPT_CUSTOMREQUEST => "POST",
+      CURLOPT_POSTFIELDS => $data_JSON,
+      CURLOPT_HTTPHEADER => array(
+        "Content-Type: text/plain"
+      ),
+    ));
+
+    $response = curl_exec($curl);
+    curl_close($curl);
+
+
+
+
+
+
+
+
   }
 }
 
