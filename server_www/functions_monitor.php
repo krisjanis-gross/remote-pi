@@ -45,26 +45,24 @@ function send_monitor_signal () {
 
 // monitor v2
 
-
-
- $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app" ;
+ $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin/" ;
+ global $monitor2_node_ID;
 //global $monitor_enabled; //  = true;
 //global $monitor_API_key; //   = "new-key";
 //global $monitor_node_ID;
 
-if ($monitor_enabled) {
-  //$sensor_readings_array = get_sensor_readings_for_monitor ();
+    //$sensor_readings_array = get_sensor_readings_for_monitor ();
   $data = [
     "api_key" => $monitor_API_key,
-    "node_id" => $monitor_node_ID,
+    "node_id" => $monitor2_node_ID,
   ];
 
   $data_JSON = json_encode($data);
 
-  //  error_log("mmmmmmmmmmmmmmmmmmm sending monitor signal mmmmmmmmmmmmmmmmmmmmmmmm $montiror_URL");
+//    error_log("mmmmmmmmmmmmmmmmmmm sending monitor signal mmmmmmmmmmmmmmmmmmmmmmmm $monitor_url_v2");
 
-    $curl = curl_init();
-    curl_setopt_array($curl, array(
+    $curl2 = curl_init();
+    curl_setopt_array($curl2, array(
       CURLOPT_URL => $monitor_url_v2,
       CURLOPT_RETURNTRANSFER => true,
       CURLOPT_ENCODING => "",
@@ -79,8 +77,8 @@ if ($monitor_enabled) {
       ),
     ));
 
-    $response = curl_exec($curl);
-    curl_close($curl);
+    $response2 = curl_exec($curl2);
+    curl_close($curl2);
 
 
 

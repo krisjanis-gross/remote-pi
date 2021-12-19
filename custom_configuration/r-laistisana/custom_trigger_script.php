@@ -11,6 +11,8 @@ function run_triggers() {
 $trigger1_go = false;
 $trigger_laistisana_go = false;
 $trigger_internets_riits_vakars = false;
+$process_trigger_combined_laistisana = false;
+
 $static_db = open_static_data_db(true);
 $results = $static_db->query('SELECT id FROM  `triggers` where state = 1;');
 while ($row = $results->fetchArray()) {
