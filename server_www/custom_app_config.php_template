@@ -18,11 +18,18 @@ $longTermSaveDays = 365;  // all records older than this will be deleted.
 $longTermSaveIntervalSeconds = 60 * 60; // 1 hour
 
 
-// monitoring parameters
-$montiror_URL = "https://helloworld-evonpsrdjq-ew.a.run.app/";
+// monitoring parameters v1
+/*$montiror_URL = "https://helloworld-evonpsrdjq-ew.a.run.app/";
 $monitor_enabled = true;
 $monitor_API_key = "new-key";
 $monitor_node_ID = "55666443";
 $monitor_node_NAME = "devtest1";
+*/
 
+// monitoring parameters v2
+
+  $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin/" ;
+  $monitor_enabled = true;
+  $monitor_API_key = "new-key";
+  $monitor2_node_ID = "devtest1";
 ?>

@@ -3,13 +3,18 @@
 
 function send_monitor_signal () {
 
-  global $montiror_URL; // "https://helloworld-evonpsrdjq-ew.a.run.app/";
+  //global $montiror_URL; // "https://helloworld-evonpsrdjq-ew.a.run.app/";
   global $monitor_enabled; //  = true;
   global $monitor_API_key; //   = "new-key";
-  global $monitor_node_ID;
-  global $monitor_node_NAME;
+  //global $monitor_node_ID;
+  //global $monitor_node_NAME;
+
+
+  global $monitor_url_v2 ;
+  global $monitor2_node_ID;
 
   if ($monitor_enabled) {
+    /*
     $sensor_readings_array = get_sensor_readings_for_monitor ();
     $data = [
       "API_key" => $monitor_API_key,
@@ -41,15 +46,9 @@ function send_monitor_signal () {
       $response = curl_exec($curl);
       curl_close($curl);
 //      echo $response;
-
+*/
 
 // monitor v2
-
- $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin/" ;
- global $monitor2_node_ID;
-//global $monitor_enabled; //  = true;
-//global $monitor_API_key; //   = "new-key";
-//global $monitor_node_ID;
 
     //$sensor_readings_array = get_sensor_readings_for_monitor ();
   $data = [
