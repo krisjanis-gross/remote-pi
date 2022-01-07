@@ -12,6 +12,7 @@ function run_triggers() {
 $trigger2_go = false;
 $trigger4_go = false;
 $trigger5_go = false;
+$trigger6_go = false;
 $static_db = open_static_data_db(true);
 $results = $static_db->query('SELECT id FROM  `triggers` where state = 1;');
 while ($row = $results->fetchArray()) {
@@ -19,6 +20,7 @@ while ($row = $results->fetchArray()) {
 		if ($trigger_id == 2) $trigger2_go = true;
 		if ($trigger_id == 4) $trigger4_go = true;
 		if ($trigger_id == 5) $trigger5_go = true;
+ 		if ($trigger_id == 6) $trigger6_go = true;
 			//print ("process trigger $trigger_id");
 }
 $static_db->close();
@@ -26,6 +28,7 @@ $static_db->close();
 if ($trigger2_go)   process_trigger_zavesana();
 if ($trigger4_go)   ledusskapja_dzesesana();
 if ($trigger5_go)   apkure();
+if ($trigger6_go)    trigger_apkure_riits_vakars ();
 }
 
 
@@ -80,6 +83,18 @@ if ($trigger_id == 5 && $command == 0) {
       unlock_pin(18);
       set_pin(18,0,false);
     }
+if ($trigger_id == 6 && $command == 1) {
+  	// action to do on trigger 1 enable event
+  	//error_log ("@@@@@@@@@@@@@@@@@@Trigger 1 enable event");
+     lock_pin(18);
+     // mark start time
+
+  	}
+
+if ($trigger_id == 6 && $command == 0) {
+       set_pin(18,0);
+    	 unlock_pin(18);
+      }
 
 
 
@@ -297,6 +312,53 @@ function apkure ()
 
 }
 
+
+
+function trigger_apkure_riits_vakars ()
+{
+// get parameters
+// internet ON time
+    $ON_time = get_parameter (24);
+    if (!is_numeric($ON_time)) $ON_time = 8;
+
+    $Off_time = get_parameter (25);
+    if (!is_numeric($Off_time)) $Off_time = 21;
+
+    //error_log ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ON time = $ON_time //// off time $Off_time \\\\\\\ ");
+
+
+    $ontime1 = time_float_to_array($ON_time);
+    //error_log( print_r( $ontime1 , true ) );
+    $ontime_string = $ontime1[0] . ':' .  $ontime1[1];
+    //error_log( print_r( $ontime_string , true ) );
+
+
+    $offtime1 = time_float_to_array($Off_time);
+    //error_log( print_r( $offtime1 , true ) );
+    $offtime_string = $offtime1[0] . ':' .  $offtime1[1];
+
+
+    $start = strtotime($ontime_string);
+    $end = strtotime($offtime_string);
+
+
+    if(time() >= $start && time() <= $end) {
+          //error_log ("**************   ON   **************");
+          add_sensor_reading("intervals_riits_vakars_rezultats", 10);
+         set_pin(18,1);
+    } else {
+           // error_log ("************** OFF  **************");
+            add_sensor_reading("intervals_riits_vakars_rezultats", 0);
+            set_pin(18,0);
+      }
+
+
+
+
+}
+function time_float_to_array($h) {
+    return [floor($h), (floor($h * 60) % 60), floor($h * 3600) % 60];
+}
 
 
 
