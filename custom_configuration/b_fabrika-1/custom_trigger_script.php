@@ -324,14 +324,21 @@ function trigger_apkure_riits_vakars ()
     $Off_time = get_parameter (25);
     if (!is_numeric($Off_time)) $Off_time = 21;
 
+
+    $ON_time2 = get_parameter (25);
+    if (!is_numeric($ON_time2)) $ON_time2 = 8;
+
+    $Off_time2 = get_parameter (26);
+    if (!is_numeric($Off_time2)) $Off_time2 = 21;
+
+
     //error_log ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ON time = $ON_time //// off time $Off_time \\\\\\\ ");
 
-
+/*
     $ontime1 = time_float_to_array($ON_time);
     //error_log( print_r( $ontime1 , true ) );
     $ontime_string = $ontime1[0] . ':' .  $ontime1[1];
     //error_log( print_r( $ontime_string , true ) );
-
 
     $offtime1 = time_float_to_array($Off_time);
     //error_log( print_r( $offtime1 , true ) );
@@ -340,9 +347,18 @@ function trigger_apkure_riits_vakars ()
 
     $start = strtotime($ontime_string);
     $end = strtotime($offtime_string);
+    */
+
+    $start1 = hour_dec_to_time_object ($ON_time);
+    $end1 = hour_dec_to_time_object ($Off_time);
+
+    $start2 = hour_dec_to_time_object ($ON_time2);
+    $end2 = hour_dec_to_time_object ($Off_time2);
 
 
-    if(time() >= $start && time() <= $end) {
+
+
+    if( (time() >= $start1 && time() <= $end1) ||   (time() >= $start2 && time() <= $end2)   ) {
           //error_log ("**************   ON   **************");
           add_sensor_reading("intervals_riits_vakars_rezultats", 10);
          set_pin(18,1);
@@ -353,6 +369,12 @@ function trigger_apkure_riits_vakars ()
       }
 
 
+function hour_dec_to_time_object ($hour_dec) {
+  $array =  time_float_to_array($hour_dec);
+  $string = $array[0] . ':' .  $array[1];
+  $time = strtotime($string);
+  return $time;
+}
 
 
 }
