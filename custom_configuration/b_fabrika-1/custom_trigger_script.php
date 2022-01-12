@@ -368,6 +368,9 @@ function trigger_apkure_riits_vakars ()
             set_pin(18,0);
       }
 
+}
+
+
 
 function hour_dec_to_time_object ($hour_dec) {
   $array =  time_float_to_array($hour_dec);
@@ -377,7 +380,7 @@ function hour_dec_to_time_object ($hour_dec) {
 }
 
 
-}
+
 function time_float_to_array($h) {
     return [floor($h), (floor($h * 60) % 60), floor($h * 3600) % 60];
 }
