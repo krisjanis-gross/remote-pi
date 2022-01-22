@@ -325,10 +325,10 @@ function trigger_apkure_riits_vakars ()
     if (!is_numeric($Off_time)) $Off_time = 21;
 
 
-    $ON_time2 = get_parameter (25);
+    $ON_time2 = get_parameter (26);
     if (!is_numeric($ON_time2)) $ON_time2 = 8;
 
-    $Off_time2 = get_parameter (26);
+    $Off_time2 = get_parameter (27);
     if (!is_numeric($Off_time2)) $Off_time2 = 21;
 
 
@@ -355,10 +355,10 @@ function trigger_apkure_riits_vakars ()
     $start2 = hour_dec_to_time_object ($ON_time2);
     $end2 = hour_dec_to_time_object ($Off_time2);
 
+    $time_now = time ();
+//error_log ("**************start1=$start1 // end1=$end1 // start2=$start2 // end2=$end2  // time_aa= $time_now     ***********");
 
-
-
-    if( (time() >= $start1 && time() <= $end1) ||   (time() >= $start2 && time() <= $end2)   ) {
+    if( (($start1 <= $time_now ) && ($time_now  <= $end1)) ||   (($start2 <= $time_now ) && ($time_now  <= $end2))   ) {
           //error_log ("**************   ON   **************");
           add_sensor_reading("intervals_riits_vakars_rezultats", 10);
          set_pin(18,1);
@@ -376,6 +376,7 @@ function hour_dec_to_time_object ($hour_dec) {
   $array =  time_float_to_array($hour_dec);
   $string = $array[0] . ':' .  $array[1];
   $time = strtotime($string);
+ // error_log ("***convert dec to time: hour_dec=$hour_dec // string=$string // time=$time ");
   return $time;
 }
 
