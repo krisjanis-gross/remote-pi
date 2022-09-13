@@ -160,8 +160,12 @@ if ($drying_action) { // calculate cooling action
                   add_sensor_reading("dzesesanas_IESL_timer", $minutes_remaining);
            	     // error_log ("+now = ".$timestamp_now ."+cooling_cycle_timestamp = ".$cooling_cycle_timestamp."+ elapsed since start :" . $elapsed_time_since_start . "minutes_remaining : " . $minutes_remaining);
 
-
-                	if ($elapsed_time_since_start > $DZES_IESLEGTS_MIN) {
+           // error_log ("%%%%%%%%%%% dzesetaja_temp $dzesetaja_temp /// cooling_target $cooling_target cooling_delta $cooling_delta");
+            $disable_cooling_ovverride = false;
+            if (!is_null($dzesetaja_temp)) {
+              if ($dzesetaja_temp <= ($cooling_target - $cooling_delta)) $disable_cooling_ovverride = true;
+            }
+                	if (($elapsed_time_since_start > $DZES_IESLEGTS_MIN) OR $disable_cooling_ovverride ) {
           		    //error_log ("%%%%%%%%%%% elapsed_time_since_start $elapsed_time_since_start /// DZES_IESLEGTS_MIN $DZES_IESLEGTS_MIN");
           		    // disable trigger
           		          $cooling_action = 0;

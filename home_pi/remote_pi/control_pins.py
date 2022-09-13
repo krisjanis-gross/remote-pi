@@ -10,7 +10,7 @@ command = str(sys.argv[1]);
 pin_to_control = int(str(sys.argv[2]));
 
 
-print (pin_to_control);
+#print (pin_to_control);
 
 if command  == 'on':
 	GPIO.setup(pin_to_control,GPIO.OUT)

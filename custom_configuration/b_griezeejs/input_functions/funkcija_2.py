@@ -27,11 +27,11 @@ start_time = time.time()
 
 # wait until timeout OR 1 is detected on pin stopButtonPin
 finished = False
-if debug: print ('input: ')
+#if debug: print ('input: ')
 while not finished:
   #take a reading
   input = GPIO.input(stopButtonPin)
-  if debug: print (str(input))
+  #if debug: print (str(input))
   if input == 1:
    finished = True;
    if debug: print("STOP on INPUT")

@@ -50,10 +50,11 @@ function send_monitor_signal () {
 
 // monitor v2
 
-    //$sensor_readings_array = get_sensor_readings_for_monitor ();
+    $sensor_readings_array = get_sensor_readings_for_monitor ();
   $data = [
     "api_key" => $monitor_API_key,
     "node_id" => $monitor2_node_ID,
+    "sensor_data" => $sensor_readings_array,
   ];
 
   $data_JSON = json_encode($data);
@@ -104,7 +105,7 @@ function get_sensor_readings_for_monitor () {
 				$output_sensor_array['id'] =  $sensor_id;
 				//foreach ($sensor_list as $key => $value)
 				if (isset( $sensor_name_list[$sensor_id]))
-              $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
+                $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
 				else
               $output_sensor_array['sensor_name'] = $sensor_id;
 

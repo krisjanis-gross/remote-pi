@@ -6,13 +6,17 @@ import sys
 debug = True;
 
 GPIO.setmode(GPIO.BOARD)
-relayPin = 12
-stopButtonPin = 11
+#relayPin = 16
+#stopButtonPin = 13
 refreshIterval = 0.01
 
 
 timeoutSeconds = str(sys.argv[1]);
 timeoutSeconds = float(timeoutSeconds)
+
+relayPin = int(str(sys.argv[2]));
+stopButtonPin = int(str(sys.argv[3]));
+
 
 if debug:
  print('stopButtonPin: ' + str(stopButtonPin) + ' relayPin: ' +  str(relayPin) + ' timeoutSeconds: ' + str(timeoutSeconds)  + ' refreshInterval: ' + str(refreshIterval))
@@ -45,3 +49,4 @@ while not finished:
 
   time.sleep(refreshIterval)
 GPIO.output(relayPin,True)
+

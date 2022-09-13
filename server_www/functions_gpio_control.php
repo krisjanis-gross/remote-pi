@@ -95,4 +95,9 @@ function get_pin_status ($pin_nr) {
 	return 	$pin_status;
  }
 
+ function get_pin_status_from_board ($pin_nr) {
+	 $value_from_board =  exec("sudo python /home/pi/remote_pi/control_pins.py read_value " . $pin_nr );
+	 return $value_from_board;
+ }
+
 ?>
