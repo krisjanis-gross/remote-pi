@@ -109,7 +109,7 @@ function get_sensor_readings_for_monitor () {
 				else
               $output_sensor_array['sensor_name'] = $sensor_id;
 
-				$output_sensor_array['value'] = $value['value'];
+				$output_sensor_array['value'] = (float)$value['value'];
 				$function_output[] = $output_sensor_array;
 			}
   return $function_output;
