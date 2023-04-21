@@ -29,11 +29,11 @@ function 	read_sensor_data_custom ()  {
    // read dht22 sensor
    $i = 0;
    do {
-      $dht22_reading = exec ("python /home/pi/remote_pi/read_DHT_sensor.py");
-     // error_log ("$$$$$$$$$$$$$$$$$$$$$$ dht22_reading = $dht22_reading");
+      $dht22_reading = exec ("python3 /home/pi/remote_pi/read_DHT_sensor.py");
+    //  error_log ("$$$$$$$$$$$$$$$$$$$$$$ dht22_reading = $dht22_reading");
       $i = $i + 1;
        }
-   while ( ($i <= 10) AND ($dht22_reading == "error"));
+   while ( ($i <= 2) AND ($dht22_reading == "error"));
 
 
 
@@ -47,11 +47,11 @@ function 	read_sensor_data_custom ()  {
      // try to read again
      $i = 0;
      do {
-       $dht22_reading = exec ("python /home/pi/remote_pi/read_DHT_sensor.py");
+       $dht22_reading = exec ("python3 /home/pi/remote_pi/read_DHT_sensor.py");
       // error_log ("$$$$$$$$$$$$$$$$$$$$$$ dht22_reading = $dht22_reading");
        $i = $i + 1;
        }
-    while ( ($i <= 10) AND ($dht22_reading == "error"));
+    while ( ($i <= 2) AND ($dht22_reading == "error"));
   }
 
 

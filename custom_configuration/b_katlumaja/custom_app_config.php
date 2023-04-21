@@ -28,7 +28,7 @@ $monitor_node_NAME = "betras-katlumaja";
 $monitor2_node_ID = "B-katlumaja-1";
 */
 
-  $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin/" ;
+  $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin" ;
   $monitor_enabled = true;
   $monitor_API_key = "rb82975298457hk";
   $monitor2_node_ID = "B-katlumaja-1";

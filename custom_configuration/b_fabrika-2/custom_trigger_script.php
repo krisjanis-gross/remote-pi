@@ -61,7 +61,7 @@ function trigger_hook ($trigger_id, $command)
 function process_trigger_zavesana () {
 $DHT11_HUMIDITY = get_sensor_reading ('dht_humidity') ;
 $dzesetaja_temp = get_sensor_reading ('28-0315a87769ff') ;
-$gaiss_augshaa = get_sensor_reading ('dht_temperature') ;
+$gaiss_augshaa = get_sensor_reading ('28-0415a86124ff') ;
 
 //error_log ("zavesana:DHT11_HUMIDITY  = $DHT11_HUMIDITY; dzesetaja_temp = $dzesetaja_temp; gaiss_augshaa =$gaiss_augshaa  ");
 
@@ -81,7 +81,7 @@ $gaiss_augshaa = get_sensor_reading ('dht_temperature') ;
   $drying_action = 0;
 
  	// perform action
-
+/*
   if ( !is_null($DHT11_HUMIDITY) ) {
   	if  ($DHT11_HUMIDITY >= ($ZGM + $ZGM_delta)) {
   			$drying_action  = 1; // on
@@ -92,6 +92,10 @@ $gaiss_augshaa = get_sensor_reading ('dht_temperature') ;
       $heating_action  = 0;
   	}
   }
+  */
+  // drying action always ON hack
+
+  $drying_action  = 1; // on
  //error_log ("zavesana:drying_action  = $drying_action   ");
 
 
@@ -119,7 +123,13 @@ $gaiss_augshaa = get_sensor_reading ('dht_temperature') ;
            	     // error_log ("+now = ".$timestamp_now ."+cooling_cycle_timestamp = ".$cooling_cycle_timestamp."+ elapsed since start :" . $elapsed_time_since_start . "minutes_remaining : " . $minutes_remaining);
 
 
-                	if ($elapsed_time_since_start > $DZES_IESLEGTS_MIN) {
+                  $disable_cooling_ovverride = false;
+                  if (!is_null($dzesetaja_temp)) {
+                      if ($dzesetaja_temp <= ($cooling_target - $cooling_delta)) $disable_cooling_ovverride = true;
+                  }
+
+
+                	if (($elapsed_time_since_start > $DZES_IESLEGTS_MIN) OR $disable_cooling_ovverride ) {
           		    //error_log ("%%%%%%%%%%% elapsed_time_since_start $elapsed_time_since_start /// DZES_IESLEGTS_MIN $DZES_IESLEGTS_MIN");
           		    // disable trigger
           		          $cooling_action = 0;

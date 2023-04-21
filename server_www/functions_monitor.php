@@ -73,7 +73,7 @@ function send_monitor_signal () {
       CURLOPT_CUSTOMREQUEST => "POST",
       CURLOPT_POSTFIELDS => $data_JSON,
       CURLOPT_HTTPHEADER => array(
-        "Content-Type: text/plain"
+         "Content-Type: application/json" 
       ),
     ));
 
