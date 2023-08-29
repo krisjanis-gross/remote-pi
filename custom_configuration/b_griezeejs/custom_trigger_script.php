@@ -206,8 +206,8 @@ function  process_trigger_loop()
         # first start. perform PRE actions
         if ($debug) error_log("~~~~~~loop step 0 =  PRE actions");
 
-        # 0.1 Relejs 2 lidz pin 11 vai laiks Y - pacelj cilindru
-        $log = shell_exec("sudo python /home/pi/remote_pi/funkcija_generic.py $Y $relejs_2_pin 11");
+        # 0.1 Relejs 2 lidz pin 13 vai laiks Y - pacelj cilindru
+        $log = shell_exec("sudo python /home/pi/remote_pi/funkcija_generic.py $Y $relejs_2_pin 13");
 		    if ($debug) error_log($log);
 
         # 0.2 Relejs iesleegts uz laiku Relejs_3_timer. - Pacelj nostumeeju
