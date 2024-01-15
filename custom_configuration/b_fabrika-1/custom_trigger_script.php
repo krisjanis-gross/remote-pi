@@ -255,6 +255,7 @@ function ledusskapja_dzesesana ()
         $target_temp = get_parameter (20);    if (!is_numeric($target_temp)) $target_temp = 2;
         $_delta = get_parameter (21);     if (!is_numeric($_delta)) $_delta = 1;
 
+//error_log ("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% ledusskapja_dzesesana sensor_temp $sensor_temp  target_temp= $target_temp\\\\\\\ ");
 
         if ( !is_null($sensor_temp) ) {
                 if  ($sensor_temp >= ($target_temp + $_delta)) {
@@ -284,7 +285,7 @@ function ledusskapja_dzesesana ()
 
 function apkure ()
 {
-  $sensor_temp = get_sensor_reading ('28-031501c40dff') ;
+  $sensor_temp = get_sensor_reading ('28-041622109bff') ;
 
 	$apkure_target = get_parameter (10);	if (!is_numeric($apkure_target)) $apkure_target = 5;
 	$apkure_delta = get_parameter (11);	if (!is_numeric($apkure_delta)) $apkure_delta = 1;
