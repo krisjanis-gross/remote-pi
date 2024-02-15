@@ -60,6 +60,10 @@ switch ($request_action) {
 				$return_data = get_sensor_data();
         return_data_to_client($return_data);
         break;
+		case "get_sensor_data_sparkline":
+				$return_data = get_sensor_data_sparkline();
+		    return_data_to_client($return_data);
+		break;
 		case "get_GPIO_list":
 				$return_data = get_GPIO_list();
 	      return_data_to_client($return_data);
@@ -128,8 +132,6 @@ function return_data_to_client($return_data) {
 
 
 
-
-
 function get_sensor_data () {
 	require_once("functions_sensors.php");
   $sensor_name_list = get_sensor_name_list();
@@ -163,6 +165,45 @@ function get_sensor_data () {
 	  return $response_to_client;
 
 }
+
+
+
+function get_sensor_data_sparkline () {
+	require_once("functions_sensors.php");
+	$sensor_name_list = get_sensor_name_list();
+
+	$sensor_data = apcu_fetch('sensor_data', $sensor_data);
+	$output_new = (array) null;
+	if ($sensor_data) {
+		$array_of_readings = $sensor_data["data"];
+		foreach ($array_of_readings as $key => $value)
+				{
+					$sensor_id = $value['id'];
+					$output_sensor_array['id'] =  $sensor_id;
+					//foreach ($sensor_list as $key => $value)
+					if (isset( $sensor_name_list[$sensor_id])) $output_sensor_array['sensor_name'] = $sensor_name_list[$sensor_id];
+					else $output_sensor_array['sensor_name'] = $sensor_id;
+
+					$output_sensor_array['value'] = $value['value'];
+					$output_sensor_array['sparkline_data'] = get_sparkline_data($sensor_id,$value['value']);
+					// tod- refactor
+					//if( $sensor_array['id'] == "__data_timestamp___") {
+					//	$data_timestam =  $value;
+					//}
+					$output_new[] = $output_sensor_array;
+				}
+		}
+		$response_to_client['response_code'] = "OK";
+		$response_data_array['timestamp'] = $sensor_data["timestamp"];
+		$response_data_array['data']= $output_new;
+		$response_to_client['response_data'] =  $response_data_array;
+
+		return $response_to_client;
+
+}
+
+
+
 
 
 
@@ -305,6 +346,50 @@ function  get_historic_data($request_data)
 }
 }
 
+function get_sparkline_data($sensor_id,$last_value) {
+
+	$query_datetime_filter = " AND datetime > datetime('now','localtime','-10 minutes')";
+	$query_sensor_id_filter = " AND sensor_id = '$sensor_id'";
+
+  $sensor_log_db_tempfs = open_sensor_log_db_in_TEMPFS_ ();
+
+	$results = $sensor_log_db_tempfs->query('SELECT `datetime` , `value`  FROM sensor_log where 1 ' . $query_sensor_id_filter . $query_datetime_filter .
+																																				'ORDER BY `datetime` asc');
+
+  $reset = date_default_timezone_get();
+	//error_log("default time zone = $reset");
+	date_default_timezone_set('UTC');
+	//error_log("default time zone = " . date_default_timezone_get() );
+	while ($row = $results->fetchArray())
+	{
+
+					//	$sensor_id = $row['sensor_id'];
+
+						// $row['datetime'] - already includes time zone ajustment (see how data was inserted in the table)
+					$datetime = strtotime ($row['datetime']) ;
+					//	error_log("ddddddddddddddddddddddddatetime = " . $row['datetime']);
+					//	error_log("uuuuuuuuuuuuuuuuuuuuuuuunixtime = " . $datetime);
+					$datetime *= 1000; // convert from Unix timestamp to JavaScript time
+
+				  $sensor_data = (float) $row["value"];
+
+						//var_dump($row);
+						//print ("<br / > " . $row['sensor_id'] . $row['value'] . $row['datetime'] . "<br / > " );
+
+					$sparkline_data[]  = 	array($datetime, $sensor_data);
+	}
+	// add the very last value
+	date_default_timezone_set($reset);
+
+	$dt = new DateTime("now", new DateTimeZone($reset));
+	//error_log("ddddddddddddddddddddddddatetime = " . $dt->format("c"));
+	//error_log("offset = " . $dt->getOffset());
+  $last_value_float = (float)  $last_value;
+	$datetime_now =  ( $dt->format("U") + $dt->getOffset() ) * 1000;
+	$sparkline_data[]  = array($datetime_now, $last_value_float);
+
+	return $sparkline_data;
+}
 
 
 function sensor_historic_data ($data_period,$selected_sensors) {
