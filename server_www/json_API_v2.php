@@ -104,7 +104,14 @@ switch ($request_action) {
 				$return_data = setSensorName($request_data);
 				return_data_to_client($return_data);
 				break;
-
+		case "restart_device":
+				$return_data = restartDevice();
+				return_data_to_client($return_data);
+				break;
+		case "shutdown_device":
+				$return_data = shutdownDevice();
+				return_data_to_client($return_data);
+				break;
 }
 
 function return_data_to_client($return_data) {
@@ -260,6 +267,22 @@ function getDeviceConfig ($request_data) {
 
 }
 
+
+function restartDevice () {
+  error_log ("!!!@@@***device restart triggered from RPI API***@@@!!!");
+	flush_sensor_data_to_permanent_storage();
+  $return = exec ( "sudo reboot");
+ 	$response_to_client['response_code'] = "OK";
+	return $response_to_client;
+}
+
+function shutdownDevice () {
+  error_log ("!!!@@@***device shutdown triggered from RPI API***@@@!!!");
+	flush_sensor_data_to_permanent_storage();
+  $return = exec ( "sudo shutdown");
+ 	$response_to_client['response_code'] = "OK";
+	return $response_to_client;
+}
 
 function set_GPIO_pin ($request_data)
 {
