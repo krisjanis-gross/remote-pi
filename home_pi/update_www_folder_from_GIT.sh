@@ -12,6 +12,7 @@ sudo chown pi:pi /var/www/html -R
 rm /var/www/html/*.js
 rm /var/www/html/*.css
 rm /var/www/html/assets -rf
+mkdir GIT_sources_html_app
 git clone https://github.com/krisjanis-gross/remote-pi-ionic-v7.git GIT_sources_html_app
 cd GIT_sources_html_app
 git pull origin master

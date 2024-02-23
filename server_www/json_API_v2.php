@@ -270,8 +270,19 @@ function getDeviceConfig ($request_data) {
 
 function restartDevice () {
   error_log ("!!!@@@***device restart triggered from RPI API***@@@!!!");
-	flush_sensor_data_to_permanent_storage();
+  try
+    {
+      flush_sensor_data_to_permanent_storage();
+    }
+  catch (Exception $e)
+    {
+      // do nothing... php will ignore and continue
+      // but maybe use "ignored" as name to silence IDE warnings.
+    }
+
+  //error_log ("^^^^^^^debug after flush done^^^^^^^^^^^^");
   $return = exec ( "sudo reboot");
+
  	$response_to_client['response_code'] = "OK";
 	return $response_to_client;
 }

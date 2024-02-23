@@ -16,32 +16,43 @@ function flush_sensor_data_to_permanent_storage (){
 
 	// select all sensor log data
 	$results = $tmp_db->query('SELECT * FROM sensor_log');
+  if($results==FALSE) {
+    // error
+    error_log ("SQlite error: " . $tmp_db->lastErrorMsg());
+  }
+  else // proceed
+  {
 
-	// open STORAGE db. (latest version)
-	$storage_db  = open_sensor_DB_in_STORAGE ();
+        	// open STORAGE db. (latest version)
+        	$storage_db  = open_sensor_DB_in_STORAGE ();
+          //error_log ("ddddddddddddddddddddddddddddddddddddd sqlite error: " . $storage_db->lastErrorMsg());
 
-	// move data from TMP to STORAGE
-	while ($row = $results->fetchArray()) {
-		//var_dump($row);
-		$sensor_id = $row["sensor_id"];
-		$datetime = $row["datetime"];
-		$value = $row["value"];
-		$data_save_LEVEL = $row["dataSaveLevel"];
 
-		$insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $datetime . "',". $value .   ",  "  . $data_save_LEVEL .  ")";
-	//	print ("<br /> Insert query  = $insert_query <br/ >");
-		$insert_result = $storage_db->query($insert_query);
+        	// move data from TMP to STORAGE
+        	while ($row = $results->fetchArray()) {
+            		//var_dump($row);
+            		$sensor_id = $row["sensor_id"];
+            		$datetime = $row["datetime"];
+            		$value = $row["value"];
+            		$data_save_LEVEL = $row["dataSaveLevel"];
 
-		// delete record from TMP DB.
-		$del_query = "delete from sensor_log where sensor_id = '$sensor_id' and datetime = '$datetime';";
-	//	print ("<br /> delete  query  = $del_query <br/ >");
-		$delete_result = $tmp_db->query($del_query);
+            		$insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $datetime . "',". $value .   ",  "  . $data_save_LEVEL .  ")";
+            	//	print ("<br /> Insert query  = $insert_query <br/ >");
+            		$insert_result = $storage_db->query($insert_query);
 
-	}
+            		// delete record from TMP DB.
+            		$del_query = "delete from sensor_log where sensor_id = '$sensor_id' and datetime = '$datetime';";
+            	//	print ("<br /> delete  query  = $del_query <br/ >");
+            		$delete_result = $tmp_db->query($del_query);
 
-	//Close both DB-s
+            	}
+          $storage_db->close();
+
+  }
+
+	//Close
 	$tmp_db->close();
-	$storage_db->close();
+
 
 }
 
