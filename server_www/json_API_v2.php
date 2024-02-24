@@ -112,6 +112,14 @@ switch ($request_action) {
 				$return_data = shutdownDevice();
 				return_data_to_client($return_data);
 				break;
+		case "restore_device_configuration":
+				$return_data = restore_device_configuration();
+				restore_device_configuration($return_data);
+				break;
+		case "backup_device_configuration":
+				$return_data = backup_device_configuration();
+				return_data_to_client($return_data);
+				break;
 }
 
 function return_data_to_client($return_data) {
@@ -294,6 +302,24 @@ function shutdownDevice () {
  	$response_to_client['response_code'] = "OK";
 	return $response_to_client;
 }
+
+
+function backup_device_configuration () {
+  error_log ("!!!@@@***backup_device_configuration triggered from RPI API***@@@!!!");
+
+
+
+ 	$response_to_client['response_code'] = "OK";
+	return $response_to_client;
+}
+
+function restore_device_configuration () {
+  error_log ("!!!@@@***restore_device_configuration triggered from RPI API***@@@!!!");
+
+ 	$response_to_client['response_code'] = "OK";
+	return $response_to_client;
+}
+
 
 function set_GPIO_pin ($request_data)
 {
