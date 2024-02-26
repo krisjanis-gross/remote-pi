@@ -306,16 +306,14 @@ function shutdownDevice () {
 
 function backup_device_configuration () {
   error_log ("!!!@@@***backup_device_configuration triggered from RPI API***@@@!!!");
-
-
-
+	backup_static_data_file ();
  	$response_to_client['response_code'] = "OK";
 	return $response_to_client;
 }
 
 function restore_device_configuration () {
   error_log ("!!!@@@***restore_device_configuration triggered from RPI API***@@@!!!");
-
+  restore_static_data_file_from_backup();
  	$response_to_client['response_code'] = "OK";
 	return $response_to_client;
 }

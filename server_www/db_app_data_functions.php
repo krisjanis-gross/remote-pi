@@ -101,4 +101,44 @@ function get_static_db_file_from_storage ($db_file_name) {
 		}
 }
 
+function backup_static_data_file () {
+		// save the current file as backup (special name)
+		global $db_storage_folder;
+		global $static_db_file_name;
+		global $tempfs_work_folder;
+
+		$file_name_prefix = "static_data";
+
+		// current db file name
+		$current_db_file_name = $tempfs_work_folder . $static_db_file_name;
+
+		// construct file name
+		$new_file_name = $db_storage_folder . "staticDataBackup.db";
+		//error_log ("saving file to " . $new_file_name);
+		if (!copy($current_db_file_name , $new_file_name )) {
+					error_log ( "failed to make static data backup");
+				}
+
+}
+
+function restore_static_data_file_from_backup () {
+	global $db_storage_folder;
+	global $tempfs_work_folder;
+	global $static_db_file_name;
+
+	$backup_file =  $db_storage_folder . "staticDataBackup.db";
+
+	$work_file =  $tempfs_work_folder . $static_db_file_name;
+
+	if (!copy($backup_file , $work_file )) {
+				error_log ( "failed to restore static data backup");
+			}
+
+	// copy from work folder to permanent Storage
+	save_static_db_in_storage();
+
+}
+
+
+
 ?>
