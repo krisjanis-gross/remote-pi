@@ -28,8 +28,8 @@ $trigger_log_data = false;
   require_once("db_app_data_functions.php");
 	require_once("functions_gpio_control.php");
 
-	$db_file_exists_in_tmp_storeage = check_if_static_db_file_exists();
-	if (!$db_file_exists_in_tmp_storeage)  // this is first run of the application
+	apcu_fetch('app_first_run', $app_first_run);
+	if ($app_first_run == true)  // this is first run of the application
 		{
 			error_log("first run of the application");
 			$static_db = open_static_data_db(true);
@@ -45,18 +45,6 @@ $trigger_log_data = false;
 			$static_db->close();
 
 		}
-
-
-
-
-
-
-
-
-
-
-
-
 
 	/////////////////////////////////////////////////////////////////////////////
   // 1. Get all sensor data ///////////////////////////////////////////////////

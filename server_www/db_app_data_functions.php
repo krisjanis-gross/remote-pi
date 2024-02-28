@@ -14,10 +14,11 @@ function open_static_data_db ($read_only = false) {
   //error_log("static_data_db_file ==" . $static_data_db_file);
 
 	// check if DB file is in place.
-	if (!file_exists ( $static_data_db_file ))
-		get_static_db_file_from_storage ($static_db_file_name);
-		//if the file is not there then get the file from Storage or Read Only storage.
-
+	if (!file_exists ( $static_data_db_file )){
+				get_static_db_file_from_storage ($static_db_file_name);
+				//if the file is not there then get the file from Storage or Read Only storage.
+				apcu_store('app_first_run',true);
+    }
 	// open the data base and return the db object
 	if ($read_only)
 	    $static_db = new SQLite3($static_data_db_file,SQLITE3_OPEN_READONLY);
