@@ -27,6 +27,15 @@ function open_static_data_db ($read_only = false) {
 	return $static_db;
 }
 
+function check_if_static_db_file_exists () {
+	global $static_db_file_name;
+	global $tempfs_work_folder;
+
+	$static_data_db_file = $tempfs_work_folder . $static_db_file_name;
+	if (file_exists ( $static_data_db_file )) return true;
+	else return false;
+
+}
 
 function save_static_db_in_storage(){
 	global $db_storage_folder;

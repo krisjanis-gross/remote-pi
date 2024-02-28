@@ -19,6 +19,43 @@ $trigger_log_data = false;
 //OLD
 //$all_data = '"__data_timestamp___":"' . date('Y-m-d H:i:s') . '"';
 
+  /////////////////////////////////////////////////////////////////////////////
+  // 0. check if this is first run of the script (after reboot).
+  //     if that is the case then read pin values and re-set them
+  /////////////////////////////////////////////////////////////////////////////
+
+  //
+  require_once("db_app_data_functions.php");
+	require_once("functions_gpio_control.php");
+
+	$db_file_exists_in_tmp_storeage = check_if_static_db_file_exists();
+	if (!$db_file_exists_in_tmp_storeage)  // this is first run of the application
+		{
+			error_log("first run of the application");
+			$static_db = open_static_data_db(true);
+			$results = $static_db->query('select `id`,`state` from pins where id < 50;');
+			while ($row = $results->fetchArray()) {
+
+				//$GPIO_id = $row['id'];
+				$pin_id = $row['id'];
+				$pin_state['state'] = $row['enabled'];
+				set_pin_GPIO_python($pin_id,$pin_state);
+				error_log("set_pin_GPIO_python if = $pin_id  state =   $pin_state");
+			}
+			$static_db->close();
+
+		}
+
+
+
+
+
+
+
+
+
+
+
 
 
 	/////////////////////////////////////////////////////////////////////////////
