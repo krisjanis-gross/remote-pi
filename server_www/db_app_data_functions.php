@@ -103,7 +103,7 @@ function get_static_db_file_from_storage ($db_file_name) {
 		// valid DB file found? Yes- nice; No - Take from Read Only storage.
 		if ($valid_db_file == null) $valid_db_file = $read_only_folder . $db_file_name;
 
-		error_log ("using  static data file file " . $valid_db_file);
+		//error_log ("using  static data file file " . $valid_db_file);
 
 		// copy file to tempfs
 		if (!copy($valid_db_file, $tempfs_work_folder . $db_file_name )) {

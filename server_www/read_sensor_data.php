@@ -28,10 +28,10 @@ $trigger_log_data = false;
   require_once("db_app_data_functions.php");
 	require_once("functions_gpio_control.php");
 
-	apcu_fetch('app_first_run', $app_first_run);
+	$app_first_run = apcu_fetch('app_first_run', $app_first_run);
 	if ($app_first_run == true)  // this is first run of the application
 		{
-			error_log("first run of the application");
+			//error_log("first run of the application");
 			$static_db = open_static_data_db(true);
 			$results = $static_db->query('select `id`,`enabled` from pins where id < 50;');
 			while ($row = $results->fetchArray()) {
@@ -40,10 +40,10 @@ $trigger_log_data = false;
 				$pin_id = $row['id'];
 				$pin_state = $row['enabled'];
 				set_pin_GPIO_python($pin_id,$pin_state);
-				error_log("set_pin_GPIO_python if = $pin_id  state =   $pin_state");
+				//error_log("set_pin_GPIO_pin id = $pin_id  state =   $pin_state");
 			}
 			$static_db->close();
-				apcu_store('app_first_run',false);
+			apcu_store('app_first_run',false);
 		}
 
 	/////////////////////////////////////////////////////////////////////////////
