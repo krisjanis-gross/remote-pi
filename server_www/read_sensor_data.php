@@ -33,12 +33,12 @@ $trigger_log_data = false;
 		{
 			error_log("first run of the application");
 			$static_db = open_static_data_db(true);
-			$results = $static_db->query('select `id`,`state` from pins where id < 50;');
+			$results = $static_db->query('select `id`,`enabled` from pins where id < 50;');
 			while ($row = $results->fetchArray()) {
 
 				//$GPIO_id = $row['id'];
 				$pin_id = $row['id'];
-				$pin_state = $row['state'];
+				$pin_state = $row['enabled'];
 				set_pin_GPIO_python($pin_id,$pin_state);
 				error_log("set_pin_GPIO_python if = $pin_id  state =   $pin_state");
 			}
