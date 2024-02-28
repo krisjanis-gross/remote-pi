@@ -38,12 +38,12 @@ $trigger_log_data = false;
 
 				//$GPIO_id = $row['id'];
 				$pin_id = $row['id'];
-				$pin_state['state'] = $row['enabled'];
+				$pin_state = $row['state'];
 				set_pin_GPIO_python($pin_id,$pin_state);
 				error_log("set_pin_GPIO_python if = $pin_id  state =   $pin_state");
 			}
 			$static_db->close();
-
+				apcu_store('app_first_run',false);
 		}
 
 	/////////////////////////////////////////////////////////////////////////////
