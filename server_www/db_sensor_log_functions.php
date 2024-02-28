@@ -111,7 +111,7 @@ function open_sensor_log_db_in_TEMPFS_(){
 	// try to find the db in tempfs
 	if (!file_exists ( $sensor_log_db_file_tempfs )) {
 		// copy file from permanent storage
-		error_log ( " not found ...\n" .  $sensor_log_db_file_tempfs);
+	//	error_log ( " not found ...\n" .  $sensor_log_db_file_tempfs);
 		if (!copy( $read_only_template_file , $sensor_log_db_file_tempfs ))
 				error_log ( "failed to copy $sensor_log_db_file_tempfs...\n");
 
