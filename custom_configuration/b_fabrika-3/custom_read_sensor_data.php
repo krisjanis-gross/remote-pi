@@ -15,6 +15,7 @@ function 	read_sensor_data_custom ()  {
    // error_log ("vvvvvvvvvvvvvvvalue $value");
     // chech if value is in "reasonable" range. e.g. not an error.
     if ($value > -50 && $value < 200){
+          $value = round($value, 1);
           add_sensor_reading($key,$value);
       }
     }
@@ -39,6 +40,7 @@ function 	read_sensor_data_custom ()  {
    // error_log ("vvvvvvvvvvvvvvvalue $value");
     // chech if value is in "reasonable" range. e.g. not an error.
     if ($value > -50 && $value < 200){
+          $value = round($value, 1);
           add_sensor_reading($key,$value);
       }
     }
