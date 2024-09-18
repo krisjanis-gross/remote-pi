@@ -8,19 +8,19 @@ function run_triggers() {
   // 1. get trigger list
   // 2. run those triggers that are activated.
   // 3. update locked pins (locked by triggers)
-  
+
   $trigger1_go = false;
-  
+
   $static_db = open_static_data_db(true);
   $results = $static_db->query('SELECT id FROM  `triggers` where state = 1;');
   while ($row = $results->fetchArray()) {
   		$trigger_id = $row['id'];
   		if ($trigger_id == 1) $trigger1_go = true;
-  	
+
   			//print ("process trigger $trigger_id");
   }
   $static_db->close();
-  
+
   if ($trigger1_go)   process_trigger_zavesana();
 
 }
@@ -195,8 +195,20 @@ if ($drying_action) { // calculate cooling action
 			//log_trigger_action("augsnes_silditajs",$action * 4);
 	}
 
-}
 
+ // calculate dew point
+ //$dew_point_simple = dew_point_simple ($gaiss_augshaa,$DHT11_HUMIDITY);
+
+
+
+ $dew_point_advanced = dew_point_advanced ($gaiss_augshaa,$DHT11_HUMIDITY);
+ add_sensor_reading("Td",$dew_point_advanced );
+
+ $starpiba =  round ($dew_point_advanced - $dzesetaja_temp,1) ;
+ add_sensor_reading("Td - dzesetajs",$starpiba );
+
+
+}
 
 
 
@@ -218,9 +230,25 @@ function time_float_to_array($h) {
 }
 
 
+function dew_point_simple ($T,$RH) {
+  $TD = $T - ((100-$RH)/5);
+  $TD = round ($TD  , 1);
+  return $TD;
+}
 
+function dew_point_advanced ($T,$RH) {
+  //  https://en.wikipedia.org/wiki/Dew_point
+  $b = 17.625;
+  $c = 243.04;
 
+  $gamma =  log ($RH / 100) + ($b*$T)/($c + $T);
 
+  $TD = ($c * $gamma)/($b-$gamma);
+
+  $TD = round ($TD  , 1);
+  return $TD;
+
+}
 
 
 ?>
