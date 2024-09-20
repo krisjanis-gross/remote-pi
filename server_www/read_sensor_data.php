@@ -31,7 +31,21 @@ $trigger_log_data = false;
 	$app_first_run = apcu_fetch('app_first_run', $app_first_run);
 	if ($app_first_run == true)  // this is first run of the application
 		{
-			//error_log("first run of the application");
+			
+      
+  	$custom_first_run_script_file = "custom_startup_script.php";
+	  if(is_file($custom_first_run_script_file)){
+			   include ($custom_first_run_script_file);
+  		   startup_script();
+	  }
+
+      
+      
+      
+      
+      
+      
+      //error_log("first run of the application");
 			$static_db = open_static_data_db(true);
 			$results = $static_db->query('select `id`,`enabled` from pins where id < 50;');
 			while ($row = $results->fetchArray()) {
