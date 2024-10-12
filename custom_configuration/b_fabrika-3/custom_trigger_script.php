@@ -57,8 +57,9 @@ function process_trigger_zavesana () {
 $DHT11_HUMIDITY = get_sensor_reading ('dht_humidity') ;
 $dzesetaja_temp = get_sensor_reading ('28-03162244e0ff') ;
 $gaiss_augshaa = get_sensor_reading ('dht_temperature') ;
+$gaiss_apakshaa = get_sensor_reading ('28-04162250c5ff') ;
 
-//error_log ("zavesana:DHT11_HUMIDITY  = $DHT11_HUMIDITY; dzesetaja_temp = $dzesetaja_temp; gaiss_augshaa =$gaiss_augshaa  ");
+//error_log ("zavesana:DHT11_HUMIDITY  = $DHT11_HUMIDITY; dzesetaja_temp = $dzesetaja_temp; gaiss_apakshaa =$gaiss_apakshaa  ");
 
   $ZGM = get_parameter (1);	if (!is_numeric($ZGM)) $ZGM = 29;
 	$ZGM_delta = get_parameter (2);	if (!is_numeric($ZGM_delta)) $ZGM_delta = 2;
@@ -172,11 +173,11 @@ if ($drying_action) { // calculate cooling action
 
 
  // heating action
-	if ( !is_null($gaiss_augshaa) ) {
-		if  ($gaiss_augshaa >= ($heating_target + $heating_delta)) {
+	if ( !is_null($gaiss_apakshaa) ) {
+		if  ($gaiss_apakshaa >= ($heating_target + $heating_delta)) {
 				$heating_action  = 0; // off
 		}
-		elseif  ($gaiss_augshaa <= ($heating_target - $heating_delta)) {
+		elseif  ($gaiss_apakshaa <= ($heating_target - $heating_delta)) {
 			$heating_action = 1 ; // on
 		}
 	}
