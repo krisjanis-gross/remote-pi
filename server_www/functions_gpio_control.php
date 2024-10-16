@@ -80,8 +80,9 @@ function set_pin_GPIO_python ($pin_nr, $command){
 	// Create a GPIO object
 	$gpio = new GPIO();
 
-	// Retrieve pin 18 and configure it as an output pin
-	$pin = $gpio->getOutputPin($pin_nr);
+	// Retrieve pin x and configure it as an output pin
+	$pin_nr_GPIO = convert_board_gpio_number_to_GPIOnumber($pin_nr);
+	$pin = $gpio->getOutputPin($pin_nr_GPIO);
 	
 	// todo - global parameter for "reverse" relays.
 	
@@ -126,7 +127,8 @@ function get_pin_status ($pin_nr) {
 	$gpio = new gpio();
 
 	// Retrieve PIN # $pin_nr  and configure it as an input pin
-	$pin = $gpio->getInputPin($pin_nr);
+	$pin_nr_GPIO = convert_board_gpio_number_to_GPIOnumber($pin_nr);
+	$pin = $gpio->getInputPin($pin_nr_GPIO);
 
 	// Configure interrupts for both rising and falling edges
 	$pin->setEdge(InputPinInterface::EDGE_BOTH);
@@ -134,5 +136,41 @@ function get_pin_status ($pin_nr) {
 
 	return $value_from_board;
  }
+
+function convert_board_gpio_number_to_GPIOnumber ($gpio_board_nr) {
+	//https://pinout.xyz/
+	
+	$mapping[3] = 2;
+	$mapping[5] = 3;
+	$mapping[7] = 4;
+	$mapping[8] = 14;
+	$mapping[10] = 15;
+	$mapping[11] = 17;
+	$mapping[12] = 18;
+	$mapping[13] = 27;
+	$mapping[15] = 22;
+	$mapping[16] = 23;
+	$mapping[18] = 24;
+	$mapping[19] = 10;
+	$mapping[21] = 9;
+	$mapping[22] = 25;
+	$mapping[23] = 11;
+	$mapping[24] = 8;
+	$mapping[26] = 7;
+	$mapping[28] = 1;
+	$mapping[29] = 5;
+	$mapping[31] = 6;
+	$mapping[32] = 12;
+	$mapping[33] = 13;
+	$mapping[35] = 19;
+	$mapping[36] = 16;
+	$mapping[37] = 26;
+	$mapping[38] = 20;
+	$mapping[40] = 21;
+
+	return $mapping[$gpio_board_nr];
+	
+}
+
 
 ?>
