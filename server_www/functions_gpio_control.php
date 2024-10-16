@@ -74,8 +74,25 @@ function set_pin ($pin_nr, $command,$save_db_to_storage = true) {
 
 function set_pin_GPIO_python ($pin_nr, $command){
 	// send action to PI GPIO
-	if ($command == 1) exec("sudo python /home/pi/remote_pi/control_pins.py on " . $pin_nr );
-	if ($command == 0) exec("sudo python /home/pi/remote_pi/control_pins.py off " . $pin_nr );
+	//if ($command == 1) exec("sudo python /home/pi/remote_pi/control_pins.py on " . $pin_nr );
+	//if ($command == 0) exec("sudo python /home/pi/remote_pi/control_pins.py off " . $pin_nr );
+	
+	use PiPHP\GPIO\GPIO;
+	use PiPHP\GPIO\Pin\PinInterface;
+
+	// Create a GPIO object
+	$gpio = new GPIO();
+
+	// Retrieve pin 18 and configure it as an output pin
+	$pin = $gpio->getOutputPin($pin_nr);
+	
+	// todo - global parameter for "reverse" relays.
+	
+	if ($command == 1)  $pin->setValue(PinInterface::VALUE_HIGH);	// Set the value of the pin high (turn it on)
+	if ($command == 0)  $pin->setValue(PinInterface::VALUE_LOW);	// Set the value of the pin high (turn it on)
+	
+	
+	
 }
 
 function save_pin_status($pin_nr,$command,$save_db_to_storage) {
