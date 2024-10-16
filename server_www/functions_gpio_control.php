@@ -76,9 +76,6 @@ function set_pin_GPIO_python ($pin_nr, $command){
 	// send action to PI GPIO
 	//if ($command == 1) exec("sudo python /home/pi/remote_pi/control_pins.py on " . $pin_nr );
 	//if ($command == 0) exec("sudo python /home/pi/remote_pi/control_pins.py off " . $pin_nr );
-	
-	use PiPHP\GPIO\GPIO;
-	use PiPHP\GPIO\Pin\PinInterface;
 
 	// Create a GPIO object
 	$gpio = new GPIO();
