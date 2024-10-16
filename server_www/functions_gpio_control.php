@@ -4,6 +4,13 @@
 //error_reporting(E_ALL);
 //ini_set('display_errors', 'On');
 
+
+require __DIR__ . '/vendor/autoload.php';
+use PiPHP\GPIO\GPIO;
+use PiPHP\GPIO\Pin\InputPinInterface;
+
+
+
 require_once("db_app_data_functions.php");
 
 function process_gpio() {
@@ -100,8 +107,18 @@ function get_pin_status ($pin_nr) {
  }
 
  function get_pin_status_from_board ($pin_nr) {
-	 $value_from_board =  exec("sudo python /home/pi/remote_pi/control_pins.py read_value " . $pin_nr );
-	 return $value_from_board;
+//	 $value_from_board =  exec("sudo python /home/pi/remote_pi/control_pins.py read_value " . $pin_nr );
+	// Create a GPIO object
+	$gpio = new gpio();
+
+	// Retrieve PIN # $pin_nr  and configure it as an input pin
+	$pin = $gpio->getInputPin($pin_nr);
+
+	// Configure interrupts for both rising and falling edges
+	$pin->setEdge(InputPinInterface::EDGE_BOTH);
+	$value_from_board = $pin->getValue();	
+
+	return $value_from_board;
  }
 
 ?>

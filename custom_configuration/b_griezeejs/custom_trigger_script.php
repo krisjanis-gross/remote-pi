@@ -386,20 +386,22 @@ function  process_trigger_loop()
 
 
         // izplidam soli 7 paraleeli - pagriešana
-        $command = "sudo python /home/pi/remote_pi/funkcija_pin_timer.py $relejs_5_pin 0 $Relejs_5_timer" . ' > /dev/null 2>&1 &';
-        if ($debug) error_log (  $command );
-        shell_exec(  $command );
-        
-
+      //  $command = "sudo python /home/pi/remote_pi/funkcija_pin_timer.py $relejs_5_pin 0 $Relejs_5_timer" . ' > /dev/null 2>&1 &';
+      //  if ($debug) error_log (  $command );
+     //   shell_exec(  $command );
+        // paarcelts uz 6. soli
+      
 
         //log_pin_values();
         $start_5 = microtime(true);
         $log = shell_exec("sudo python /home/pi/remote_pi/funkcija_generic.py $Y $relejs_2_pin 33");
 		    if ($debug)error_log($log);
             
-        $time_elapsed_secs_5 = microtime(true) - $start_5;
-        $time_elapsed_secs_5 =  round($time_elapsed_secs_5, 1);
-        add_sensor_reading("5_pacelj_lidz_pin_33", $time_elapsed_secs_5);
+            $start_5_uz_6 = microtime(true);
+            
+      //  $time_elapsed_secs_5 = microtime(true) - $start_5;
+     //   $time_elapsed_secs_5 =  round($time_elapsed_secs_5, 1);
+     //   add_sensor_reading("5_pacelj_lidz_pin_33", $time_elapsed_secs_5);
       //  sleep(2);
       //  log_pin_values2();    
    
@@ -408,14 +410,20 @@ function  process_trigger_loop()
       //  sleep ($Y);
       //  set_pin($relejs_2_pin,0);
         
-        sleep($atstarpe_starp_soliem);
+      //  sleep($atstarpe_starp_soliem);
         $loop_active_step = 6;
         $run_button_status = get_run_button_status ();
       }     
     if ($run_button_status && $loop_active_step == 6) 
       {
         # Solis 6. Relejs 4 uz laiku - izsplauj
-        if ($debug) error_log("~~~~~~loop step $loop_active_step");
+     //   if ($debug) error_log("~~~~~~loop step $loop_active_step");
+        
+        
+         $time_elapsed_secs_5_uz_6 = microtime(true) - $start_5_uz_6;
+        $time_elapsed_secs_5_uz_6 =  round($time_elapsed_secs_5_uz_6, 1);
+    //    add_sensor_reading("time_elapsed_secs_starp soli 5 un 6", $time_elapsed_secs_5_uz_6);
+        if ($debug) error_log("TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT time_elapsed_secs_5_uz_6 $time_elapsed_secs_5_uz_6");
         
         step_6 ();
               
@@ -448,25 +456,38 @@ function  process_trigger_loop()
     $timestamp_loop_end = microtime(true);
     apc_store('timestamp_loop_end',$timestamp_loop_end);
     
+    // if idle then pause 1 sec
+    if (!$run_button_status) sleep(1); 
+     
     
 };
 
 
 
 function step_6 () {
-
+global $debug;
 $relejs_4_pin = 22;
 $Relejs_4_timer  = get_parameter (4);	if (!is_numeric($Relejs_4_timer)) $Relejs_4_timer = 0.01;
 $Relejs_4_timer_BEFORE  = get_parameter (10);	if (!is_numeric($Relejs_4_timer_BEFORE)) $Relejs_4_timer_BEFORE = 0.00;
 $relejs_6_pin = 36;
 $Relejs_6_timer  = get_parameter (11);	if (!is_numeric($Relejs_6_timer)) $Relejs_6_timer = 0.01;
-
+$relejs_5_pin = 32;
+$Relejs_5_timer  = get_parameter (6);	if (!is_numeric($Relejs_5_timer)) $Relejs_5_timer = 0.01;
+$Relejs_5_atstarpe_pirms_2  = get_parameter (12);	if (!is_numeric($Relejs_5_atstarpe_pirms_2)) $Relejs_5_atstarpe_pirms_2 = 0;
 
 $start_6 = microtime(true);
 
 // fork
 $command = "sudo python /home/pi/remote_pi/funkcija_pin_timer.py $relejs_4_pin $Relejs_4_timer_BEFORE $Relejs_4_timer" . ' > /dev/null 2>&1 &';
 shell_exec(  $command );
+
+
+// fork2 
+$command = "sudo python /home/pi/remote_pi/funkcija_pin_timer.py $relejs_5_pin $Relejs_5_atstarpe_pirms_2 $Relejs_5_timer" . ' > /dev/null 2>&1 &';
+if ($debug) error_log (  $command );
+shell_exec(  $command );
+
+
            
 // set_pin($relejs_4_pin,1);
 //  sleep ($Relejs_4_timer);
@@ -484,11 +505,20 @@ add_sensor_reading("6_izsplauj_", $time_elapsed_secs_6);
 
 }
 
-
+  
 function get_run_button_status () {
+    global $debug;
+    $functio_start = microtime(true);
+    
     $run_button_pin = 15;
-    $run_button_status = get_pin_status_from_board($run_button_pin);
+    //$run_button_status = get_pin_status_from_board($run_button_pin);
     //error_log("****** run_button_status = $run_button_status");
+    $run_button_status = false;
+    
+    $function_time_elapsed = microtime(true) - $functio_start;
+    if ($debug) error_log (  "TTTTTTTTTT function get_run_button_status time elapsed = $function_time_elapsed" );
+
+
     return $run_button_status;
 };
 
