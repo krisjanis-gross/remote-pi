@@ -8,7 +8,7 @@
 require __DIR__ . '/vendor/autoload.php';
 use PiPHP\GPIO\GPIO;
 use PiPHP\GPIO\Pin\InputPinInterface;
-
+use PiPHP\GPIO\Pin\PinInterface;
 
 
 require_once("db_app_data_functions.php");
