@@ -32,4 +32,6 @@ $monitor_node_NAME = "devtest1";
   $monitor_enabled = true;
   $monitor_API_key = "new-key";
   $monitor2_node_ID = "devtest1";
+  
+  $GPIO_reverse = false; // some relay boards have reversed logic (no signal = ON)
 ?>
