@@ -33,4 +33,6 @@ $monitor_node_NAME = "laistisana-pi";  */
   $monitor2_node_ID = "laistisana-1";
 
 
+  $GPIO_reverse = false; // some relay boards have reversed logic (no signal = ON)
+
 ?>
