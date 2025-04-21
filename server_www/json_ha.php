@@ -19,14 +19,21 @@ else {
 die();
 }
 
-if (isset($_POST["API_key"])) {
-$request_API_key = htmlspecialchars($_POST["API_key"]);
+// Takes raw data from the request
+$json = file_get_contents('php://input');
+
+// Converts it into a PHP object
+$data = json_decode($json);
+
+
+if (isset($data->API_key)) {
+$request_API_key = $data->API_key;
 }
 else {
 $request_API_key = null;
 }
-if (isset($_POST["active"])) {
-$active = htmlspecialchars($_POST["active"]);
+if (isset($data->active)) {
+$active = $data->active;
 }
 else {
 $active = null;
