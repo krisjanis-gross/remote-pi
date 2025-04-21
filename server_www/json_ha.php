@@ -40,7 +40,11 @@ $active = null;
 }
 
 
+require_once("functions_gpio_control.php");
+$pin_status = get_pin_status ($pin_id ) ;
 
+if ($pin_status) print ('{"is_active": "true"}');
+else print ('{"is_active": "false"}');
 
 // check API key.
 //if ($request_API_key <> $config_API_KEY ) {
@@ -55,7 +59,7 @@ error_log("json_ha called. pin_id = $pin_id active = $active ");
 
 
 
-print ('{"is_active": "true"}');
+
 
 
 
