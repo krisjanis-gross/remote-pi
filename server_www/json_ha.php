@@ -10,7 +10,7 @@ else // some default config
 	$config_API_KEY = "new-key";
 }
 
-require_once("db_app_data_functions.php");
+
 
 if (isset($_GET["pin_id"])) {
 $pin_id = htmlspecialchars($_GET["pin_id"]);
@@ -39,13 +39,13 @@ else {
 $active = null;
 }
 
-
+require_once("db_app_data_functions.php");
 require_once("functions_gpio_control.php");
 
 
 
-if ($active == true) set_pin ($pin_id, true);
-if ($active == false) set_pin ($pin_id, false);
+if ($active == true) process_gpio2 ($pin_id, true);
+if ($active == false) process_gpio2 ($pin_id, false);
 
 
 
