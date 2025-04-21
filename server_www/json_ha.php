@@ -26,11 +26,11 @@ else {
 
 
 // check API key.
-if ($request_API_key <> $config_API_KEY ) {
-	echo ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
-	error_log ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
-	die();
-}
+//if ($request_API_key <> $config_API_KEY ) {
+//	echo ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
+//	error_log ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
+//	die();
+//}
 
 
 error_log("json_ha called. pin_id = $pin_id active = $active ");
