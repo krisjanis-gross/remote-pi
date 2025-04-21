@@ -44,8 +44,8 @@ require_once("functions_gpio_control.php");
 
 
 
-if ($active == true) process_gpio2 ($pin_id, true);
-if ($active == false) process_gpio2 ($pin_id, false);
+if ($active == true) process_gpio2 ($pin_id, 1);
+if ($active == false) process_gpio2 ($pin_id, 0);
 
 
 
