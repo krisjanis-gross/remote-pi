@@ -12,17 +12,27 @@ else // some default config
 
 require_once("db_app_data_functions.php");
 
-$postdata = file_get_contents("php://input");
-if (isset($postdata)) {
-	$request_parameters = json_decode($postdata);
-	if (isset($request_parameters->pin_id)) $pin_id = $request_parameters->pin_id; else $pin_id = null;
-	if (isset($request_parameters->active))  $active = $request_parameters->active; else $active = null;
-	if (isset($request_parameters->API_key))  $request_API_key = $request_parameters->API_key; else $request_API_key = null;
+if (isset($_GET["pin_id"])) {
+$pin_id = htmlspecialchars($_GET["pin_id"]);
 }
 else {
-		echo "Not called properly with request_type parameter!";
-		die();
+die();
 }
+
+if (isset($_POST["API_key"])) {
+$request_API_key = htmlspecialchars($_POST["API_key"]);
+}
+else {
+$request_API_key = null;
+}
+if (isset($_POST["active"])) {
+$active = htmlspecialchars($_POST["active"]);
+}
+else {
+$active = null;
+}
+
+
 
 
 // check API key.
