@@ -11,6 +11,10 @@ else // some default config
 }
 
 
+if (isset($_GET["API_key"])) {
+$request_API_key  = htmlspecialchars($_GET["API_key"]);
+}
+
 if (isset($_GET["pin_id"])) {
 $pin_id = htmlspecialchars($_GET["pin_id"]);
 }
@@ -24,13 +28,6 @@ $json = file_get_contents('php://input');
 // Converts it into a PHP object
 $data = json_decode($json);
 
-
-if (isset($data->API_key)) {
-$request_API_key = $data->API_key;
-}
-else {
-$request_API_key = null;
-}
 if (isset($data->active)) {
 $active = $data->active;
 }
