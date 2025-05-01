@@ -18,15 +18,14 @@ function process_gpio() {
 	isset ($_GET['pin_nr']) ? $pin_nr = $_GET['pin_nr'] : $pin_nr = "";
 
 	if  (is_numeric($pin_nr) and is_numeric($command) )
-		{
-			if ($pin_nr < 50) {
+            process_custom_pin_hook ($pin_nr,$command);
+			if ($pin_nr <= 40) {
 				set_pin ($pin_nr,$command);
 			}
 			else // custom function
-				{
-				process_custom_pin_hook ($pin_nr,$command);
-				}
-		}
+			{
+				save_pin_status($pin_nr,$command,0);
+			}
 
 
 
@@ -51,13 +50,13 @@ function process_custom_pin_hook ($pin_nr,$command)
 function process_gpio2($pin_nr,$command) {
 
 	if  (is_numeric($pin_nr) and is_numeric($command) )
-
-			if ($pin_nr < 50) {
+            process_custom_pin_hook ($pin_nr,$command);
+			if ($pin_nr <= 40) {
 				set_pin ($pin_nr,$command);
 			}
 			else // custom function
 				{
-				process_custom_pin_hook ($pin_nr,$command);
+				save_pin_status($pin_nr,$command,0);
 				}
 
 }
