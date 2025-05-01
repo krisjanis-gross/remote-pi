@@ -47,7 +47,7 @@ $trigger_log_data = false;
       
       //error_log("first run of the application");
 			$static_db = open_static_data_db(true);
-			$results = $static_db->query('select `id`,`enabled` from pins where id < 50;');
+			$results = $static_db->query('select `id`,`enabled` from pins where id <= 40;');
 			while ($row = $results->fetchArray()) {
 
 				//$GPIO_id = $row['id'];
