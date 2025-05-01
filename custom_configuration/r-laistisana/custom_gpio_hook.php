@@ -18,7 +18,7 @@ if ($pin_nr == 101)
 if (   ($pin_nr == 11) || ($pin_nr == 12) || ($pin_nr == 13) || ($pin_nr == 15))
 {
        if ($command == 1) { // of one of these pins have been enabled then add safety timer
-                error_log("debug trigger enable on pin enable");
+          //      error_log("debug trigger enable on pin enable");
                 set_trigger (3, 1);
        }
  }
