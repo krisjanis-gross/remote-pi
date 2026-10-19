@@ -1,0 +1,10 @@
+<?php
+// Install outside the web root as /etc/remote-pi/monitor.php (root:www-data 0640).
+$monitor_enabled = true;
+$monitor_url_v2 = 'https://remote-pi-monitor-staging-1050773679295.europe-west3.run.app/checkin';
+$monitor2_node_ID = 'CHANGE-ME-UNIQUE-NODE';
+$monitor_api_key_file = '/etc/remote-pi/monitor-api-key';
+$monitor_legacy_body_key = false;
+$monitor_interval_seconds = 60;
+$monitor_sample_max_age_seconds = 30;
+$monitor_state_dir = '/var/lib/remote-pi-monitor';

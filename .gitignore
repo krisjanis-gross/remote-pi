@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+server_www/custom_app_config.php
+server_www/monitor.local.php
+monitor-api-key
+test-results/

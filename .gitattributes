@@ -1,0 +1,3 @@
+home_pi/remote_pi/trigger_background_process.py text eol=lf
+tests/* text eol=lf
+.github/workflows/monitor-client.yml text eol=lf

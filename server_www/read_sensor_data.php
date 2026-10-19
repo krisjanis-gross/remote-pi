@@ -124,6 +124,7 @@ $trigger_log_data = false;
 	/////////////////////////////////////////////////////////////////////////////
   // 3. Save sensor readings to APC for other scripts    /////////////////////
 	/////////////////////////////////////////////////////////////////////////////
+  $sensor_data['monitor_sample_unix_time'] = time();
   apcu_store('sensor_data', $sensor_data);
 
 // OLD
@@ -220,8 +221,7 @@ if ($data_save_LEVEL > 0) { // save sensor readings in DB
 	/////////////////////////////////////////////////////////////////////////////
 	// send signal to external monitor  (if configured and enabled)           ///
 	/////////////////////////////////////////////////////////////////////////////
-  	require_once("functions_monitor.php");
- 		send_monitor_signal ();
+    // Monitoring runs independently through the loopback-only monitor_checkin.php.
 
 
 }

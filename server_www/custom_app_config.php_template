@@ -28,10 +28,17 @@ $monitor_node_NAME = "devtest1";
 
 // monitoring parameters v2
 
-  $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin/" ;
+  $monitor_url_v2 = "https://rocket-app-j2lxa6zaaq-ey.a.run.app/checkin" ;
   $monitor_enabled = true;
   $monitor_API_key = "new-key";
   $monitor2_node_ID = "devtest1";
+  // Set false for the new server; true preserves compatibility with old production.
+  $monitor_legacy_body_key = true;
+  $monitor_interval_seconds = 60;
+  $monitor_sample_max_age_seconds = 30;
+  $monitor_state_dir = '/var/lib/remote-pi-monitor';
+  // Prefer a protected file outside the web root over a key in this file.
+  // $monitor_api_key_file = '/etc/remote-pi/monitor-api-key';
   
   $GPIO_reverse = false; // some relay boards have reversed logic (no signal = ON)
 ?>
