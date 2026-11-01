@@ -16,7 +16,7 @@ import { LocalAppDataService } from '../services/local-app-data.service';
   styleUrls: ['./historic-data.page.scss'],
   standalone: true,
   imports: [/*IonicModule, */CommonModule, FormsModule,RouterModule,
-  IonToggle,IonLabel,IonItem,IonSelect,IonSelectOption,IonList,IonContent,IonTitle,
+  IonToggle,IonItem,IonSelect,IonSelectOption,IonList,IonContent,IonTitle,
   IonToolbar,IonButtons,IonHeader
   ]
 })

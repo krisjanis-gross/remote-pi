@@ -1,10 +1,7 @@
 {
   "name": "remote-pi-ionic-v7",
   "integrations": {
-    "capacitor": {
-      "enabled": false
-    },
-    "cordova": {}
+    "capacitor": {}
   },
   "type": "angular-standalone"
 }

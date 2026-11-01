@@ -20,7 +20,7 @@ import { LocalAppDataService } from '../services/local-app-data.service';
   styleUrls: ['./device-data.page.scss'],
   standalone: true,
   imports: [ CommonModule, FormsModule,RouterModule,
-  IonLabel,IonItem,IonList,IonContent,IonTitle,
+  IonItem,IonList,IonContent,IonTitle,
   IonToolbar,IonButtons,IonHeader,IonButton,IonInput,IonCard,IonIcon]
 })
 export class DeviceDataPage implements OnInit {

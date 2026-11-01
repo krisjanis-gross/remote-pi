@@ -2,6 +2,7 @@ import { Component, OnInit, OnDestroy } from '@angular/core';
 import { IonHeader, IonToolbar, IonTitle, IonContent , IonButtons,
 IonButton,IonProgressBar,IonList,IonItem,IonToggle,IonLabel,
 IonItemGroup,IonCard,IonCardHeader,IonCardContent,IonListHeader,IonGrid,IonRow,IonCol,IonAlert} from '@ionic/angular/standalone';
+import {FormsModule} from  '@angular/forms';
 
 import { Router, RouterModule } from '@angular/router';
 import { IonicModule } from '@ionic/angular';
@@ -25,9 +26,9 @@ import * as HighCharts from 'highcharts';
   styleUrls: ['home.page.scss'],
   standalone: true,
   imports: [CommonModule, IonHeader, IonToolbar, IonTitle, IonContent,IonButtons,
-  IonButton,IonProgressBar,IonList,IonItem,IonToggle,IonLabel,
+  IonButton,IonProgressBar,IonList,IonItem,IonToggle,
   IonItemGroup,IonCard,IonCardHeader,IonCardContent,IonListHeader,RouterModule,
-  IonIcon,IonGrid,IonRow,IonCol,IonAlert],
+  IonIcon,IonGrid,IonRow,IonCol,IonAlert,FormsModule],
 })
 export class HomePage   {
  status_message:string;
@@ -35,7 +36,7 @@ export class HomePage   {
  AppConfig = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
  public RelayList: Array<{id: string; state: string, locked: string, description:string}>;
  public SensorList: Array<{id:string, sensor_name:string, value:string}> = [];
- public TriggerList: Array<{triggerID:string, state:string, description:string, parameters:Array<{name:string,par_value:string}>}>;
+ public TriggerList: Array<{triggerID:string, state:number, description:string, parameters:Array<{id:string,name:string,par_value:string}>}>;
 
 connectedToDevice = false;
 
@@ -63,6 +64,9 @@ sparkline_chart:any[] = [];
                   public platform: Platform,
   ) {
   addIcons({ analytics });
+  this.targetDeviceName = "";
+  this.RelayList = [];
+  this.TriggerList = [];
   this.status_message = "";
   //router.navigate(['/list'])
 
@@ -260,12 +264,13 @@ sparkline_chart:any[] = [];
   }
 
 async toggleTriggerState (item:any) {
-//console.log("/////////////////toggleTriggerState");
+console.log("/////////////////toggleTriggerState");
+console.log("/////////////////item.state " + item.state);
 
- let new_state = 1;
- if (item.state) { new_state = 0;}
- else { new_state = 1;}
+let new_state = 0;
+if (item.state == true) { new_state = 1;}
 
+console.log("/////////////////new_state " + new_state);
 this.other_loading = true;
 this.update_loading ();
 
@@ -290,7 +295,7 @@ await this.backendDataService.toggleTriggerState(item.triggerID,new_state)
            inputs: [
                     {
                       name: 'NewValue',
-                      type: 'text',
+                      type: 'number',
                       placeholder: 'Placeholder 1',
                       value: ParameterValue,
                     },
@@ -506,7 +511,7 @@ public  triggerByID(trigger: any): number
                                         //  width: 120,
                                         //  height: 20,
                                           style: {
-                                                overflow: 'visible'
+                                              //  overflow: 'visible'
                                            },
                                            // small optimalization, saves 1-2 ms each sparkline
                                          //skipClone: true
@@ -522,7 +527,7 @@ public  triggerByID(trigger: any): number
                                                   enabled: false
                                               },
                                               title: {
-                                                  text: null
+                                                  text: ""
                                               },
                                               tickLength: 0,
                                               type: 'datetime',
@@ -535,7 +540,7 @@ public  triggerByID(trigger: any): number
                                                   enabled: false
                                               },
                                               title: {
-                                                  text: null
+                                                  text: ""
                                               },
                                             //  tickPositions: [0]
                                             gridLineWidth: 0,
@@ -546,7 +551,7 @@ public  triggerByID(trigger: any): number
                                           },
                                   tooltip: {
                                               hideDelay: 0,
-                                              outside: true,
+                                          //    outside: true,
                                               shared: true,
                                               xDateFormat: '%H:%M:%S',
                                           },
@@ -580,8 +585,8 @@ public  triggerByID(trigger: any): number
                                   series: [{
                                                   data: chart_data,
                                                   type:'area',
-                                                   fillColor: 'rgba(124, 181, 236, 0.3)',
-                                                  pointStart: 1
+                                                 //  fillColor: 'rgba(124, 181, 236, 0.3)',
+                                       //           pointStart: 1
                                    }],
                               });
 
