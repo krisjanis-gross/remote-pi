@@ -8,3 +8,5 @@ test-results/
 .DS_Store
 .idea/
 server_www/.ftpconfig
+# Per-device site files and secrets (provision/install.sh --site-config)
+/sites/
