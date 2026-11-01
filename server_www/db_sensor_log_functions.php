@@ -1,211 +1,172 @@
 <?php
-//error_reporting(E_ALL);
-//ini_set('display_errors', 'On');
+require_once __DIR__ . '/db_common.php';
+require_once __DIR__ . '/db_app_data_functions.php';
 
-require_once ("db_common.php");
-require_once ("db_app_data_functions.php");
-
-$sensor_log_template_file =  "sensor_log_template.db";
-$sensor_log_db_file_name = "sensor_log_tmp_db.db";
-$log_db_file_pattern = "/sensor_log/";
-$file_name_prefix = "sensor_log";
+// Readings are inserted into a RAM copy of the log ($tempfs_work_folder) every cycle and
+// moved to the SD/USB storage file in one transaction every $sensor_log_flush_interval_seconds.
+// A power cut loses at most that interval; a shorter interval means more SD card writes.
+$GLOBALS['sensor_log_template_file'] = "sensor_log_template.db";
+$GLOBALS['sensor_log_db_file_name'] = "sensor_log_tmp_db.db";
+$GLOBALS['log_db_file_pattern'] = "/^sensor_log\d+\.db$/";
+$GLOBALS['file_name_prefix'] = "sensor_log";
 
 function flush_sensor_data_to_permanent_storage (){
-	// open TEMP sensor log DB
+	if (!remote_pi_clock_synced()) {
+		error_log('Sensor log flush postponed: system clock is not synchronized');
+		return false;
+	}
+	$storage_file = sensor_log_storage_file(true);
 	$tmp_db = open_sensor_log_db_in_TEMPFS_();
 
-	// select all sensor log data
-	$results = $tmp_db->query('SELECT * FROM sensor_log');
-  if($results==FALSE) {
-    // error
-    error_log ("SQlite error: " . $tmp_db->lastErrorMsg());
-  }
-  else // proceed
-  {
-
-        	// open STORAGE db. (latest version)
-        	$storage_db  = open_sensor_DB_in_STORAGE ();
-          //error_log ("ddddddddddddddddddddddddddddddddddddd sqlite error: " . $storage_db->lastErrorMsg());
-
-
-        	// move data from TMP to STORAGE
-        	while ($row = $results->fetchArray()) {
-            		//var_dump($row);
-            		$sensor_id = $row["sensor_id"];
-            		$datetime = $row["datetime"];
-            		$value = $row["value"];
-            		$data_save_LEVEL = $row["dataSaveLevel"];
-
-            		$insert_query = "INSERT INTO sensor_log values ('" . $sensor_id . "','" . $datetime . "',". $value .   ",  "  . $data_save_LEVEL .  ")";
-            	//	print ("<br /> Insert query  = $insert_query <br/ >");
-            		$insert_result = $storage_db->query($insert_query);
-
-            		// delete record from TMP DB.
-            		$del_query = "delete from sensor_log where sensor_id = '$sensor_id' and datetime = '$datetime';";
-            	//	print ("<br /> delete  query  = $del_query <br/ >");
-            		$delete_result = $tmp_db->query($del_query);
-
-            	}
-          $storage_db->close();
-
-  }
-
-	//Close
+	// One transaction for the whole batch: a single journal write instead of one per row,
+	// and rows are only removed from RAM if they reached storage.
+	$ok = db_exec($tmp_db, 'ATTACH DATABASE ? AS storage', array($storage_file));
+	if ($ok) {
+		$ok = $tmp_db->exec('BEGIN IMMEDIATE')
+			&& db_exec($tmp_db, 'INSERT OR IGNORE INTO storage.sensor_log (sensor_id, datetime, value, dataSaveLevel)
+				SELECT sensor_id, datetime, value, dataSaveLevel FROM main.sensor_log')
+			&& db_exec($tmp_db, 'DELETE FROM main.sensor_log')
+			&& $tmp_db->exec('COMMIT');
+		if (!$ok) {
+			error_log('Sensor log flush failed: ' . $tmp_db->lastErrorMsg());
+			@$tmp_db->exec('ROLLBACK');
+		}
+		db_exec($tmp_db, 'DETACH DATABASE storage');
+	}
 	$tmp_db->close();
-
-
+	return $ok;
 }
 
-function open_sensor_DB_in_STORAGE ($read_only = false) {
+// Newest valid storage file. When none exists, a new one is created from the template
+// ($create = true) or the read-only template itself is returned for reading.
+function sensor_log_storage_file ($create = false) {
 	global $db_storage_folder;
 	global $log_db_file_pattern;
 	global $file_name_prefix;
+	global $read_only_folder;
+	global $sensor_log_template_file;
 
-
-	$valid_db_file = null;
-
-	//// get file list from Storage location.
-	$db_file_list = directoryToArray($db_storage_folder,false,false,true,$log_db_file_pattern);
-
-	// sort the list so that the newest files come first
-	arsort ($db_file_list);
-
-	// try to open files in starting with the newest. If a valid db file is found then it is used.
-		foreach ($db_file_list as $file) {
-			if (verify_sqlite_file($file)) // file found
-				{
-				//print ( "This file is good!  $file <br />");
-				$valid_db_file = $file;
-				break;
-				}
-
-			// try to open file
+	foreach (list_db_files_newest_first($db_storage_folder, $log_db_file_pattern) as $file) {
+		if (verify_sqlite_file($file)) {
+			return $file;
 		}
-
-	if ($valid_db_file == null) { // if a valid DB file is not located in storage then we use the template file.
-		global $read_only_folder;
-		global $sensor_log_template_file;
-		global $file_name_prefix;
-		$valid_db_file = $db_storage_folder . $file_name_prefix .  date("YmdHi") . ".db";
-		if (!copy($read_only_folder . $sensor_log_template_file , $valid_db_file ))
-				error_log ( "failed to copy default sensor log DB file to storage $sensor_log_db_file_tempfs...\n");
 	}
-//error_log($valid_db_file);
-	if ($read_only) $db = new SQLite3($valid_db_file,SQLITE3_OPEN_READONLY);
-	else $db = new SQLite3($valid_db_file);
 
-	return $db;
+	$template = $read_only_folder . $sensor_log_template_file;
+	if (!$create) {
+		return $template;
+	}
+	$new_file = $db_storage_folder . $file_name_prefix . date("YmdHis") . ".db";
+	if (!copy($template, $new_file)) {
+		error_log("failed to copy default sensor log DB file to storage $new_file");
+	}
+	return $new_file;
+}
+
+function open_sensor_DB_in_STORAGE ($read_only = false) {
+	return db_open(sensor_log_storage_file(!$read_only), $read_only);
 }
 
 function open_sensor_log_db_in_TEMPFS_(){
 
 	global $sensor_log_template_file;
 	global $sensor_log_db_file_name;
-
 	global $tempfs_work_folder;
 	global $read_only_folder;
 
 	$sensor_log_db_file_tempfs = $tempfs_work_folder . $sensor_log_db_file_name;
-	$read_only_template_file = $read_only_folder . $sensor_log_template_file;
 
-	// try to find the db in tempfs
 	if (!file_exists ( $sensor_log_db_file_tempfs )) {
-		// copy file from permanent storage
-	//	error_log ( " not found ...\n" .  $sensor_log_db_file_tempfs);
-		if (!copy( $read_only_template_file , $sensor_log_db_file_tempfs ))
-				error_log ( "failed to copy $sensor_log_db_file_tempfs...\n");
-
+		if (!copy( $read_only_folder . $sensor_log_template_file , $sensor_log_db_file_tempfs ))
+			error_log ( "failed to copy $sensor_log_db_file_tempfs");
 	}
 
-	$db =  new SQLite3($sensor_log_db_file_tempfs);
-	return $db;
+	return db_open($sensor_log_db_file_tempfs);
 }
 
+// Starts a new storage file from the newest one (VACUUM INTO writes a compact, consistent
+// copy) and keeps the newest 10. New readings then go into the new file.
 function backup_sensor_log_db () {
 
 	global $db_storage_folder;
 	global $log_db_file_pattern;
 	global $file_name_prefix;
-	global $static_db_file_pattern;
 
-	$tmp_file_name =  $db_storage_folder . "s_log_backup_tmp.db";
-
-	// find the last sensor log db file
-	$valid_db_file = null;
-
-	//// get file list from Storage location.
-	$db_file_list = directoryToArray($db_storage_folder,false,false,true,$log_db_file_pattern);
-
-	// sort the list so that the newest files come first
-	arsort ($db_file_list);
-  //error_log( print_r( $db_file_list, true ) );
-	// try to open files in starting with the newest. If a valid db file is found then it is used.
-	foreach ($db_file_list as $file) {
-		if (verify_sqlite_file($file)) // file found
-			{
-				//print ( "This file is good to be backed up  $file <br />");
-				$valid_db_file = $file;
-				break;
-			}
-
-		}
-	// copy that file to tmp_
-	if ($valid_db_file)	{
-		if (!copy($valid_db_file , $tmp_file_name )) {
-				error_log ( "failed to copy $file...\n");
-		}
-
-		$new_file_name = $db_storage_folder . $file_name_prefix .  date("YmdHi") . ".db";
-		// rename the newly copied file
-		//echo ("new file with latest backup = ". $new_file_name );
-		rename ( $tmp_file_name , $new_file_name);
-
+	if (!remote_pi_clock_synced()) {
+		return false;
 	}
 
-	// delete archive files that are  older than N
-	purgeBackupFiles($db_file_list, 10);
+	$source = null;
+	foreach (list_db_files_newest_first($db_storage_folder, $log_db_file_pattern) as $file) {
+		if (verify_sqlite_file($file, true)) {
+			$source = $file;
+			break;
+		}
+	}
+	if ($source) {
+		$tmp_file_name = $db_storage_folder . "s_log_backup_tmp.db";
+		@unlink($tmp_file_name);
+		$db = db_open($source, true);
+		$ok = db_exec($db, 'VACUUM INTO ?', array($tmp_file_name));
+		$db->close();
+		if (!$ok && !copy($source, $tmp_file_name)) {
+			error_log("failed to back up sensor log $source");
+			return false;
+		}
+		rename($tmp_file_name, $db_storage_folder . $file_name_prefix . date("YmdHis") . ".db");
+	}
 
+	purgeBackupFiles(list_db_files_newest_first($db_storage_folder, $log_db_file_pattern), 10);
+	return true;
+}
 
+// Seconds since the newest storage file was started (file names carry the time).
+function sensor_log_backup_age () {
+	global $db_storage_folder;
+	global $log_db_file_pattern;
 
-	// purge static data db files.
+	$files = list_db_files_newest_first($db_storage_folder, $log_db_file_pattern);
+	if (!$files || !preg_match('/(\d{12})(\d{2})?\.db$/', $files[0], $match)) {
+		return PHP_INT_MAX;
+	}
+	$started = DateTime::createFromFormat('YmdHis', $match[1] . (isset($match[2]) && $match[2] !== '' ? $match[2] : '00'));
+	return $started ? time() - $started->getTimestamp() : PHP_INT_MAX;
+}
 
-  $db_file_list2 = directoryToArray($db_storage_folder,false,false,true,$static_db_file_pattern);
-	// sort the list so that the newest files come first
-	arsort ($db_file_list2);
+// Called once per sensor cycle: flush, purge and back up when due.
+function run_sensor_log_maintenance () {
+	if (!remote_pi_clock_synced()) {
+		return;
+	}
+	$now = time();
+	$flushed_at = apcu_fetch('sensor_log_flushed_at');
+	if (!$flushed_at) {
+		apcu_store('sensor_log_flushed_at', $now);
+		return;
+	}
+	if ($now - $flushed_at < (int) remote_pi_setting('sensor_log_flush_interval_seconds', 3600)) {
+		return;
+	}
+	apcu_store('sensor_log_flushed_at', $now);
+	flush_sensor_data_to_permanent_storage();
 
-//  error_log( print_r( $db_file_list2, true ) );
-
-	// delete archive files that are  older than N
-	purgeBackupFiles($db_file_list2, 50);
-
+	if (sensor_log_backup_age() >= (int) remote_pi_setting('sensor_log_backup_interval_seconds', 86400)) {
+		purge_sensor_data_history();
+		backup_sensor_log_db();
+	}
 }
 
 
 
 function purge_sensor_data_history ()
-
 {
-
-global $allDataSaveHours;
-global $midTermSaveDays;
-global $longTermSaveDays;
-
-
-$purge_query1 = "delete from sensor_log where datetime < datetime('now','localtime','-$longTermSaveDays days');";
-//error_log("ppppppppppppppppppppppppppppppppppppppurge $purge_query1" );
-$purge_query2 = "delete from sensor_log where datetime < datetime('now','localtime','-$midTermSaveDays days') AND dataSaveLevel < 3;";
-//error_log("ppppppppppppppppppppppppppppppppppppppurge2 $purge_query2" );
-$purge_query3 = "delete from sensor_log where datetime < datetime('now','localtime','-$allDataSaveHours hours') AND dataSaveLevel < 2;";
-//error_log("ppppppppppppppppppppppppppppppppppppppurge2 $purge_query3" );
-
+	$long_term_days = (int) remote_pi_setting('longTermSaveDays', 365);
+	$mid_term_days = (int) remote_pi_setting('midTermSaveDays', 90);
+	$all_data_hours = (int) remote_pi_setting('allDataSaveHours', 3);
 
 	$storage_db  = open_sensor_DB_in_STORAGE ();
-	$result1 = $storage_db->query($purge_query1);
-  $result2 = $storage_db->query($purge_query2);
-  $result3 = $storage_db->query($purge_query3);
+	db_exec($storage_db, "DELETE FROM sensor_log WHERE datetime < datetime('now','localtime',?)", array("-$long_term_days days"));
+	db_exec($storage_db, "DELETE FROM sensor_log WHERE datetime < datetime('now','localtime',?) AND dataSaveLevel < 3", array("-$mid_term_days days"));
+	db_exec($storage_db, "DELETE FROM sensor_log WHERE datetime < datetime('now','localtime',?) AND dataSaveLevel < 2", array("-$all_data_hours hours"));
 	$storage_db->close();
-
-
-
 }
-?>

@@ -49,8 +49,8 @@ function trigger_hook ($trigger_id, $command)
      $cooling_enabled = "YES";
       $timestamp_now = microtime(true);
       $cooling_cycle_timestamp = $timestamp_now;
-      apc_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
-      apc_store('cooling_enabled',$cooling_enabled);
+      apcu_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
+      apcu_store('cooling_enabled',$cooling_enabled);
     }
     if ($trigger_id == 2 && $command == 0) {
       unlock_pin(16);unlock_pin(29);unlock_pin(31);
@@ -58,8 +58,8 @@ function trigger_hook ($trigger_id, $command)
       set_pin(29,0,false);
       set_pin(31,0,false);
 
-      apc_store('cooling_cycle_timestamp',NULL);
-      apc_store('cooling_enabled',NULL);
+      apcu_store('cooling_cycle_timestamp',NULL);
+      apcu_store('cooling_enabled',NULL);
 
    //  add_sensor_reading("ventilatora_relejs_16",0);
    //   add_sensor_reading("ledusskapja_dzesesanas_relejs_18",0);
@@ -146,13 +146,13 @@ if ($drying_action) { // calculate cooling action
 	//			$cooling_action = 0 ; // off
 	//		}
 	//	}
-   	$cooling_enabled = apc_fetch('cooling_enabled');
+   	$cooling_enabled = apcu_fetch('cooling_enabled');
     if (!$cooling_enabled) $cooling_enabled = "YES";
     // error_log ("*** cooling_enabled: $cooling_enabled *** DZES_IESLEGTS_MIN  =  $DZES_IESLEGTS_MIN // $DZES_IZSLEEGTS_MIN =$DZES_IZSLEEGTS_MIN");
 
     $timestamp_now = microtime(true);
     if ($cooling_enabled == "YES") {
-                  $cooling_cycle_timestamp = apc_fetch('cooling_cycle_timestamp');
+                  $cooling_cycle_timestamp = apcu_fetch('cooling_cycle_timestamp');
                   if (!$cooling_cycle_timestamp) $cooling_cycle_timestamp = $timestamp_now;
           	      $elapsed_time_since_start = $timestamp_now  - $cooling_cycle_timestamp;
                   $minutes_remaining = round ( ($DZES_IESLEGTS_MIN - $elapsed_time_since_start) / 60   , 0);
@@ -176,7 +176,7 @@ if ($drying_action) { // calculate cooling action
                   else $cooling_action = 1;
     }
     else {
-                  $cooling_cycle_timestamp = apc_fetch('cooling_cycle_timestamp');
+                  $cooling_cycle_timestamp = apcu_fetch('cooling_cycle_timestamp');
                   if (!$cooling_cycle_timestamp) $cooling_cycle_timestamp = $timestamp_now;
           	      $elapsed_time_since_start = $timestamp_now  - $cooling_cycle_timestamp;
           	      //error_log ("+++++++++++". $cooling_cycle_timestamp ."+++++++++++++++++++++++".$timestamp_now."+++++++++++++++++:" . $elapsed_time_since_start . "timer X: " . $X);
@@ -196,8 +196,8 @@ if ($drying_action) { // calculate cooling action
                   else $cooling_action = 0;
 
     }
-    apc_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
-    apc_store('cooling_enabled',$cooling_enabled);
+    apcu_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
+    apcu_store('cooling_enabled',$cooling_enabled);
 
 	}
 

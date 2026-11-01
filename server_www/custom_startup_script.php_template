@@ -1,19 +1,9 @@
 <?php
+// Runs once after boot, before saved pin states are restored to the GPIO header.
+// This example switches every output off at startup.
 
-function  startup_script (){
-  $static_db = open_static_data_db(false);
-  $results = $static_db->query('update pins set enabled = 0 where 1;');
+function startup_script (){
+	$static_db = open_static_data_db(false);
+	db_exec($static_db, 'UPDATE pins SET enabled = 0');
+	$static_db->close();
 }
-
-
-
-
-
-
-
-
-
-
-
-
-?>

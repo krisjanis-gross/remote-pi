@@ -46,7 +46,7 @@ if ($trigger_id == 1 && $command == 1) {
 	process_custom_pin_hook (101, 1); // enable pin 101
 	// mark start time
 	$timestamp_now = microtime(true);
-	apc_store('internet_on_timestamp',$timestamp_now);
+	apcu_store('internet_on_timestamp',$timestamp_now);
 
   lock_pin(101);
 
@@ -64,7 +64,7 @@ if ($trigger_id == 3 && $command == 1) {
 
 	// mark start time
 	$timestamp_now = microtime(true);
-	apc_store('trigger_laistisana_start_timestamp',$timestamp_now);
+	apcu_store('trigger_laistisana_start_timestamp',$timestamp_now);
 
 }
 
@@ -84,7 +84,7 @@ function process_trigger_1()
 	$X =  $X * 60;  // set to minutes
 
 	// if time is expired then switch off pin 101 and trigger.
-	$internet_on_timestamp = apc_fetch('internet_on_timestamp');
+	$internet_on_timestamp = apcu_fetch('internet_on_timestamp');
     if (!$internet_on_timestamp) $internet_on_timestamp = 0;
 	$timestamp_now = microtime(true);
 	$elapsed_time_since_start = $timestamp_now  - $internet_on_timestamp;
@@ -113,7 +113,7 @@ function process_trigger_laistisana ()
 	$X =  $X * 60;  // set to minutes
 
 	// if timer is expired then switch off pins 11, 12, 13, 15.
-	$trigger_laistisana_start_timestamp = apc_fetch('trigger_laistisana_start_timestamp');
+	$trigger_laistisana_start_timestamp = apcu_fetch('trigger_laistisana_start_timestamp');
     if (!$trigger_laistisana_start_timestamp) $trigger_laistisana_start_timestamp = 0;
 	$timestamp_now = microtime(true);
 	$elapsed_time_since_start = $timestamp_now  - $trigger_laistisana_start_timestamp;
@@ -155,13 +155,13 @@ function process_trigger_combined_laistisana ()
 	if (!is_numeric($timer_pin15)) $timer_pin15 = 5;
 	$timer_pin15 =  $timer_pin15 * 60;  // set to minutes
 
-  $laistisana_combined_active_stage = apc_fetch('laistisana_combined_active_stage');
+  $laistisana_combined_active_stage = apcu_fetch('laistisana_combined_active_stage');
     if (!$laistisana_combined_active_stage) // fist run of the script
       {
           $laistisana_combined_active_stage = 1;
           // mark start time
 	        $timestamp_now = microtime(true);
-	        apc_store('laistisana_combined_start_timestamp',$timestamp_now);
+	        apcu_store('laistisana_combined_start_timestamp',$timestamp_now);
          // enable first pin
           set_pin(13,1);
           set_pin(11,0);
@@ -172,7 +172,7 @@ function process_trigger_combined_laistisana ()
 
                 if ($laistisana_combined_active_stage == 1) {
 
-                  	$laistisana_combined_start_timestamp = apc_fetch('laistisana_combined_start_timestamp');
+                  	$laistisana_combined_start_timestamp = apcu_fetch('laistisana_combined_start_timestamp');
                       if (!$laistisana_combined_start_timestamp) $laistisana_combined_start_timestamp = 0;
                   	$timestamp_now = microtime(true);
                   	$elapsed_time_since_start = $timestamp_now  - $laistisana_combined_start_timestamp;
@@ -187,7 +187,7 @@ function process_trigger_combined_laistisana ()
                       $laistisana_combined_active_stage = 2;
                       // mark start time
               	      $timestamp_now = microtime(true);
-              	      apc_store('laistisana_combined_start_timestamp',$timestamp_now);
+              	      apcu_store('laistisana_combined_start_timestamp',$timestamp_now);
                       // enable next pin
                       set_pin(12,1);
 
@@ -203,7 +203,7 @@ function process_trigger_combined_laistisana ()
 
                   if ($laistisana_combined_active_stage == 2) {
 
-                      	$laistisana_combined_start_timestamp = apc_fetch('laistisana_combined_start_timestamp');
+                      	$laistisana_combined_start_timestamp = apcu_fetch('laistisana_combined_start_timestamp');
                         if (!$laistisana_combined_start_timestamp) $laistisana_combined_start_timestamp = 0;
                     	$timestamp_now = microtime(true);
                     	$elapsed_time_since_start = $timestamp_now  - $laistisana_combined_start_timestamp;
@@ -218,7 +218,7 @@ function process_trigger_combined_laistisana ()
                         $laistisana_combined_active_stage = 3;
                         // mark start time
                 	      $timestamp_now = microtime(true);
-                	      apc_store('laistisana_combined_start_timestamp',$timestamp_now);
+                	      apcu_store('laistisana_combined_start_timestamp',$timestamp_now);
 
                         set_pin(15,1);
 
@@ -234,7 +234,7 @@ function process_trigger_combined_laistisana ()
 
 
                   if ($laistisana_combined_active_stage == 3) {
-                 	      $laistisana_combined_start_timestamp = apc_fetch('laistisana_combined_start_timestamp');
+                 	      $laistisana_combined_start_timestamp = apcu_fetch('laistisana_combined_start_timestamp');
                         if (!$laistisana_combined_start_timestamp) $laistisana_combined_start_timestamp = 0;
                  	      $timestamp_now = microtime(true);
                     	  $elapsed_time_since_start = $timestamp_now  - $laistisana_combined_start_timestamp;
@@ -249,7 +249,7 @@ function process_trigger_combined_laistisana ()
                           $laistisana_combined_active_stage = 4;
                           // mark start time
                   	      $timestamp_now = microtime(true);
-                  	      apc_store('laistisana_combined_start_timestamp',$timestamp_now);
+                  	      apcu_store('laistisana_combined_start_timestamp',$timestamp_now);
 
                           set_pin(11,1);
 
@@ -268,7 +268,7 @@ function process_trigger_combined_laistisana ()
 
                   if ($laistisana_combined_active_stage == 4) {
 
-                      $laistisana_combined_start_timestamp = apc_fetch('laistisana_combined_start_timestamp');
+                      $laistisana_combined_start_timestamp = apcu_fetch('laistisana_combined_start_timestamp');
                       if (!$laistisana_combined_start_timestamp) $laistisana_combined_start_timestamp = 0;
                	      $timestamp_now = microtime(true);
                   	  $elapsed_time_since_start = $timestamp_now  - $laistisana_combined_start_timestamp;
@@ -292,7 +292,7 @@ function process_trigger_combined_laistisana ()
 
                 }
 
-apc_store('laistisana_combined_active_stage',$laistisana_combined_active_stage);
+apcu_store('laistisana_combined_active_stage',$laistisana_combined_active_stage);
 error_log ("%%% laistisana_combined_active_stage = $laistisana_combined_active_stage");
 }
 

@@ -1,60 +1,43 @@
 <?php
+require_once __DIR__ . '/bootstrap.php';
 
-$db_storage_folder =  "/media/usbdrive/sqlite_data/";
-$read_only_folder =  "/var/www/html/sqlite_db_templates/";
-$tempfs_work_folder = "/tmp/";
-$bad_folder = "bad/";
-
+// Folder globals ($db_storage_folder, $read_only_folder, $tempfs_work_folder)
+// are set in bootstrap.php from configuration.
 
 
 function purgeBackupFiles ($file_list, $number_of_items_to_keep)
 {
 	$current_file_nr = 0;
-	 foreach ($file_list as $file) {
-		  $current_file_nr++;
-		  if ($current_file_nr > $number_of_items_to_keep)
-		   	   unlink($file);
+	foreach ($file_list as $file) {
+		$current_file_nr++;
+		if ($current_file_nr > $number_of_items_to_keep)
+			unlink($file);
 	}
 }
 
+// Newest first. Names embed the creation time, so a name sort is a time sort.
+function list_db_files_newest_first ($directory, $pattern) {
+	$files = directoryToArray($directory, false, false, true, $pattern);
+	rsort($files);
+	return $files;
+}
 
 
-
-function verify_sqlite_file ($file) {
-	// this function checks whether the file is OK.
-	// there might be better function for this task and this can be replaced later...
-
-//	error_log ( "checking file " . $file . "<br />");
-	$db = new SQLite3($file,SQLITE3_OPEN_READONLY);
-
-	// try to get table list
-	$results = $db->query("SELECT * FROM sqlite_master WHERE type='table';");
-	$db->close();
-	if ($results == false) {
-		error_log ("This file is no good: " . $file );
-		//move_to_BAD_folder($file);
-		return false;
+function verify_sqlite_file ($file, $thorough = false) {
+	// Cheap check by default (it runs on every history query); thorough check before backups.
+	try {
+		$db = db_open($file, true);
+		$result = $thorough ? db_value($db, 'PRAGMA quick_check') === 'ok'
+			: @$db->querySingle("SELECT count(*) FROM sqlite_master WHERE type='table'") !== false;
+		$db->close();
+	} catch (Exception $e) {
+		$result = false;
 	}
-	else return true;
-	//else while ($row = $results->fetchArray())     var_dump($row);
-
+	if (!$result) {
+		error_log("This file is no good: " . $file);
+	}
+	return $result;
 }
-/*
-function move_to_BAD_folder($file) {
-  global $bad_folder;
-  global $db_storage_folder;
-
-  $destination = $db_storage_folder . $bad_folder . basename($file);
-  //error_log ("MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMmove $file to $destination");
-  rename($file,$destination);
-
-  // check that there are not more than 10 bad files. delete older..
-
-	$db_file_list = directoryToArray($db_storage_folder . $bad_folder ,false,false,true,'');
-	error_log($db_file_list);
-	purgeBackupFiles($db_file_list, 10);
-}
-*/
 
 
 /**
@@ -67,18 +50,18 @@ function move_to_BAD_folder($file) {
      */
 function directoryToArray($directory, $recursive = true, $listDirs = false, $listFiles = true, $include = '') {
         $arrayItems = array();
-        $skipByExclude = false;
-        $handle = opendir($directory);
+        $skipByExclude = true;
+        $handle = @opendir($directory);
         if ($handle) {
             while (false !== ($file = readdir($handle))) {
             preg_match("/(^(([\.]){1,2})$|(\.(svn|git|md))|(Thumbs\.db|\.DS_STORE))$/iu", $file, $skip);
             if($include){
-                preg_match($include, $file, $skipByExclude);
+                $skipByExclude = preg_match($include, $file) === 1;
             }
             if (!$skip && $skipByExclude) {
                 if (is_dir($directory. DIRECTORY_SEPARATOR . $file)) {
                     if($recursive) {
-                        $arrayItems = array_merge($arrayItems, directoryToArray($directory. DIRECTORY_SEPARATOR . $file, $recursive, $listDirs, $listFiles, $exclude));
+                        $arrayItems = array_merge($arrayItems, directoryToArray($directory. DIRECTORY_SEPARATOR . $file, $recursive, $listDirs, $listFiles, $include));
                     }
                     if($listDirs){
                         $file = $directory . DIRECTORY_SEPARATOR . $file;
@@ -96,6 +79,3 @@ function directoryToArray($directory, $recursive = true, $listDirs = false, $lis
         }
         return $arrayItems;
  }
-
-
-?>

@@ -39,8 +39,8 @@ function trigger_hook ($trigger_id, $command)
       $cooling_enabled = "YES";
       $timestamp_now = microtime(true);
       $cooling_cycle_timestamp = $timestamp_now;
-      apc_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
-      apc_store('cooling_enabled',$cooling_enabled);
+      apcu_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
+      apcu_store('cooling_enabled',$cooling_enabled);
 
     }
     if ($trigger_id == 1 && $command == 0) {
@@ -48,8 +48,8 @@ function trigger_hook ($trigger_id, $command)
       set_pin(12,0,false);
       set_pin(18,0,false);
       set_pin(16,1,false);
-      apc_store('cooling_cycle_timestamp',NULL);
-      apc_store('cooling_enabled',NULL);
+      apcu_store('cooling_cycle_timestamp',NULL);
+      apcu_store('cooling_enabled',NULL);
 
 
     }
@@ -108,13 +108,13 @@ $gaiss_augshaa = get_sensor_reading ('28-0415a86124ff') ;
 	//			$cooling_action = 0 ; // off
 	//		}
 	//	}
-   	$cooling_enabled = apc_fetch('cooling_enabled');
+   	$cooling_enabled = apcu_fetch('cooling_enabled');
     if (!$cooling_enabled) $cooling_enabled = "YES";
     // error_log ("*** cooling_enabled: $cooling_enabled *** DZES_IESLEGTS_MIN  =  $DZES_IESLEGTS_MIN // $DZES_IZSLEEGTS_MIN =$DZES_IZSLEEGTS_MIN");
 
     $timestamp_now = microtime(true);
     if ($cooling_enabled == "YES") {
-                  $cooling_cycle_timestamp = apc_fetch('cooling_cycle_timestamp');
+                  $cooling_cycle_timestamp = apcu_fetch('cooling_cycle_timestamp');
                   if (!$cooling_cycle_timestamp) $cooling_cycle_timestamp = $timestamp_now;
           	      $elapsed_time_since_start = $timestamp_now  - $cooling_cycle_timestamp;
                   $minutes_remaining = round ( ($DZES_IESLEGTS_MIN - $elapsed_time_since_start) / 60   , 0);
@@ -140,7 +140,7 @@ $gaiss_augshaa = get_sensor_reading ('28-0415a86124ff') ;
                   else $cooling_action = 1;
     }
     else {
-                  $cooling_cycle_timestamp = apc_fetch('cooling_cycle_timestamp');
+                  $cooling_cycle_timestamp = apcu_fetch('cooling_cycle_timestamp');
                   if (!$cooling_cycle_timestamp) $cooling_cycle_timestamp = $timestamp_now;
           	      $elapsed_time_since_start = $timestamp_now  - $cooling_cycle_timestamp;
           	      //error_log ("+++++++++++". $cooling_cycle_timestamp ."+++++++++++++++++++++++".$timestamp_now."+++++++++++++++++:" . $elapsed_time_since_start . "timer X: " . $X);
@@ -160,8 +160,8 @@ $gaiss_augshaa = get_sensor_reading ('28-0415a86124ff') ;
                   else $cooling_action = 0;
 
     }
-    apc_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
-    apc_store('cooling_enabled',$cooling_enabled);
+    apcu_store('cooling_cycle_timestamp',$cooling_cycle_timestamp);
+    apcu_store('cooling_enabled',$cooling_enabled);
 
 
 

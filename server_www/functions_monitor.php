@@ -43,7 +43,7 @@ function monitor_settings(array $vars) {
         'url' => rtrim($url, '/'), 'key' => $key,
         'node' => monitor_text($vars['monitor2_node_ID'] ?? '', 100),
         'legacy' => $legacy,
-        'state_dir' => $vars['monitor_state_dir'] ?? '/var/lib/remote-pi-monitor',
+        'state_dir' => $vars['monitor_state_dir'] ?? '/run/remote-pi-monitor',
     ];
     foreach (['interval' => [60, 30, 120], 'sample_max_age' => [30, 5, 120]] as $name => $bounds) {
         $value = $vars['monitor_' . $name . '_seconds'] ?? $bounds[0];
@@ -168,7 +168,7 @@ function monitor_open_state($directory) {
     return $handle;
 }
 
-function monitor_attempt(array $settings, callable $sampleProvider, callable $transport = null) {
+function monitor_attempt(array $settings, callable $sampleProvider, ?callable $transport = null) {
     $handle = monitor_open_state($settings['state_dir']);
     try {
         if (!flock($handle, LOCK_EX | LOCK_NB)) {

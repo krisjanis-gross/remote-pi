@@ -134,7 +134,7 @@ function trigger_hook ($trigger_id, &$command)
   
     if ($trigger_id == 5 && $command == 0) {
         $loop_active_step = 0;
-        apc_store('loop_active_step',$loop_active_step);
+        apcu_store('loop_active_step',$loop_active_step);
         
     }
   
@@ -177,7 +177,7 @@ function  process_trigger_loop()
     $Relejs_5_delayBefore  = get_parameter (7);	if (!is_numeric($Relejs_5_delayBefore)) $Relejs_5_delayBefore = 0.01;
     $delay_after_step_2  = get_parameter (8);	if (!is_numeric($delay_after_step_2)) $delay_after_step_2 = 5;
     $izmantot_optisko_sensoru  = get_parameter (9);	if (!is_numeric($izmantot_optisko_sensoru)) $izmantot_optisko_sensoru = 0;
-    $loop_active_step = apc_fetch('loop_active_step');
+    $loop_active_step = apcu_fetch('loop_active_step');
     if (!$loop_active_step) $loop_active_step = 0;   
     
    
@@ -190,7 +190,7 @@ function  process_trigger_loop()
     //error_log("griezeejs loop start");
     # check RUN button
     
-    $timestamp_prev_loop_end = apc_fetch('timestamp_loop_end');
+    $timestamp_prev_loop_end = apcu_fetch('timestamp_loop_end');
     if ($timestamp_prev_loop_end) { // calcule how much time elapsed between loops
         $loop_delta = microtime(true) - $timestamp_prev_loop_end ;
         $loop_delta =  round($loop_delta, 1);
@@ -447,14 +447,14 @@ function  process_trigger_loop()
       }     
       */  
       
-    apc_store('loop_active_step',$loop_active_step);
+    apcu_store('loop_active_step',$loop_active_step);
 
     $time_elapsed_secs = microtime(true) - $start;
     $time_elapsed_secs =  round($time_elapsed_secs, 1);
     add_sensor_reading("cikla_izpildes_laiks", $time_elapsed_secs);
     
     $timestamp_loop_end = microtime(true);
-    apc_store('timestamp_loop_end',$timestamp_loop_end);
+    apcu_store('timestamp_loop_end',$timestamp_loop_end);
     
     // if idle then pause 1 sec
     if (!$run_button_status) sleep(1); 

@@ -1,72 +1,31 @@
 <?php
-// include some files
+// Home Assistant RESTful switch endpoint: json_ha.php?pin_id=N&API_key=KEY
+// with an optional JSON body {"active": "true"|"false"}.
+require_once __DIR__ . '/bootstrap.php';
 
-$config_file = "custom_app_config.php";
-if(is_file($config_file)){
-	require_once ($config_file);
-}
-else // some default config
-{
-	$config_API_KEY = "new-key";
-}
+header('Content-Type: application/json');
+header('Cache-Control: no-store');
 
-
-if (isset($_GET["API_key"])) {
-$request_API_key  = htmlspecialchars($_GET["API_key"]);
+$pin_id = isset($_GET["pin_id"]) ? $_GET["pin_id"] : null;
+if (!is_string($pin_id) || !ctype_digit($pin_id)) {
+	http_response_code(400);
+	exit;
 }
 
-if (isset($_GET["pin_id"])) {
-$pin_id = htmlspecialchars($_GET["pin_id"]);
-}
-else {
-die();
-}
-
-// Takes raw data from the request
-$json = file_get_contents('php://input');
-//error_log($json);
-// Converts it into a PHP object
-$data = json_decode($json);
-
-if (isset($data->active)) {
-$active = $data->active;
-}
-else {
-$active = null;
+if (!remote_pi_api_key_valid(isset($_GET["API_key"]) ? $_GET["API_key"] : null)) {
+	error_log('Rejected Home Assistant request: API key not correct');
+	http_response_code(403);
+	exit;
 }
 
-//error_log("json_ha called. pin_id = $pin_id active = $active  API_key = $request_API_key ");
+$data = json_decode((string) file_get_contents('php://input'));
+$active = (is_object($data) && isset($data->active)) ? $data->active : null;
 
-// check API key.
-if ($request_API_key <> $config_API_KEY ) {
-	echo ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
-	error_log ("!!!!!!!!!!!!!!API KEY not correct!" . $request_API_key ) ;
-	die();
-}
+require_once __DIR__ . "/db_app_data_functions.php";
+require_once __DIR__ . "/functions_gpio_control.php";
 
-require_once("db_app_data_functions.php");
-require_once("functions_gpio_control.php");
-
-
-if ($active == "true") process_gpio2 ($pin_id, 1);
-if ($active == "false") process_gpio2 ($pin_id, 0);
+if ($active === "true" || $active === true) process_gpio2 ($pin_id, 1);
+if ($active === "false" || $active === false) process_gpio2 ($pin_id, 0);
 
 // return result
-$pin_status = get_pin_status ($pin_id ) ;
-if ($pin_status) print ('{"is_active": "true"}');
-else print ('{"is_active": "false"}');
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-?>
+print json_encode(array('is_active' => get_pin_status($pin_id) ? "true" : "false"));

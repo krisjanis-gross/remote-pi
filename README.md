@@ -1,6 +1,20 @@
 # remote-pi
 Remote control of Raspberry PI
 
+## Installing a device
+
+New devices are set up with [`provision/install.sh`](provision/README.md) on
+Raspberry Pi OS Lite (32-bit, Trixie): read-only root, data on `/data`, hardened
+web server, unique API key. `home_pi/update_www_folder_from_GIT.sh` is only for
+devices installed with the old manual guide until they are rebuilt.
+
+## Tests
+
+```sh
+docker build -t remote-pi-tests tests
+docker run --rm --network none --mount type=bind,src="$PWD",dst=/app,readonly remote-pi-tests
+```
+
 ## Monitor client
 
 See [monitor client deployment](docs/monitor-client.md) for compatibility with the

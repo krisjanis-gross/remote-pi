@@ -1,0 +1,4 @@
+#!/bin/sh
+# Test stand-in for Raspberry Pi pinctrl: records its arguments.
+if [ -n "$FAKE_PINCTRL_LOG" ]; then echo "$@" >> "$FAKE_PINCTRL_LOG"; fi
+exit 0

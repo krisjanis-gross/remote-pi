@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# Switch the read-only root (RAM overlay) on and off, and run OS updates in between.
+#   remote-pi-maintenance status    show the current mode
+#   remote-pi-maintenance enable    next boot without overlay (changes persist), reboots
+#   remote-pi-maintenance upgrade   apt full-upgrade (only while maintenance is enabled)
+#   remote-pi-maintenance disable   next boot with overlay again, reboots
+set -euo pipefail
+
+TOKEN="overlayroot=tmpfs:recurse=0"
+BOOT=/boot/firmware
+[[ -f $BOOT/cmdline.txt ]] || BOOT=/boot
+CMDLINE=$BOOT/cmdline.txt
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || die "run as root (sudo)"
+
+overlay_active() { [[ "$(findmnt -no FSTYPE /)" == overlay ]]; }
+
+# The boot partition is mounted read-only; open it briefly for a change.
+with_boot_rw() {
+	mount -o remount,rw "$BOOT"
+	"$@"
+	mount -o remount,ro "$BOOT"
+}
+
+set_overlay() {
+	local wanted=$1 line
+	line=$(sed -E 's/(^| )overlayroot=[^ ]*//g; s/^ +//' "$CMDLINE")
+	[[ "$wanted" == on ]] && line="$TOKEN $line"
+	printf '%s\n' "$line" >"$CMDLINE.new"
+	mv "$CMDLINE.new" "$CMDLINE"
+	sync
+}
+
+case "${1:-status}" in
+	status)
+		if overlay_active; then echo "read-only root: ACTIVE (changes are lost at reboot)"; else echo "read-only root: OFF (maintenance mode, changes persist)"; fi
+		if grep -q 'overlayroot=' "$CMDLINE"; then echo "next boot: read-only root"; else echo "next boot: maintenance mode"; fi
+		;;
+	enable)
+		with_boot_rw set_overlay off
+		echo "Maintenance mode from the next boot. Rebooting..."
+		systemctl reboot
+		;;
+	disable)
+		overlay_active && die "already running read-only"
+		with_boot_rw set_overlay on
+		echo "Read-only root from the next boot. Rebooting..."
+		systemctl reboot
+		;;
+	upgrade)
+		overlay_active && die "enable maintenance mode first"
+		mount -o remount,rw "$BOOT"
+		trap 'mount -o remount,ro "$BOOT"' EXIT
+		apt-get update
+		DEBIAN_FRONTEND=noninteractive apt-get -y full-upgrade
+		apt-get -y autoremove
+		apt-get clean
+		;;
+	*)
+		sed -n '2,6p' "$0"
+		exit 1
+		;;
+esac

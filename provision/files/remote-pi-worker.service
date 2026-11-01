@@ -1,0 +1,26 @@
+# Managed by remote-pi provision/install.sh
+[Unit]
+Description=Remote PI sensor and monitor loops
+After=network.target nginx.service php@PHP_VERSION@-fpm.service
+Wants=nginx.service php@PHP_VERSION@-fpm.service
+
+[Service]
+# Only makes HTTP requests to 127.0.0.1; needs no privileges or files.
+ExecStart=/usr/bin/python3 @WORKER_DIR@/worker.py
+DynamicUser=yes
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

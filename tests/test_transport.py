@@ -33,8 +33,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Location", "/capture")
             if code == 429:
                 self.send_header("Retry-After", "123")
+            # Newer curl treats a TLS close without a known body length as a receive error.
+            body = b"fixture-only-key must not be emitted by the client"
+            self.send_header("Content-Length", str(len(body)))
             self.end_headers()
-            self.wfile.write(b"fixture-only-key must not be emitted by the client")
+            self.wfile.write(body)
         except (BrokenPipeError, ConnectionResetError, ssl.SSLError):
             pass
 

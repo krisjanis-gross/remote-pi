@@ -1,56 +1,54 @@
 <?php
+require_once __DIR__ . '/db_app_data_functions.php';
 
 
 function get_parameter ($parameter_id)
-	{
+{
 	$static_db = open_static_data_db(true);
-	$results = $static_db->query("SELECT value FROM  `trigger_parameters` where id = $parameter_id ;");
-	if ($row = $results->fetchArray()) 	return  $row['value'];
+	$value = db_value($static_db, 'SELECT value FROM trigger_parameters WHERE id = ?', array((int) $parameter_id));
 	$static_db->close();
+	return $value;
 }
 
 
 function get_sensor_reading ($sensor_id) {
 	global $sensor_data;
-	$reading = null;
 
-  foreach ($sensor_data["data"]  as $key => $value) {
-		$data_sensor_id = $value['id'];
-		if ($data_sensor_id == $sensor_id) {
-			$reading = $value['value'];
-			return $reading;
-		  }
+	foreach ($sensor_data["data"] as $value) {
+		if ($value['id'] == $sensor_id) {
+			return $value['value'];
+		}
 	}
-	return $reading;
+	return null;
 }
-
-
 
 
 function lock_pin ($pin_id) {
 	$static_db = open_static_data_db();
-	$results = $static_db->query("update pins set locked = 1 where id = " . $pin_id . ";");
+	db_exec($static_db, 'UPDATE pins SET locked = 1 WHERE id = ?', array((int) $pin_id));
 	$static_db->close();
 }
 
 function UNlock_pin ($pin_id) {
 	$static_db = open_static_data_db();
-	$results = $static_db->query("update pins set locked = 0 where id = " . $pin_id . ";");
+	db_exec($static_db, 'UPDATE pins SET locked = 0 WHERE id = ?', array((int) $pin_id));
 	$static_db->close();
 }
 
 function set_trigger ($trigger_id, $command) {
-  require_once("custom_trigger_script.php");
-	trigger_hook ($trigger_id, $command);
+	if (!is_numeric($trigger_id) || !($command === 0 || $command === 1 || $command === '0' || $command === '1')) {
+		error_log('Rejected trigger change with invalid id or command');
+		return false;
+	}
+	$trigger_script = __DIR__ . "/custom_trigger_script.php";
+	if (is_file($trigger_script)) {
+		require_once($trigger_script);
+		if (function_exists('trigger_hook')) trigger_hook ((int) $trigger_id, (int) $command);
+	}
 
-	require_once("db_app_data_functions.php");
 	$static_db = open_static_data_db(false);
-	$results = $static_db->query('UPDATE triggers SET `state` = ' . $command . ' where `id` = ' .  $trigger_id  );
+	db_exec($static_db, 'UPDATE triggers SET state = ? WHERE id = ?', array((int) $command, (int) $trigger_id));
 	$static_db->close();
 	save_static_db_in_storage();
-
+	return true;
 }
-
-
-
-?>

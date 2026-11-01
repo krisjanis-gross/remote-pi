@@ -1,41 +1,28 @@
 <?php
-require_once("db_app_data_functions.php");
+require_once __DIR__ . '/db_app_data_functions.php';
 
 
 function get_sensor_name_by_id ($sensor_id) {
-	// get sensor name list
 	$sensor_list = get_sensor_name_list();
 
 	//return the sensor name if that is found in the list. Othervise return the sensor ID
-	if ($sensor_list) {
-     return  (array_key_exists($sensor_id, $sensor_list)) ?  $sensor_list[$sensor_id] : $sensor_id;
-  }
-	//return  ($sensor_list[$sensor_id] != null) ? $sensor_list[$sensor_id] : $sensor_id;
+	return (is_array($sensor_list) && array_key_exists($sensor_id, $sensor_list)) ? $sensor_list[$sensor_id] : $sensor_id;
 }
 
 function get_sensor_name_list () {
 
 	$sensor_list = apcu_fetch('sensor_list');
-	//var_dump($sensor_list);
 
-	if (!$sensor_list) // if not available in APC then read the list from DB, then save the list in APC
-		{
-			//echo "must read sesnor list from db";
-
-			$static_db = open_static_data_db(true);
-			$results = $static_db->query('SELECT * FROM sensor_names;');
-			while ($row = $results->fetchArray()) {
-				$sensor_id = $row['id'];
-				$sensor_name = $row['sensor_name'];
-				$sensor_list[$sensor_id] = $sensor_name;
-				//var_dump($sensor_list);
-				// save the sensor list in APC
-			}
-			$static_db->close();
-			apcu_store('sensor_list', $sensor_list);
+	if (!is_array($sensor_list)) // if not available in APCu then read the list from DB, then save the list in APCu
+	{
+		$sensor_list = array();
+		$static_db = open_static_data_db(true);
+		foreach (db_rows($static_db, 'SELECT id, sensor_name FROM sensor_names') as $row) {
+			$sensor_list[$row['id']] = $row['sensor_name'];
+		}
+		$static_db->close();
+		apcu_store('sensor_list', $sensor_list);
 	}
 
 	return $sensor_list;
-
 }
-?>

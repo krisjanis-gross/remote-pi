@@ -64,9 +64,14 @@ Create runtime/config directories using the actual PHP service user/group. For
 the usual `www-data` setup:
 
 ```sh
-sudo install -d -o www-data -g www-data -m 0700 /var/lib/remote-pi-monitor
+echo 'd /run/remote-pi-monitor 0700 www-data www-data -' | sudo tee /etc/tmpfiles.d/remote-pi-monitor.conf
+sudo systemd-tmpfiles --create /etc/tmpfiles.d/remote-pi-monitor.conf
 sudo install -d -o root -g www-data -m 0750 /etc/remote-pi
 ```
+
+The state directory is in RAM (`/run`) so it works on a read-only root; the
+tmpfiles entry recreates it at every boot. Devices set up with
+`provision/install.sh` get all of this automatically.
 
 Put the staging key in `/etc/remote-pi/monitor-api-key` through your secure secret
 delivery process, owned by root, group `www-data`, mode `0640`. Do not place the

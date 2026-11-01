@@ -5,3 +5,6 @@ server_www/custom_app_config.php
 server_www/monitor.local.php
 monitor-api-key
 test-results/
+.DS_Store
+.idea/
+server_www/.ftpconfig

@@ -1,3 +1,6 @@
+#!/bin/sh
+# LEGACY: for devices installed with the old manual guide only.
+# New devices use provision/install.sh (see provision/README.md).
 rm -rf Remote_PI_wwwroot_backup
 mkdir Remote_PI_wwwroot_backup
 rsync -r /var/www/html/ Remote_PI_wwwroot_backup

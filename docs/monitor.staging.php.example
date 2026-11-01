@@ -7,4 +7,4 @@ $monitor_api_key_file = '/etc/remote-pi/monitor-api-key';
 $monitor_legacy_body_key = false;
 $monitor_interval_seconds = 60;
 $monitor_sample_max_age_seconds = 30;
-$monitor_state_dir = '/var/lib/remote-pi-monitor';
+$monitor_state_dir = '/run/remote-pi-monitor';

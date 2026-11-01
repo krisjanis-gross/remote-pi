@@ -1,12 +1,10 @@
 <?php
-if ( $_SERVER['REMOTE_ADDR'] != '127.0.0.1' ) exit;  // only supposed to be run locally
-include("settings.php");
-include("functions_gpio_control.php");
-isset ($_GET['button']) ? $button = $_GET['button'] : $button = "";
-if ($button == 1)
-	{
+// Copy to local_gpio.php for a hardware button script that calls
+// http://127.0.0.1/local_gpio.php?button=1 (allow it in the nginx config).
+require_once __DIR__ . '/bootstrap.php';
+remote_pi_require_loopback();
+require_once __DIR__ . '/functions_gpio_control.php';
 
-	toggle_pin (11);
-
-	}
-?>
+if (isset($_GET['button']) && $_GET['button'] === '1') {
+	toggle_pin(11);
+}

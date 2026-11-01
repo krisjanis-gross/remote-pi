@@ -1,8 +1,8 @@
 <?php
-require_once ("db_common.php");
+require_once __DIR__ . '/db_common.php';
 
-$static_db_file_name = "static_data.db";
-$static_db_file_pattern = "/static_data/";
+$GLOBALS['static_db_file_name'] = "static_data.db";
+$GLOBALS['static_db_file_pattern'] = "/^static_data_\d+\.db$/";
 
 function open_static_data_db ($read_only = false) {
 
@@ -11,59 +11,68 @@ function open_static_data_db ($read_only = false) {
 
 	$static_data_db_file = $tempfs_work_folder . $static_db_file_name;
 
-  //error_log("static_data_db_file ==" . $static_data_db_file);
-
 	// check if DB file is in place.
 	if (!file_exists ( $static_data_db_file )){
-				get_static_db_file_from_storage ($static_db_file_name);
 				//if the file is not there then get the file from Storage or Read Only storage.
+				get_static_db_file_from_storage ($static_db_file_name);
 				apcu_store('app_first_run',true);
     }
 	// open the data base and return the db object
-	if ($read_only)
-	    $static_db = new SQLite3($static_data_db_file,SQLITE3_OPEN_READONLY);
-	else
-	    $static_db = new SQLite3($static_data_db_file);
-
-	return $static_db;
+	return db_open($static_data_db_file, $read_only);
 }
 
 function check_if_static_db_file_exists () {
 	global $static_db_file_name;
 	global $tempfs_work_folder;
 
-	$static_data_db_file = $tempfs_work_folder . $static_db_file_name;
-	if (file_exists ( $static_data_db_file )) return true;
-	else return false;
-
+	return file_exists($tempfs_work_folder . $static_db_file_name);
 }
 
-function save_static_db_in_storage(){
+// Every pin toggle, trigger or parameter change used to copy the whole static DB
+// to the SD card. Changes are now batched: the copy happens once the DB has been
+// unchanged for $static_db_save_delay_seconds (see persist_static_db_if_due()).
+// Pass $immediate = true when the copy must happen now (restore, reboot, shutdown).
+function save_static_db_in_storage($immediate = false){
+	$delay = (int) remote_pi_setting('static_db_save_delay_seconds', 0);
+	if ($immediate || $delay <= 0 || !function_exists('apcu_store')) {
+		copy_static_db_to_storage();
+		return;
+	}
+	apcu_store('static_db_changed_at', microtime(true));
+}
+
+// Called once per sensor cycle by read_sensor_data.php.
+function persist_static_db_if_due() {
+	$changed_at = apcu_fetch('static_db_changed_at');
+	if (!$changed_at) {
+		return;
+	}
+	if (microtime(true) - $changed_at >= (int) remote_pi_setting('static_db_save_delay_seconds', 0)) {
+		apcu_delete('static_db_changed_at');
+		copy_static_db_to_storage();
+	}
+}
+
+function copy_static_db_to_storage(){
 	global $db_storage_folder;
 	global $static_db_file_name;
 	global $tempfs_work_folder;
+	global $static_db_file_pattern;
 
-	$file_name_prefix = "static_data";
-
-	// current db file name
-	$current_db_file_name = $tempfs_work_folder . $static_db_file_name;
-
-	// construct file name
-	$new_file_name = $db_storage_folder . $file_name_prefix .  date("_YmdHi") . ".db";
-	//error_log ("saving file to " . $new_file_name);
-	if (!copy($current_db_file_name , $new_file_name )) {
-				error_log ( "failed save DB data file in storage $file...\n");
+	if (!remote_pi_clock_synced()) {
+		// Keep the change pending; file names carry the time and would sort wrongly.
+		if (function_exists('apcu_store')) apcu_store('static_db_changed_at', microtime(true));
+		return;
 	}
 
- // purge old files
- global $static_db_file_pattern;
- $db_file_list = directoryToArray($db_storage_folder,false,false,true,$static_db_file_pattern);
+	$current_db_file_name = $tempfs_work_folder . $static_db_file_name;
+	$new_file_name = $db_storage_folder . "static_data_" . date("YmdHis") . ".db";
+	if (!copy($current_db_file_name , $new_file_name )) {
+		error_log ( "failed to save static DB file in storage: $new_file_name");
+		return;
+	}
 
- // sort the list so that the newest files come first
- arsort ($db_file_list);
-
- purgeBackupFiles ($db_file_list, 20);
-
+	purgeBackupFiles(list_db_files_newest_first($db_storage_folder, $static_db_file_pattern), 20);
 }
 
 
@@ -74,40 +83,22 @@ function get_static_db_file_from_storage ($db_file_name) {
 		global $tempfs_work_folder;
 		global $static_db_file_pattern;
 
-
-
-//error_log("<><><><><><funtion get_static_db_file_from_storage");
-//error_log("<><><><><>< d_storage_folder=" . $db_storage_folder  );
-//error_log("<><><><><>< tempfs_work_folder=" . $tempfs_work_folder  );
-
-
-
 		$valid_db_file = null;
-			// get file list from Storage location.
-		$db_file_list = directoryToArray($db_storage_folder,false,false,true,$static_db_file_pattern);
 
-		// sort the list so that the newest files come first
-		arsort ($db_file_list);
-
-		// try to open files in starting with the newest. If a valid db file is found then it is used.
-		foreach ($db_file_list as $file) {
-			if (verify_sqlite_file($file)) // file found
-				{
-				//error_log  ( "This file is good! <br />");
+		// try to open files starting with the newest. If a valid db file is found then it is used.
+		foreach (list_db_files_newest_first($db_storage_folder, $static_db_file_pattern) as $file) {
+			if (verify_sqlite_file($file)) {
 				$valid_db_file = $file;
 				break;
-				}
-			// try to open file
+			}
 		}
 
 		// valid DB file found? Yes- nice; No - Take from Read Only storage.
 		if ($valid_db_file == null) $valid_db_file = $read_only_folder . $db_file_name;
 
-		//error_log ("using  static data file file " . $valid_db_file);
-
 		// copy file to tempfs
 		if (!copy($valid_db_file, $tempfs_work_folder . $db_file_name )) {
-			error_log ( "failed to copy static db file to work folder $valid_db_file...\n");
+			error_log ( "failed to copy static db file to work folder $valid_db_file");
 		}
 }
 
@@ -117,18 +108,9 @@ function backup_static_data_file () {
 		global $static_db_file_name;
 		global $tempfs_work_folder;
 
-		$file_name_prefix = "static_data";
-
-		// current db file name
-		$current_db_file_name = $tempfs_work_folder . $static_db_file_name;
-
-		// construct file name
-		$new_file_name = $db_storage_folder . "staticDataBackup.db";
-		//error_log ("saving file to " . $new_file_name);
-		if (!copy($current_db_file_name , $new_file_name )) {
-					error_log ( "failed to make static data backup");
-				}
-
+		if (!copy($tempfs_work_folder . $static_db_file_name, $db_storage_folder . "staticDataBackup.db")) {
+			error_log ( "failed to make static data backup");
+		}
 }
 
 function restore_static_data_file_from_backup () {
@@ -137,18 +119,17 @@ function restore_static_data_file_from_backup () {
 	global $static_db_file_name;
 
 	$backup_file =  $db_storage_folder . "staticDataBackup.db";
-
-	$work_file =  $tempfs_work_folder . $static_db_file_name;
-
-	if (!copy($backup_file , $work_file )) {
-				error_log ( "failed to restore static data backup");
-			}
+	if (!is_file($backup_file) || !verify_sqlite_file($backup_file)) {
+		error_log ( "no valid static data backup to restore");
+		return false;
+	}
+	if (!copy($backup_file , $tempfs_work_folder . $static_db_file_name )) {
+		error_log ( "failed to restore static data backup");
+		return false;
+	}
+	if (function_exists('apcu_delete')) apcu_delete('sensor_list');
 
 	// copy from work folder to permanent Storage
-	save_static_db_in_storage();
-
+	save_static_db_in_storage(true);
+	return true;
 }
-
-
-
-?>
