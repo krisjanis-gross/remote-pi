@@ -83,6 +83,7 @@ export DEVICE_HOSTNAME TIMEZONE ADMIN_USER LAN_CIDRS EXTRA_HTTP_PORTS ALLOW_INTE
 # Relative paths in the site file are relative to the site file itself.
 if [[ -n "$SITE_FILES_DIR" && "$SITE_FILES_DIR" != /* ]]; then SITE_FILES_DIR="$SITE_CONFIG_DIR_BASE/$SITE_FILES_DIR"; fi
 if [[ -n "$MONITOR_KEY_FILE" && "$MONITOR_KEY_FILE" != /* ]]; then MONITOR_KEY_FILE="$SITE_CONFIG_DIR_BASE/$MONITOR_KEY_FILE"; fi
+if [[ "$UI_SOURCE" != /* && "$UI_SOURCE" != *://* && -d "$SITE_CONFIG_DIR_BASE/$UI_SOURCE" ]]; then UI_SOURCE="$SITE_CONFIG_DIR_BASE/$UI_SOURCE"; fi
 
 # Fixed layout used by the steps and the generated configuration.
 export WEB_ROOT=/var/www/remote-pi
@@ -96,6 +97,8 @@ export BOOT_DIR REPO_DIR PROVISION_DIR
 
 LOG_FILE=/var/log/remote-pi-install.log
 exec > >(tee -a "$LOG_FILE") 2>&1
+# set -e stops on the first failing command; say where, so the log does not just end.
+trap 'printf "\033[31mERROR:\033[0m step %s failed (exit %s): %s\n" "${name:-setup}" "$?" "$BASH_COMMAND" >&2' ERR
 log "Remote PI install started $(date -Is) from $REPO_DIR ($(git -C "$REPO_DIR" describe --always --dirty 2>/dev/null || echo 'no git'))"
 
 # The boot partition is mounted read-only after the first install; open it for this run.

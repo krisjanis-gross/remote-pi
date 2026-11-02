@@ -2,6 +2,8 @@
 # Install what the app needs, remove what it does not.
 
 export DEBIAN_FRONTEND=noninteractive
+# finish an upgrade cut short by a power loss or crash; a no-op otherwise
+dpkg --configure -a
 apt-get update
 apt-get -y full-upgrade
 apt-get install -y --no-install-recommends \

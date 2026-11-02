@@ -37,7 +37,12 @@ check "/data is mounted" mountpoint -q /data
 check "/data is writable" mount_has_option /data rw
 check "/data is a real partition, not overlaid" test "$(findmnt -no FSTYPE /data)" = ext4
 check "web user can write /data/sqlite" sudo -u www-data test -w /data/sqlite
-if swapon --show=NAME --noheadings 2>/dev/null | grep -qv zram; then fail "disk swap is active"; else pass "no swap on the SD card"; fi
+# Lite has no swapon; /var/swap is the zram writeback file rpi-swap keeps by default.
+if awk 'NR > 1 && $1 !~ /zram/' /proc/swaps | grep -q . || [[ -e /var/swap ]]; then
+	fail "swap or swap file on the SD card"
+else
+	pass "no swap on the SD card"
+fi
 
 echo "Time"
 if [[ "$(timedatectl show -p NTPSynchronized --value)" == yes ]]; then

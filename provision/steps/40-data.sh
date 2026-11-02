@@ -23,18 +23,7 @@ if [[ ! -b "$data_part" && "$DATA_DEVICE" == auto ]]; then
 	root_start=$(sectors "$root_name" start)
 	disk_size=$(sectors "$disk_name" size)
 
-	# Grow the root partition to ROOT_SIZE_GB first (online grow is safe for ext4).
-	if [[ "$ROOT_SIZE_GB" -gt 0 ]]; then
-		wanted=$((ROOT_SIZE_GB * 1024 * 1024 * 1024 / 512))
-		current=$(sectors "$root_name" size)
-		if [[ $wanted -gt $current && $((root_start + wanted + 2048)) -lt $disk_size ]]; then
-			info "growing root partition to ${ROOT_SIZE_GB} GiB"
-			echo "${root_start},${wanted}" | sfdisk --no-reread --force -N "$root_num" "$disk"
-			partx -u -n "$root_num" "$disk"
-			resize2fs "$root_part"
-		fi
-	fi
-
+	# root was grown to ROOT_SIZE_GB in step 15-root; /data takes the rest
 	root_end=$((root_start + $(sectors "$root_name" size)))
 	data_start=$(( (root_end + 2047) / 2048 * 2048 ))
 	if [[ $((disk_size - data_start)) -lt $((512 * 1024 * 1024 / 512)) ]]; then

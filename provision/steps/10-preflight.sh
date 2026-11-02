@@ -12,6 +12,12 @@ if [[ "${VERSION_CODENAME:-}" != "trixie" ]]; then
 fi
 info "OS: ${PRETTY_NAME:-unknown} ($(dpkg --print-architecture)), model: $(tr -d '\0' </proc/device-tree/model 2>/dev/null || echo unknown)"
 
+# The desktop image fills a small card and its RAM with a desktop nobody sees.
+if [[ "$(systemctl get-default)" == graphical.target ||
+	"$(dpkg-query -W -f='${db:Status-Status}' rpd-wayland-core 2>/dev/null)" == installed ]]; then
+	die "this is the Raspberry Pi OS desktop image. Flash 'Raspberry Pi OS Lite (32-bit)' instead."
+fi
+
 id "$ADMIN_USER" >/dev/null 2>&1 || die "ADMIN_USER '$ADMIN_USER' does not exist"
 admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)
 [[ -s "$admin_home/.ssh/authorized_keys" ]] || die "$ADMIN_USER has no SSH key in $admin_home/.ssh/authorized_keys; password login is about to be disabled"

@@ -4,8 +4,8 @@
 Remote PI device with a read-only root file system. One image works on every Pi
 model. The script can be re-run at any time; each step converges to the same state.
 
-> **Status:** written but not yet run on hardware. The items marked *(Phase 0)*
-> below must be confirmed on a spare card before the first real device.
+> **Status:** Phase 0 run on pi-laistisana (Pi 2, Lite 32-bit Trixie, 2026-11-02);
+> only the 24-hour check below is still open.
 
 ## What you get
 
@@ -23,7 +23,8 @@ model. The script can be re-run at any time; each step converges to the same sta
 
 ## Install a device
 
-1. **Flash** with Raspberry Pi Imager 2.x: *Raspberry Pi OS (other) → Raspberry Pi OS Lite (32-bit)*.
+1. **Flash** with Raspberry Pi Imager 2.x: *Raspberry Pi OS (other) → Raspberry Pi OS Lite (32-bit)*
+   (not the desktop image: the installer refuses it).
    In the customisation screen set hostname, user, **SSH with public key only**, Wi-Fi
    (if needed) and time zone.
 2. **Data partition** *(Phase 0)*: see below. Default: the script creates it in the free space after root.
@@ -71,14 +72,18 @@ touching the partitions.
 
 ## Phase 0 checklist (spare card, oldest Pi)
 
-- [ ] Trixie 32-bit boots and updates on a Pi 2 (kernel packages present)
-- [ ] First-boot resize can be stopped (option A) and the installer creates `/data`
-- [ ] After reboot: `/` is overlay, `/data` is ext4 and writes survive a reboot (`recurse=0`)
-- [ ] `pinctrl set <gpio> op dh` switches a relay and the state holds
-- [ ] DS18B20 via `w1-gpio` and DHT22 via `dht11` overlay read through `functions_hw_sensors.php`
-- [ ] php-fpm can run `sudo -n systemctl reboot` (unit not blocking privilege changes)
-- [ ] `remote-pi-maintenance enable/upgrade/disable` round trip
+- [x] Trixie 32-bit boots and updates on a Pi 2 (kernel packages present)
+- [x] First-boot resize can be stopped (option A) and the installer creates `/data`
+- [x] After reboot: `/` is overlay, `/data` is ext4 and writes survive a reboot (`recurse=0`)
+- [x] `pinctrl set <gpio> op dh` switches a relay and the state holds (via the API, reversed relay board)
+- [x] DS18B20 via `w1-gpio` reads through `functions_hw_sensors.php` (DHT22 not tested: no sensor at this site)
+- [x] php-fpm can run `sudo -n systemctl reboot` (unit not blocking privilege changes)
+- [x] `remote-pi-maintenance enable/disable` round trip, installer re-run in maintenance mode
 - [ ] `remote-pi-doctor` passes after 24 h; SD writes per hour are low
+
+Found on the way: the first-boot resize leaves root nearly full (the installer now grows it
+before installing packages); Trixie's default swap writes a file on the card (now zram only);
+a router may not answer NTP, so list pool servers in `NTP_SERVERS`.
 
 ## Site scripts
 
