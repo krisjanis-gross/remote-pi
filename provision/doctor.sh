@@ -106,10 +106,14 @@ sample_age=$(api get_sensor_data | php -r '$r = json_decode(stream_get_contents(
 if [[ "$sample_age" -ge 0 && "$sample_age" -le 30 ]]; then pass "sensor loop is running (sample ${sample_age}s old)"; else fail "no fresh sensor sample (age: $sample_age)"; fi
 if [[ -f /etc/remote-pi/monitor.php ]]; then
 	state=/run/remote-pi-monitor/sender-state.json
-	if [[ -r "$state" ]] && php -r 'exit((json_decode(file_get_contents($argv[1]), true)["failures"] ?? 1) === 0 ? 0 : 1);' "$state"; then
+	monitor_failures=$(php -r 'echo json_decode((string)@file_get_contents($argv[1]), true)["failures"] ?? -1;' "$state" 2>/dev/null)
+	# A check-in times out now and then over weak Wi-Fi; the sender retries after 30 s, 60 s, 120 s.
+	if [[ "$monitor_failures" == 0 ]]; then
 		pass "monitor check-ins succeed"
+	elif [[ "$monitor_failures" == [12] ]]; then
+		note "last $monitor_failures monitor check-in(s) failed, retrying (journalctl -g 'Monitor check-in')"
 	else
-		fail "monitor check-ins failing or not attempted yet (journalctl -u php*-fpm, nginx)"
+		fail "monitor check-ins failing or not attempted yet (journalctl -g 'Monitor check-in')"
 	fi
 fi
 

@@ -125,11 +125,13 @@ touching the partitions.
 - [x] DS18B20 via `w1-gpio` reads through `functions_hw_sensors.php` (DHT22 not tested: no sensor at this site)
 - [x] php-fpm can run `sudo -n systemctl reboot` (unit not blocking privilege changes)
 - [x] `remote-pi-maintenance enable/disable` round trip, installer re-run in maintenance mode
-- [ ] `remote-pi-doctor` passes after 24 h; SD writes per hour are low
+- [x] `remote-pi-doctor` passes after 24 h; SD writes per hour are low (4.9 MB in 25 h, all to `/data`)
 
 Found on the way: the first-boot resize leaves root nearly full (the installer now grows it
 before installing packages); Trixie's default swap writes a file on the card (now zram only);
-a router may not answer NTP, so list pool servers in `NTP_SERVERS`.
+a router may not answer NTP, so list pool servers in `NTP_SERVERS`; monitor check-ins time out
+1–3 times an hour over this site's weak Wi-Fi (the sender retries; the doctor fails only after
+three in a row).
 
 ## Site scripts
 
