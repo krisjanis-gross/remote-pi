@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # Web app: code owned by root (the web server cannot change it), only the files the app
-# needs are deployed, secrets and paths live in /etc/remote-pi outside the web root.
+# needs are installed, secrets and paths live in /etc/remote-pi.
 
 : "${PHP_VERSION:=$(php_version)}"
 export PHP_VERSION
@@ -70,21 +70,22 @@ else
 	rm -f "$CONFIG_DIR/monitor.php"
 fi
 
-# --- assemble the web root -------------------------------------------------
+# --- application files -----------------------------------------------------
+# ui/ is the only folder nginx serves; app/ and site/ are reached through PHP-FPM only.
 stage=$(mktemp -d)
+mkdir -p "$stage/ui" "$stage/app" "$stage/site"
 
 # 1. User interface (prebuilt Ionic app)
 if [[ -d "$UI_SOURCE" ]]; then
-	ui_dir=$UI_SOURCE
+	ui_build=$UI_SOURCE
 else
 	git clone --quiet --depth 1 --branch "$UI_REF" "$UI_SOURCE" "$stage/ui-src"
-	ui_dir="$stage/ui-src/$UI_SUBDIR"
+	ui_build="$stage/ui-src/$UI_SUBDIR"
 fi
-[[ -f "$ui_dir/index.html" ]] || die "no index.html in UI source $ui_dir"
-mkdir -p "$stage/www"
-rsync -a --exclude '.*' --exclude '*.php' "$ui_dir"/ "$stage/www"/
+[[ -f "$ui_build/index.html" ]] || die "no index.html in UI source $ui_build"
+rsync -a --exclude '.*' --exclude '*.php' "$ui_build"/ "$stage/ui"/
 
-# 2. Application code: an explicit list, nothing else from server_www is published.
+# 2. Application code: an explicit list, nothing else from server_www is installed.
 app_files=(
 	bootstrap.php db_common.php db_app_data_functions.php db_sensor_log_functions.php
 	functions_gpio_control.php functions_hw_sensors.php functions_monitor.php
@@ -92,27 +93,32 @@ app_files=(
 	json_API_v2.php json_ha.php csv_export.php read_sensor_data.php monitor_checkin.php
 )
 for file in "${app_files[@]}"; do
-	cp "$REPO_DIR/server_www/$file" "$stage/www/"
+	cp "$REPO_DIR/server_www/$file" "$stage/app/"
 done
-cp -r "$REPO_DIR/server_www/sqlite_db_templates" "$REPO_DIR/server_www/vendor" "$stage/www/"
+cp -r "$REPO_DIR/server_www/sqlite_db_templates" "$REPO_DIR/server_www/vendor" "$stage/app/"
 
 # 3. Site-specific scripts
 if [[ -n "$SITE_FILES_DIR" ]]; then
 	for file in custom_app_config.php custom_read_sensor_data.php custom_trigger_script.php \
-		custom_gpio_hook.php custom_startup_script.php local_gpio.php; do
-		if [[ -f "$SITE_FILES_DIR/$file" ]]; then cp "$SITE_FILES_DIR/$file" "$stage/www/"; fi
+		custom_gpio_hook.php custom_startup_script.php; do
+		if [[ -f "$SITE_FILES_DIR/$file" ]]; then cp "$SITE_FILES_DIR/$file" "$stage/site/"; fi
 	done
-	if grep -lE 'sudo |python2|exec *\( *"python ' "$stage/www"/custom_*.php 2>/dev/null; then
+	# An entry point of its own (see custom_local_gpio.php_template), so it sits with the app.
+	if [[ -f "$SITE_FILES_DIR/local_gpio.php" ]]; then cp "$SITE_FILES_DIR/local_gpio.php" "$stage/app/"; fi
+	if grep -lE 'sudo |python2|exec *\( *"python ' "$stage/site"/custom_*.php 2>/dev/null; then
 		warn "the site scripts listed above still call sudo/python; the web user has no sudo rights now. Port them to functions_hw_sensors.php / pinctrl."
 	fi
 fi
-[[ -f "$stage/www/custom_app_config.php" ]] || cp "$REPO_DIR/server_www/custom_app_config.php_template" "$stage/www/custom_app_config.php"
+[[ -f "$stage/site/custom_app_config.php" ]] || cp "$REPO_DIR/server_www/custom_app_config.php_template" "$stage/site/custom_app_config.php"
 
-install -d -o root -g root -m 0755 "$WEB_ROOT"
-rsync -a --delete --chown=root:root --chmod=D0755,F0644 "$stage/www"/ "$WEB_ROOT"/
-# may hold legacy monitor credentials
-chgrp www-data "$WEB_ROOT/custom_app_config.php" && chmod 0640 "$WEB_ROOT/custom_app_config.php"
+install -d -o root -g root -m 0755 "$INSTALL_DIR"
+rsync -a --delete --chown=root:root --chmod=D0755,F0644 "$stage/ui"/ "$UI_DIR"/
+rsync -a --delete --chown=root:root --chmod=D0755,F0644 "$stage/app"/ "$APP_DIR"/
+# Site scripts may hold legacy monitor credentials: readable by the web user only.
+rsync -a --delete --chown=root:www-data --chmod=D0750,F0640 "$stage/site"/ "$SITE_DIR"/
 rm -rf "$stage"
+# Layout before 2026-11: everything in one web root.
+rm -rf /var/www/remote-pi
 
 # --- PHP-FPM ---------------------------------------------------------------
 fpm_dir=/etc/php/$PHP_VERSION/fpm

@@ -40,7 +40,7 @@ function set_trigger ($trigger_id, $command) {
 		error_log('Rejected trigger change with invalid id or command');
 		return false;
 	}
-	$trigger_script = __DIR__ . "/custom_trigger_script.php";
+	$trigger_script = remote_pi_site_file("custom_trigger_script.php");
 	if (is_file($trigger_script)) {
 		require_once($trigger_script);
 		if (function_exists('trigger_hook')) trigger_hook ((int) $trigger_id, (int) $command);

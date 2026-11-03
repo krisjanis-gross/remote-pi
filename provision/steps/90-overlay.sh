@@ -3,7 +3,7 @@
 # the boot partition is mounted read-only. recurse=0 is essential: with the overlayroot
 # default (recurse=1) /data would be overlaid too and every database write lost.
 
-install -o root -g root -m 0755 "$PROVISION_DIR/files/remote-pi-maintenance" /usr/local/sbin/remote-pi-maintenance
+install_tool "$PROVISION_DIR/files/remote-pi-maintenance" remote-pi-maintenance
 
 boot_fstab_line=$(grep -E "^[^#]+[[:space:]]${BOOT_DIR}[[:space:]]" /etc/fstab || true)
 if [[ -n "$boot_fstab_line" ]] && ! awk '{print $4}' <<<"$boot_fstab_line" | grep -qE '(^|,)ro(,|$)'; then

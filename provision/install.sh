@@ -85,21 +85,44 @@ if [[ -n "$SITE_FILES_DIR" && "$SITE_FILES_DIR" != /* ]]; then SITE_FILES_DIR="$
 if [[ -n "$MONITOR_KEY_FILE" && "$MONITOR_KEY_FILE" != /* ]]; then MONITOR_KEY_FILE="$SITE_CONFIG_DIR_BASE/$MONITOR_KEY_FILE"; fi
 if [[ "$UI_SOURCE" != /* && "$UI_SOURCE" != *://* && -d "$SITE_CONFIG_DIR_BASE/$UI_SOURCE" ]]; then UI_SOURCE="$SITE_CONFIG_DIR_BASE/$UI_SOURCE"; fi
 
-# Fixed layout used by the steps and the generated configuration.
-export WEB_ROOT=/var/www/remote-pi
+# Fixed layout used by the steps and the generated configuration (see provision/README.md).
+export INSTALL_DIR=/opt/remote-pi
+export APP_DIR=$INSTALL_DIR/app        # PHP code, run through PHP-FPM only
+export SITE_DIR=$INSTALL_DIR/site      # this site's custom_*.php
+export UI_DIR=$INSTALL_DIR/ui          # built Ionic app, the only folder nginx serves
+export WORKER_DIR=$INSTALL_DIR/worker
+export BIN_DIR=$INSTALL_DIR/bin        # admin commands, linked from /usr/local/sbin
 export DATA_MOUNT=/data
 export DATA_DIR=/data/sqlite
 export RUNTIME_DIR=/run/remote-pi
 export CONFIG_DIR=/etc/remote-pi
-export WORKER_DIR=/usr/local/lib/remote-pi
 BOOT_DIR=$(boot_dir)
 export BOOT_DIR REPO_DIR PROVISION_DIR
+
+# Code version: git when installing from a checkout, else the REVISION file deploy.sh writes.
+if ! VERSION=$(git -C "$REPO_DIR" describe --always --dirty 2>/dev/null); then
+	VERSION=$(cat "$REPO_DIR/REVISION" 2>/dev/null || echo unknown)
+fi
+SITE_NAME=$(basename "$SITE_CONFIG_DIR_BASE")
 
 LOG_FILE=/var/log/remote-pi-install.log
 exec > >(tee -a "$LOG_FILE") 2>&1
 # set -e stops on the first failing command; say where, so the log does not just end.
 trap 'printf "\033[31mERROR:\033[0m step %s failed (exit %s): %s\n" "${name:-setup}" "$?" "$BASH_COMMAND" >&2' ERR
-log "Remote PI install started $(date -Is) from $REPO_DIR ($(git -C "$REPO_DIR" describe --always --dirty 2>/dev/null || echo 'no git'))"
+log "Remote PI install started $(date -Is): version $VERSION, site $SITE_NAME, from $REPO_DIR"
+
+# remote-pi-doctor reports this; "state=running" left behind means the run did not finish.
+# A single step (--only) does not install a whole version, so it leaves the file alone.
+write_version() {
+	[[ -z "$ONLY_STEP" ]] || return 0
+	install -d -o root -g root -m 0755 "$INSTALL_DIR"
+	write_file "$INSTALL_DIR/VERSION" <<EOF
+version=$VERSION
+site=$SITE_NAME
+installed=$(date -Is)
+state=$1
+EOF
+}
 
 # The boot partition is mounted read-only after the first install; open it for this run.
 if findmnt -no OPTIONS "$BOOT_DIR" | grep -qE '(^|,)ro(,|$)'; then
@@ -117,7 +140,9 @@ for step in "$PROVISION_DIR"/steps/[0-9][0-9]-*.sh; do
 	# shellcheck source=/dev/null
 	source "$step"
 	ran=$((ran + 1))
+	if [[ $name == 10-preflight ]]; then write_version running; fi
 done
 [[ $ran -gt 0 ]] || die "no step matched '$ONLY_STEP'"
 
+write_version complete
 log "Done. Log: $LOG_FILE"

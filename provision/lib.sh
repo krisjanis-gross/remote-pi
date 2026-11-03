@@ -38,6 +38,15 @@ replace_block() {
 	rm -f "$tmp"
 }
 
+# Install an admin command into $BIN_DIR and link it into /usr/local/sbin (mode 0644: a
+# file the commands source, not linked).
+install_tool() {
+	local src=$1 name=$2 mode=${3:-0755}
+	install -d -o root -g root -m 0755 "$BIN_DIR"
+	install -o root -g root -m "$mode" "$src" "$BIN_DIR/$name"
+	if [[ $mode != 0644 ]]; then ln -sfn "$BIN_DIR/$name" "/usr/local/sbin/$name"; fi
+}
+
 boot_dir() {
 	if [[ -d /boot/firmware ]] && mountpoint -q /boot/firmware; then echo /boot/firmware; else echo /boot; fi
 }

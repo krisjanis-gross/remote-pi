@@ -3,9 +3,9 @@ Remote control of Raspberry PI
 
 ## Installing a device
 
-New devices are set up with [`provision/install.sh`](provision/README.md) on
-Raspberry Pi OS Lite (32-bit, Trixie): read-only root, data on `/data`, hardened
-web server, unique API key. `home_pi/update_www_folder_from_GIT.sh` is only for
+New devices are set up and updated with [`provision/deploy.sh`](provision/README.md)
+on Raspberry Pi OS Lite (32-bit, Trixie): read-only root, data on `/data`, hardened
+web server, unique API key. Each device's settings and scripts are in `sites/<name>/`. `home_pi/update_www_folder_from_GIT.sh` is only for
 devices installed with the old manual guide until they are rebuilt.
 
 ## Tests

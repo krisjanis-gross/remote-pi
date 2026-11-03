@@ -13,8 +13,10 @@ header('Cache-Control: no-store');
 header('Content-Type: text/plain');
 ob_start();
 try {
-    if (is_file(__DIR__ . '/custom_app_config.php')) {
-        require __DIR__ . '/custom_app_config.php';
+    // Same lookup as REMOTE_PI_SITE_DIR in bootstrap.php, which is not loaded yet.
+    $site_config = (is_dir(dirname(__DIR__) . '/site') ? dirname(__DIR__) . '/site' : __DIR__) . '/custom_app_config.php';
+    if (is_file($site_config)) {
+        require $site_config;
     }
     // Protected override, outside the web root; do not edit tracked keys for staging.
     $override = getenv('REMOTE_PI_MONITOR_CONFIG') ?: '/etc/remote-pi/monitor.php';

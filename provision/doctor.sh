@@ -8,7 +8,8 @@ PRE_REBOOT=no
 [[ "${1:-}" == --pre-reboot ]] && PRE_REBOOT=yes
 [[ $EUID -eq 0 ]] || { echo "run as root (sudo)" >&2; exit 2; }
 
-for lib in /usr/local/lib/remote-pi/lib.sh "$(dirname "${BASH_SOURCE[0]}")/lib.sh"; do
+# Installed: /usr/local/sbin/remote-pi-doctor -> /opt/remote-pi/bin, next to lib.sh.
+for lib in "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/lib.sh" /usr/local/lib/remote-pi/lib.sh; do
 	# shellcheck source=provision/lib.sh
 	[[ -r "$lib" ]] && source "$lib" && break
 done
@@ -21,6 +22,17 @@ check() { local message=$1; shift; if "$@" >/dev/null 2>&1; then pass "$message"
 
 mount_has_option() { findmnt -no OPTIONS "$1" | tr ',' '\n' | grep -qx "$2"; }
 http_code() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.0.1$1"; }
+
+echo "Installed"
+version_file=/opt/remote-pi/VERSION
+version_value() { sed -n "s/^$1=//p" "$version_file"; }
+if [[ ! -r $version_file ]]; then
+	fail "no $version_file (installed before 2026-11, or install.sh never ran)"
+elif [[ $(version_value state) == complete ]]; then
+	pass "version $(version_value version), site $(version_value site), installed $(version_value installed | cut -c1-16 | tr T ' ')"
+else
+	fail "the install of version $(version_value version) started $(version_value installed | cut -c1-16 | tr T ' ') did not finish; see /var/log/remote-pi-install.log"
+fi
 
 echo "Storage"
 if [[ $PRE_REBOOT == yes ]]; then
@@ -70,6 +82,11 @@ else
 fi
 check "firewall drops inbound by default" grep -q 'policy drop' <(nft list chain inet filter input)
 check "no FTP server" bash -c '! ss -ltn | grep -q ":21 "'
+if find /opt/remote-pi/ui \( -name '*.php' -o -name '*.db' -o -name '.*' \) 2>/dev/null | grep -q .; then
+	fail "PHP, database or hidden files in the served folder /opt/remote-pi/ui"
+else
+	pass "served folder holds only the built app"
+fi
 for path in /.ftpconfig /custom_app_config.php /bootstrap.php /vendor/autoload.php /sqlite_db_templates/static_data.db /composer.json; do
 	code=$(http_code "$path")
 	if [[ "$code" == 404 || "$code" == 403 ]]; then pass "not served: $path"; else fail "served ($code): $path"; fi

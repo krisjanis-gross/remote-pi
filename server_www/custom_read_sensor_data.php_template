@@ -1,7 +1,7 @@
 <?php
 // Copy to custom_read_sensor_data.php and keep only the sensors this site has.
 // Readers in functions_hw_sensors.php use kernel drivers: no Python, no sudo.
-require_once __DIR__ . '/functions_hw_sensors.php';
+require_once 'functions_hw_sensors.php';
 
 function read_sensor_data_custom ()  {
 

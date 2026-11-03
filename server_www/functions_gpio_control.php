@@ -30,7 +30,7 @@ function gpio_valid_pin_id($pin_nr) {
 
 function process_custom_pin_hook ($pin_nr,$command)
 {
-	$custom_hook_file = __DIR__ . "/custom_gpio_hook.php";
+	$custom_hook_file = remote_pi_site_file("custom_gpio_hook.php");
 	if(is_file($custom_hook_file)){
 		require_once ($custom_hook_file);
 		pin_hook ($pin_nr,$command);

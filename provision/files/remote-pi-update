@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Run the installer from a source copy, then reboot into the read-only root.
+#   remote-pi-update [--import-data DIR] [--no-reboot] [SOURCE]
+# SOURCE is a copy of the repository holding one site folder, sites/<name>/site.env,
+# as provision/deploy.sh sends it. Default: /opt/remote-pi/src, the last copy deploy.sh
+# sent, e.g. to re-run it after editing its site.env. Needs maintenance mode
+# (sudo remote-pi-maintenance enable); deploy.sh does all of this from your computer.
+set -euo pipefail
+
+die() { echo "ERROR: $*" >&2; exit 1; }
+[[ $EUID -eq 0 ]] || die "run as root (sudo)"
+
+reboot=yes
+install_args=()
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+		--import-data) install_args+=(--import-data "${2:-}"); shift 2 ;;
+		--no-reboot) reboot=no; shift ;;
+		-h|--help) sed -n '2,7p' "$0"; exit 0 ;;
+		-*) die "unknown option: $1" ;;
+		*) break ;;
+	esac
+done
+source_dir=${1:-/opt/remote-pi/src}
+
+[[ "$(findmnt -no FSTYPE /)" != overlay ]] ||
+	die "the read-only root is active and the install would be lost. Run 'sudo remote-pi-maintenance enable' (reboots), then this again."
+[[ -x "$source_dir/provision/install.sh" ]] || die "no provision/install.sh in $source_dir"
+
+shopt -s nullglob
+site_configs=("$source_dir"/sites/*/site.env)
+[[ ${#site_configs[@]} -eq 1 ]] ||
+	die "expected exactly one sites/<name>/site.env in $source_dir, found ${#site_configs[@]}"
+
+"$source_dir/provision/install.sh" --site-config "${site_configs[0]}" "${install_args[@]}"
+
+if [[ $reboot == yes ]]; then
+	echo "Rebooting into the read-only root..."
+	systemctl reboot
+else
+	echo "Reboot to switch the read-only root back on: sudo reboot"
+fi

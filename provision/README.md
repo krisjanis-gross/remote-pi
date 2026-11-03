@@ -16,10 +16,44 @@ model. The script can be re-run at any time; each step converges to the same sta
 | Clock | `systemd-timesyncd`; the app pauses logging until the clock is synchronized |
 | Logs | journald in RAM, capped at 32 MB; no nginx access log |
 | Web | only the app and its two APIs are served; worker endpoints are loopback-only |
-| Secrets | API key (unique, generated) and monitor key in `/etc/remote-pi/`, outside the web root |
+| Secrets | API key (unique, generated) and monitor key in `/etc/remote-pi/`, outside the served folder |
 | Privileges | `www-data` is in the `gpio` group; sudo only for `systemctl reboot/poweroff` |
 | Network | nftables: SSH + HTTP from `LAN_CIDRS` only; SSH key-only, no root login |
 | Worker | `remote-pi-worker.service` (unprivileged, restarts automatically) |
+
+## Where things are on the device
+
+| Path | What | Survives a reboot |
+|---|---|---|
+| `/opt/remote-pi/VERSION` | installed version, site, time; `state=running` = the install did not finish | yes* |
+| `/opt/remote-pi/ui/` | built Ionic app; the only folder nginx serves | yes* |
+| `/opt/remote-pi/app/` | PHP code (`server_www/`), reached only through the PHP endpoints | yes* |
+| `/opt/remote-pi/site/` | this site's `custom_*.php` (from `sites/<name>/php/`) | yes* |
+| `/opt/remote-pi/worker/worker.py` | Python worker: calls the sensor and monitor endpoints on 127.0.0.1 | yes* |
+| `/opt/remote-pi/bin/` | `remote-pi-doctor`, `-maintenance`, `-update`, linked from `/usr/local/sbin` | yes* |
+| `/opt/remote-pi/src/` | the repository copy and site folder `deploy.sh` last sent (root only) | yes* |
+| `/etc/remote-pi/` | generated `app.php` (API key, paths), `monitor.php`, `monitor-api-key` | yes* |
+| `/data/sqlite/` | settings (`static_data_<time>.db`, last 20 kept) and sensor log (`sensor_log<time>.db`) | yes |
+| `/run/remote-pi/` | working copies of the databases in RAM, saved to `/data` periodically | no |
+| `/var/log/remote-pi-install.log` | installer output | yes* |
+
+\* written in maintenance mode or by the installer; under the read-only root, changes to
+these paths vanish at the next reboot.
+
+## Site folders
+
+Each device has a folder `sites/<name>/` in this repository:
+
+| Path | What | In git |
+|---|---|---|
+| `site.env` | settings, copied from `provision/site.env.example` | yes |
+| `php/` | `custom_*.php`: sensors, triggers, GPIO hooks, startup script | yes |
+| `secrets/` | key files, e.g. `monitor-api-key` | no |
+| `ui/` | built app (`npx ng build` in remote-pi-ionic-v7, its `browser/` folder) | no |
+
+Anything else in the folder (old databases, notes) stays local and is not sent to the device.
+Sites in `custom_configuration/` still call the old Python scripts and need porting
+(see *Site scripts* below) before they move into `sites/`.
 
 ## Install a device
 
@@ -28,27 +62,39 @@ model. The script can be re-run at any time; each step converges to the same sta
    In the customisation screen set hostname, user, **SSH with public key only**, Wi-Fi
    (if needed) and time zone.
 2. **Data partition** *(Phase 0)*: see below. Default: the script creates it in the free space after root.
-3. **Boot**, then copy the repository and the site file to the Pi:
+3. **Boot**, then install from your computer (this repository, site folder ready):
    ```bash
-   scp -r remote-pi pi@pi-laistisana.local:
-   scp laistisana.env pi@pi-laistisana.local:
-   ```
-4. **Install**:
-   ```bash
-   sudo ~/remote-pi/provision/install.sh --site-config ~/laistisana.env --import-data ~/old-sqlite-data
+   provision/deploy.sh sites/laistisana --import-data ~/old-sqlite-data
    ```
    `--import-data` copies the newest intact databases from an old device's `sqlite_data` folder.
-   Note the API key printed at the end (enter it in the app).
-5. **Reboot** and check: `sudo remote-pi-doctor`
+   The script copies everything to the device, runs the installer there, reboots and
+   runs `remote-pi-doctor`. Note the API key in the output (enter it in the app; later:
+   `sudo sed -n "s/^\$config_API_KEY = '\(.*\)';/\1/p" /etc/remote-pi/app.php`).
 
-## Day-to-day
+Without a computer that can run `deploy.sh`: copy the repository and the site folder to
+the Pi, run `sudo remote-pi/provision/install.sh --site-config <site folder>/site.env`, then reboot.
+
+## Updating
+
+Commit or keep the change in this repository, then:
+
+```bash
+provision/deploy.sh sites/laistisana
+```
+
+It switches the device to maintenance mode, copies, installs, reboots into the read-only
+root and runs `remote-pi-doctor`. The installer runs on the device, so a dropped Wi-Fi
+connection does not stop it; `deploy.sh` reconnects and keeps showing the log.
+`remote-pi-doctor` shows the installed version (`git describe` of the copy that was sent).
+
+On the device:
 
 ```bash
 sudo remote-pi-maintenance status    # read-only or maintenance mode
 sudo remote-pi-maintenance enable    # reboot into maintenance mode (writable root)
 sudo remote-pi-maintenance upgrade   # apt full-upgrade, only in maintenance mode
-sudo ~/remote-pi/provision/install.sh --site-config ~/laistisana.env   # deploy a new app version
-sudo remote-pi-maintenance disable   # back to read-only, reboots
+sudo remote-pi-update                # re-run the installer from /opt/remote-pi/src, then reboot read-only
+sudo remote-pi-maintenance disable   # back to read-only without installing, reboots
 ```
 
 Changes made while the read-only root is active (files in `/etc`, packages, the app)

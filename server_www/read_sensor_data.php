@@ -19,7 +19,7 @@ $trigger_log_data = false;
 	}
 	if (apcu_fetch('app_first_run') == true)  // this is first run of the application
 	{
-		$custom_first_run_script_file = __DIR__ . "/custom_startup_script.php";
+		$custom_first_run_script_file = remote_pi_site_file("custom_startup_script.php");
 		if(is_file($custom_first_run_script_file)){
 			include ($custom_first_run_script_file);
 			startup_script();
@@ -40,7 +40,7 @@ $trigger_log_data = false;
 	// (start from custom_read_sensor_data.php_template). Without it a dummy
 	// sensor with a random reading is shown.
 
-	$custom_sensor_data_file = __DIR__ . "/custom_read_sensor_data.php";
+	$custom_sensor_data_file = remote_pi_site_file("custom_read_sensor_data.php");
 	$sensor_data["timestamp"] = date('Y-m-d H:i:s') ;
 	$sensor_data["data"] = [];
 
@@ -63,7 +63,7 @@ $trigger_log_data = false;
 	/////////////////////////////////////////////////////////////////////////////
 	// Sites implement triggers in custom_trigger_script.php (from the _template).
 
-	$trigger_script_file = __DIR__ . "/custom_trigger_script.php";
+	$trigger_script_file = remote_pi_site_file("custom_trigger_script.php");
 	if(is_file($trigger_script_file)){
 		include ($trigger_script_file);
 		run_triggers();

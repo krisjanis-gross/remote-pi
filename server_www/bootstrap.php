@@ -7,11 +7,21 @@ if (defined('REMOTE_PI_BOOTSTRAPPED')) {
 }
 define('REMOTE_PI_BOOTSTRAPPED', true);
 
-// Site settings live in custom_app_config.php (web root). Devices installed with
+// Site scripts (custom_*.php) sit next to this code in the old flat web root, and in
+// ../site in the provisioned layout (/opt/remote-pi/app + /opt/remote-pi/site).
+define('REMOTE_PI_SITE_DIR', is_dir(dirname(__DIR__) . '/site') ? dirname(__DIR__) . '/site' : __DIR__);
+// Site scripts include app files by bare name, e.g. require_once 'functions_triggers.php'.
+set_include_path(__DIR__ . PATH_SEPARATOR . get_include_path());
+
+function remote_pi_site_file($name) {
+	return REMOTE_PI_SITE_DIR . '/' . $name;
+}
+
+// Site settings live in custom_app_config.php (site scripts). Devices installed with
 // provision/install.sh also have /etc/remote-pi/app.php (outside the web root),
 // which holds the API key and storage paths and overrides the site file.
 function remote_pi_load_config() {
-	$files = array(__DIR__ . '/custom_app_config.php', getenv('REMOTE_PI_APP_CONFIG') ?: '/etc/remote-pi/app.php');
+	$files = array(remote_pi_site_file('custom_app_config.php'), getenv('REMOTE_PI_APP_CONFIG') ?: '/etc/remote-pi/app.php');
 	foreach ($files as $file) {
 		if (!is_file($file) || !is_readable($file)) {
 			continue;
