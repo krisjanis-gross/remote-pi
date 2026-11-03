@@ -30,6 +30,8 @@ if [[ ! -r $version_file ]]; then
 	fail "no $version_file (installed before 2026-11, or install.sh never ran)"
 elif [[ $(version_value state) == complete ]]; then
 	pass "version $(version_value version), site $(version_value site), installed $(version_value installed | cut -c1-16 | tr T ' ')"
+elif [[ $PRE_REBOOT == yes && $(version_value state) == running ]]; then
+	note "version $(version_value version), site $(version_value site): this install is still running"
 else
 	fail "the install of version $(version_value version) started $(version_value installed | cut -c1-16 | tr T ' ') did not finish; see /var/log/remote-pi-install.log"
 fi

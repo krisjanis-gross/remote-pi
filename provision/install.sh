@@ -100,8 +100,8 @@ BOOT_DIR=$(boot_dir)
 export BOOT_DIR REPO_DIR PROVISION_DIR
 
 # Code version: git when installing from a checkout, else the REVISION file deploy.sh writes.
-if ! VERSION=$(git -C "$REPO_DIR" describe --always --dirty 2>/dev/null); then
-	VERSION=$(cat "$REPO_DIR/REVISION" 2>/dev/null || echo unknown)
+if ! REMOTE_PI_VERSION=$(git -C "$REPO_DIR" describe --always --dirty 2>/dev/null); then
+	REMOTE_PI_VERSION=$(cat "$REPO_DIR/REVISION" 2>/dev/null || echo unknown)
 fi
 SITE_NAME=$(basename "$SITE_CONFIG_DIR_BASE")
 
@@ -109,7 +109,7 @@ LOG_FILE=/var/log/remote-pi-install.log
 exec > >(tee -a "$LOG_FILE") 2>&1
 # set -e stops on the first failing command; say where, so the log does not just end.
 trap 'printf "\033[31mERROR:\033[0m step %s failed (exit %s): %s\n" "${name:-setup}" "$?" "$BASH_COMMAND" >&2' ERR
-log "Remote PI install started $(date -Is): version $VERSION, site $SITE_NAME, from $REPO_DIR"
+log "Remote PI install started $(date -Is): version $REMOTE_PI_VERSION, site $SITE_NAME, from $REPO_DIR"
 
 # remote-pi-doctor reports this; "state=running" left behind means the run did not finish.
 # A single step (--only) does not install a whole version, so it leaves the file alone.
@@ -117,7 +117,7 @@ write_version() {
 	[[ -z "$ONLY_STEP" ]] || return 0
 	install -d -o root -g root -m 0755 "$INSTALL_DIR"
 	write_file "$INSTALL_DIR/VERSION" <<EOF
-version=$VERSION
+version=$REMOTE_PI_VERSION
 site=$SITE_NAME
 installed=$(date -Is)
 state=$1

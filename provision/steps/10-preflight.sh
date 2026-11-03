@@ -5,12 +5,14 @@ if overlay_active; then
 	die "the read-only root is active, changes would be lost. Run 'sudo remote-pi-maintenance enable', reboot, then re-run."
 fi
 
-. /etc/os-release
-if [[ "${VERSION_CODENAME:-}" != "trixie" ]]; then
-	is_yes "${ALLOW_UNSUPPORTED_OS:-no}" || die "expected Raspberry Pi OS Trixie, found ${PRETTY_NAME:-unknown}. Set ALLOW_UNSUPPORTED_OS=yes to try anyway."
-	warn "untested OS: ${PRETTY_NAME:-unknown}"
+# In a subshell: os-release also sets VERSION, ID and NAME.
+os_codename=$(. /etc/os-release && echo "${VERSION_CODENAME:-}")
+os_name=$(. /etc/os-release && echo "${PRETTY_NAME:-unknown}")
+if [[ "$os_codename" != "trixie" ]]; then
+	is_yes "${ALLOW_UNSUPPORTED_OS:-no}" || die "expected Raspberry Pi OS Trixie, found $os_name. Set ALLOW_UNSUPPORTED_OS=yes to try anyway."
+	warn "untested OS: $os_name"
 fi
-info "OS: ${PRETTY_NAME:-unknown} ($(dpkg --print-architecture)), model: $(tr -d '\0' </proc/device-tree/model 2>/dev/null || echo unknown)"
+info "OS: $os_name ($(dpkg --print-architecture)), model: $(tr -d '\0' </proc/device-tree/model 2>/dev/null || echo unknown)"
 
 # The desktop image fills a small card and its RAM with a desktop nobody sees.
 if [[ "$(systemctl get-default)" == graphical.target ||
