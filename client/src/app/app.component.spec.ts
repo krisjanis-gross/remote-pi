@@ -1,16 +1,13 @@
 import { TestBed } from '@angular/core/testing';
-import { RouterTestingModule } from '@angular/router/testing';
+import { provideRouter } from '@angular/router';
+import { provideIonicAngular } from '@ionic/angular/standalone';
+
 import { AppComponent } from './app.component';
 
 describe('AppComponent', () => {
   it('should create the app', () => {
-    TestBed.overrideComponent(AppComponent, {
-      add: {
-        imports: [RouterTestingModule]
-      }
-    });
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideIonicAngular()] });
     const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app).toBeTruthy();
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });

@@ -20,6 +20,7 @@ cd client
 npm ci            # once, and after package-lock.json changes
 npm start         # dev server on http://localhost:4200
 npm run lint
+npm test          # unit tests in Chrome, re-run on changes; npm run test:ci runs once, headless
 npm run build     # production build in client/www
 npx cap sync ios  # copy the build into the iOS project, then open ios/App/App.xcworkspace
 ```

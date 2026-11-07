@@ -1,0 +1,30 @@
+name: Client app checks
+# Lint, test and build the Ionic app in client/ (the browser build is what deploy.sh
+# installs on devices). Runs only when the app or this workflow changes.
+on:
+  push:
+    paths: ['client/**', '.github/workflows/client.yml']
+  pull_request:
+    paths: ['client/**', '.github/workflows/client.yml']
+permissions:
+  contents: read
+jobs:
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run test:ci
+      - run: npm run build

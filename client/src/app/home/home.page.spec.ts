@@ -1,18 +1,18 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { HomePage } from './home.page';
+import { providePageTesting } from '../testing/page-providers';
 
 describe('HomePage', () => {
-  let component: HomePage;
   let fixture: ComponentFixture<HomePage>;
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    TestBed.configureTestingModule({ providers: providePageTesting() });
     fixture = TestBed.createComponent(HomePage);
-    component = fixture.componentInstance;
     fixture.detectChanges();
   });
 
   it('should create', () => {
-    expect(component).toBeTruthy();
+    expect(fixture.componentInstance).toBeTruthy();
   });
 });
