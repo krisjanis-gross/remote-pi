@@ -37,7 +37,7 @@ import {
 } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
 import { analytics, createOutline } from 'ionicons/icons';
-import * as Highcharts from 'highcharts';
+import Highcharts from 'highcharts/esm/highcharts.js';
 
 import { LocalAppDataService } from '../services/local-app-data.service';
 import {
@@ -53,20 +53,6 @@ const REFRESH_MS = 10_000;
 /** Height of a sensor's sparkline, in px (also set in home.page.scss). */
 const SPARKLINE_HEIGHT = 48;
 
-/** The part of a Highcharts 5 chart this page uses. */
-interface SparklineChart {
-  renderTo: HTMLElement;
-  reflow(): void;
-  series: {
-    setData(
-      data: ChartPoint[],
-      redraw?: boolean,
-      animation?: boolean,
-      updatePoints?: boolean
-    ): void;
-  }[];
-  destroy(): void;
-}
 
 @Component({
   selector: 'app-home',
@@ -122,7 +108,7 @@ export class HomePage {
   /** Requests in flight; the progress bar runs while any are. */
   private pending = 0;
   private readonly leave$ = new Subject<void>();
-  private readonly sparklines = new Map<string, SparklineChart>();
+  private readonly sparklines = new Map<string, Highcharts.Chart>();
 
   constructor() {
     addIcons({ analytics, createOutline });
@@ -263,20 +249,14 @@ export class HomePage {
       current.add(id);
       const data = sensor.sparkline_data ?? [];
       const chart = this.sparklines.get(id);
-      if (chart && chart.renderTo === container) {
+      if (chart && chart.container?.parentElement === container) {
         chart.series[0].setData(data, true, false, false);
         // A chart created while the page was still being shown gets Highcharts' default
         // width; fit it to its row.
         chart.reflow();
       } else {
         chart?.destroy();
-        this.sparklines.set(
-          id,
-          Highcharts.chart(
-            container as any,
-            sparklineOptions(data) as any
-          ) as unknown as SparklineChart
-        );
+        this.sparklines.set(id, Highcharts.chart(container, sparklineOptions(data)));
       }
     }
     for (const [id, chart] of this.sparklines) {
@@ -514,7 +494,7 @@ function confirmButtons(onConfirm: () => void) {
   ];
 }
 
-function sparklineOptions(data: ChartPoint[]) {
+function sparklineOptions(data: ChartPoint[]): Highcharts.Options {
   return {
     chart: {
       backgroundColor: 'transparent',

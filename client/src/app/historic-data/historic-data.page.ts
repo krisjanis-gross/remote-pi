@@ -19,7 +19,7 @@ import {
   IonToolbar,
   ToastController,
 } from '@ionic/angular/standalone';
-import * as Highcharts from 'highcharts';
+import Highcharts from 'highcharts/esm/highcharts.js';
 
 import { BackendDataService } from '../services/backend-data.service';
 import { LocalAppDataService } from '../services/local-app-data.service';
@@ -33,22 +33,6 @@ import {
 
 /** How often new readings are added to the chart while realtime update is on. */
 const LIVE_UPDATE_MS = 1_000;
-
-/** The part of a Highcharts 5 chart this page uses. */
-interface HistoryChart {
-  get(
-    id: string | number
-  ):
-    | {
-        addPoint(
-          point: [number, number],
-          redraw?: boolean,
-          shift?: boolean
-        ): void;
-      }
-    | undefined;
-  destroy(): void;
-}
 
 @Component({
   selector: 'app-historic-data',
@@ -87,7 +71,7 @@ export class HistoricDataPage {
   loading = false;
 
   private device: Device | null = null;
-  private chart: HistoryChart | null = null;
+  private chart: Highcharts.Chart | null = null;
   private lastTimestamp: string | null = null;
   private readonly leave$ = new Subject<void>();
 
@@ -153,19 +137,17 @@ export class HistoricDataPage {
   private showChart(series: HistoricSeries[]) {
     this.destroyChart();
     this.lastTimestamp = null;
-    this.chart = Highcharts.chart(
-      this.chartContainer.nativeElement as any,
-      {
-        chart: { type: 'spline' },
-        title: { text: 'Historic data' },
-        xAxis: {
-          type: 'datetime',
-          dateTimeLabelFormats: { day: '%e %b %y<br/>%H:%M:%S' },
-        },
-        yAxis: { title: { text: 'measurement' } },
-        series,
-      } as any
-    ) as unknown as HistoryChart;
+    this.chart = Highcharts.chart(this.chartContainer.nativeElement, {
+      chart: { type: 'spline' },
+      title: { text: 'Historic data' },
+      xAxis: {
+        type: 'datetime',
+        dateTimeLabelFormats: { day: '%e %b %y<br/>%H:%M:%S' },
+      },
+      yAxis: { title: { text: 'measurement' } },
+      // Series ids are the sensor ids, so live readings find their series.
+      series: series.map(s => ({ type: 'spline', id: String(s.id), name: String(s.name), data: s.data })),
+    });
   }
 
   private addReadings(reading: SensorData) {
@@ -181,9 +163,8 @@ export class HistoricDataPage {
     // The device sends local time; written as UTC it lines up with the history's points.
     const time = Date.parse(reading.timestamp + ' UTC');
     for (const sensor of reading.data) {
-      this.chart
-        .get(sensor.id)
-        ?.addPoint([time, Number(sensor.value)], true, false);
+      const series = this.chart.get(String(sensor.id)) as Highcharts.Series | undefined;
+      series?.addPoint([time, Number(sensor.value)], true, false);
     }
   }
 

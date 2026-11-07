@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed, discardPeriodicTasks, fakeAsync, flushMicrotasks, tick } from '@angular/core/testing';
 import { HttpTestingController, TestRequest } from '@angular/common/http/testing';
-import * as Highcharts from 'highcharts';
+import Highcharts from 'highcharts/esm/highcharts.js';
 
 import { HomePage } from './home.page';
 import { FakeStorage } from '../testing/fake-storage';
