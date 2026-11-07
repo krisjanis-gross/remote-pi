@@ -38,6 +38,8 @@ import {
 import { addIcons } from 'ionicons';
 import { analytics, createOutline } from 'ionicons/icons';
 import Highcharts from 'highcharts/esm/highcharts.js';
+// Screen-reader descriptions and keyboard navigation for charts (Highcharts asks for it).
+import 'highcharts/esm/modules/accessibility.js';
 
 import { LocalAppDataService } from '../services/local-app-data.service';
 import {

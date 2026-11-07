@@ -20,6 +20,8 @@ import {
   ToastController,
 } from '@ionic/angular/standalone';
 import Highcharts from 'highcharts/esm/highcharts.js';
+// Screen-reader descriptions and keyboard navigation for charts (Highcharts asks for it).
+import 'highcharts/esm/modules/accessibility.js';
 
 import { BackendDataService } from '../services/backend-data.service';
 import { LocalAppDataService } from '../services/local-app-data.service';
