@@ -1,0 +1,7 @@
+{
+  "name": "remote-pi-ionic-v7",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular-standalone"
+}

@@ -1,0 +1,26 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-title>Device List</ion-title>
+    <ion-buttons slot="start">
+      <ion-button fill="solid"  [routerLink]="['/']" > &lt; Back</ion-button>
+    </ion-buttons>
+    <ion-buttons slot="end">
+      <ion-button fill="solid" (click)="newDevice()" >Add new device</ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content [fullscreen]="true">
+    <ion-list>
+      <ion-item *ngFor="let item of localAppDataService.deviceList">
+        <ion-label>
+          <h1 (click)="selectDevice(item)" >{{item.deviceTitle}}</h1>
+          <h2 class="item-note" (click)="selectDevice(item)" >{{item.deviceURL}}</h2>
+          <h3 class="item-note" >
+            <ion-badge color="{{this.deviceStatusColor[item.deviceID]}}" >{{this.deviceStatus[item.deviceID]}}</ion-badge>
+          </h3>
+        </ion-label>
+        <ion-button large clear slot="end" (click)="editDevice(item)" >Edit</ion-button>
+      </ion-item>
+    </ion-list>
+</ion-content>

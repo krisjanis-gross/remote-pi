@@ -1,0 +1,38 @@
+<ion-header [translucent]="true">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-button   fill="solid"  [routerLink]="['/']"  > &lt; Back</ion-button>
+    </ion-buttons >
+    <ion-title>Historic data</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <h3> Filter </h3>
+  <ion-list>
+    <ion-item>
+      <ion-select label="Data period" interface="popover" [(ngModel)]="chart_time_interval" (ionChange)="change_period()"  >
+        <ion-select-option value="hour">hour</ion-select-option>
+        <ion-select-option value="3hrs">3 hours</ion-select-option>
+        <ion-select-option value="6hrs">6 hours</ion-select-option>
+        <ion-select-option value="day">day</ion-select-option>
+        <ion-select-option value="3days">3 days</ion-select-option>
+        <ion-select-option value="week">week</ion-select-option>
+        <ion-select-option value="month">month</ion-select-option>
+      </ion-select>
+    </ion-item>
+    <ion-item>
+      <ion-select label="Select Sensors" multiple="true" cancelText="Cancel" okText="OK" (ionChange)="select_sensors()" [(ngModel)]="selected_sensors" >
+        <ion-select-option *ngFor="let item of SensorList" [value]="item.id">{{ item.name }}</ion-select-option>
+      </ion-select>
+    </ion-item>
+
+
+    <ion-item>
+      <ion-toggle [enableOnOffLabels]="true" [(ngModel)]="DataUpdateEnabled"  [checked]="DataUpdateEnabled" >Realtime data update</ion-toggle>
+    </ion-item>
+  </ion-list>
+
+
+  <div id="container" style="display: block;"	></div>
+</ion-content>
