@@ -1,42 +1,26 @@
 import UIKit
 import Capacitor
 
-// iOS 27 apps built with the current SDK must use the scene lifecycle; without it UIKit
-// stops the app at launch. The window and the Capacitor view controller come from
-// Main.storyboard (UISceneStoryboardFile in Info.plist). URL opens and user activities now
-// arrive here instead of in AppDelegate, so they are passed on to Capacitor from here.
-//
-// With scenes, UIKit posts willEnterForeground at launch too; Capacitor then sends a
-// "resume" event before the page exists and logs "⚡️ JS Eval error" once at start-up.
-// That message is harmless: the page loads right after, and later resumes work.
+// Capacitor 8.5's scene delegate template (https://capacitorjs.com/docs/updating/8-5):
+// iOS 27 apps built with the current SDK must use the scene lifecycle, or UIKit stops them
+// at launch. The window and the Capacitor view controller are created here;
+// SceneDelegateProxy passes URL opens and user activities on to Capacitor and its plugins.
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
-
     var window: UIWindow?
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
-        if let url = connectionOptions.urlContexts.first?.url {
-            open(url)
-        }
-        if let userActivity = connectionOptions.userActivities.first {
-            continueActivity(userActivity)
-        }
+        guard let windowScene = scene as? UIWindowScene else { return }
+        window = UIWindow(windowScene: windowScene)
+        window?.rootViewController = CAPBridgeViewController()
+        window?.makeKeyAndVisible()
+        SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
-        if let url = URLContexts.first?.url {
-            open(url)
-        }
+        SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
     }
 
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
-        continueActivity(userActivity)
-    }
-
-    private func open(_ url: URL) {
-        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, open: url, options: [:])
-    }
-
-    private func continueActivity(_ userActivity: NSUserActivity) {
-        _ = ApplicationDelegateProxy.shared.application(UIApplication.shared, continue: userActivity, restorationHandler: { _ in })
+        SceneDelegateProxy.shared.scene(scene, continue: userActivity)
     }
 }
