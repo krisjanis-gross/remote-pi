@@ -78,6 +78,8 @@ mkdir -p "$stage/ui" "$stage/app" "$stage/site"
 # 1. User interface (prebuilt Ionic app)
 if [[ -d "$UI_SOURCE" ]]; then
 	ui_build=$UI_SOURCE
+elif [[ "$UI_SOURCE" != *://* && "$UI_SOURCE" != git@* ]]; then
+	die "UI folder $UI_SOURCE not found: build the app (npm run build in remote-pi-ionic-v7) and copy www/ there"
 else
 	git clone --quiet --depth 1 --branch "$UI_REF" "$UI_SOURCE" "$stage/ui-src"
 	ui_build="$stage/ui-src/$UI_SUBDIR"

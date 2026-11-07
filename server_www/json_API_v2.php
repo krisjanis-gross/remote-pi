@@ -43,7 +43,7 @@ $handlers = array(
 if (!isset($handlers[$request_action])) {
 	api_fail(400, 'Unknown request action');
 }
-return_data_to_client(call_user_func($handlers[$request_action], $request_data));
+send_result(call_user_func($handlers[$request_action], $request_data));
 
 
 function return_data_to_client($return_data, $status = 200) {
@@ -57,12 +57,20 @@ function api_ok($data = "") {
 	return array('response_code' => "OK", 'response_data' => $data);
 }
 
-function api_error($message) {
-	return array('response_code' => "ERROR", 'response_data' => $message);
+// Failed requests keep the same envelope but also get a 4xx/5xx status, so clients
+// cannot mistake them for success. The status is not part of the JSON body.
+function api_error($message, $status = 400) {
+	return array('response_code' => "ERROR", 'response_data' => $message, 'http_status' => $status);
+}
+
+function send_result($result) {
+	$status = isset($result['http_status']) ? $result['http_status'] : 200;
+	unset($result['http_status']);
+	return_data_to_client($result, $status);
 }
 
 function api_fail($status, $message) {
-	return_data_to_client(api_error($message), $status);
+	send_result(api_error($message, $status));
 	exit;
 }
 
@@ -223,7 +231,7 @@ function backup_device_configuration () {
 
 function restore_device_configuration () {
 	error_log ("restore_device_configuration triggered from RPI API");
-	return restore_static_data_file_from_backup() ? api_ok() : api_error('No valid backup to restore');
+	return restore_static_data_file_from_backup() ? api_ok() : api_error('No valid backup to restore', 404);
 }
 
 
@@ -374,7 +382,7 @@ function setPinConfig($request_data) {
 	}
 	$static_db->close();
 	save_static_db_in_storage();
-	return $ok ? api_ok() : api_error('Pin configuration could not be saved');
+	return $ok ? api_ok() : api_error('Pin configuration could not be saved (is the pin number already in use?)', 409);
 }
 
 

@@ -123,13 +123,25 @@ class ApiTests(unittest.TestCase):
             self.assertEqual(db.execute("SELECT sensor_name FROM sensor_names WHERE id = ?", ("probe'1",)).fetchone()[0], payload)
             self.assertEqual(db.execute("SELECT count(*) FROM sqlite_master WHERE name = 'pins'").fetchone()[0], 1)
 
+    def assertError(self, response, status):
+        actual, _, body = response
+        self.assertEqual(actual, status, body)
+        envelope = json.loads(body)
+        self.assertEqual(set(envelope), {"response_code", "response_data"})  # http_status is not leaked
+        self.assertEqual(envelope["response_code"], "ERROR")
+        self.assertIsInstance(envelope["response_data"], str)
+
     def test_gpio_and_trigger_validation(self):
-        status, _, body = self.api("set_GPIO_pin", {"pin_id": "9 or 1=1", "command": 1})
-        self.assertEqual(json.loads(body)["response_code"], "ERROR")
-        status, _, body = self.api("set_trigger_state", {"triggerID": "1", "command": "1); DROP TABLE triggers; --"})
-        self.assertEqual(json.loads(body)["response_code"], "ERROR")
+        self.assertError(self.api("set_GPIO_pin", {"pin_id": "9 or 1=1", "command": 1}), 400)
+        self.assertError(self.api("set_trigger_state", {"triggerID": "1", "command": "1); DROP TABLE triggers; --"}), 400)
         self.assertOk(self.api("setParameterValue", {"parameterID": 1, "newValue": "5.5"}))
-        self.assertEqual(json.loads(self.api("setParameterValue", {"parameterID": "1 OR 1=1", "newValue": 1})[2])["response_code"], "ERROR")
+        self.assertError(self.api("setParameterValue", {"parameterID": "1 OR 1=1", "newValue": 1}), 400)
+        self.assertError(self.api("setSensorName", {"sensorID": "", "sensorName": "x"}), 400)
+
+    def test_pin_config_errors(self):
+        self.assertError(self.api("setPinConfig", {"pinID": "x", "newPinId": 5, "pinDescription": "x"}), 400)
+        # Pin 11 exists in the template database: adding it again is a conflict.
+        self.assertError(self.api("setPinConfig", {"pinID": 0, "newPinId": 11, "pinDescription": "again"}), 409)
 
     def test_history_queries(self):
         for data in ({"period": "day"}, {"period": "hour'); DROP TABLE sensor_log; --"},

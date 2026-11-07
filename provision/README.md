@@ -49,7 +49,7 @@ Each device has a folder `sites/<name>/` in this repository:
 | `site.env` | settings, copied from `provision/site.env.example` | yes |
 | `php/` | `custom_*.php`: sensors, triggers, GPIO hooks, startup script | yes |
 | `secrets/` | key files, e.g. `monitor-api-key` | no |
-| `ui/` | built app (`npx ng build` in remote-pi-ionic-v7, its `browser/` folder) | no |
+| `ui/` | built app: the contents of `www/` after `npm run build` in remote-pi-ionic-v7 | no |
 
 Anything else in the folder (old databases, notes) stays local and is not sent to the device.
 Sites in `custom_configuration/` still call the old Python scripts and need porting
