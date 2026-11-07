@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -24,12 +24,13 @@ import { MIN_API_KEY_LENGTH } from '../models/device';
   IonToolbar, IonButtons, IonHeader, IonButton, IonInput, IonInputPasswordToggle, IonCard, IonIcon]
 })
 export class DeviceDataPage {
+  private router = inject(Router);
+  localAppDataService = inject(LocalAppDataService);
+
 
   readonly minKeyLength = MIN_API_KEY_LENGTH;
 
-  constructor(private router: Router,
-              public localAppDataService: LocalAppDataService
-              ) {
+  constructor() {
     addIcons({ save });
   }
 

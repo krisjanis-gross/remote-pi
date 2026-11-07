@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild } from '@angular/core';
+import { Component, ElementRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -33,6 +33,10 @@ interface HistoryChart {
     IonContent, IonTitle, IonToolbar, IonButtons, IonButton, IonHeader, IonProgressBar],
 })
 export class HistoricDataPage {
+  private api = inject(BackendDataService);
+  private localAppDataService = inject(LocalAppDataService);
+  private toastController = inject(ToastController);
+
   @ViewChild('chartContainer', { static: true }) chartContainer!: ElementRef<HTMLDivElement>;
 
   sensors: SensorListItem[] = [];
@@ -45,10 +49,6 @@ export class HistoricDataPage {
   private chart: HistoryChart | null = null;
   private lastTimestamp: string | null = null;
   private readonly leave$ = new Subject<void>();
-
-  constructor(private api: BackendDataService,
-              private localAppDataService: LocalAppDataService,
-              private toastController: ToastController) { }
 
   async ionViewWillEnter() {
     this.device = await this.localAppDataService.getLocalAppconfig();

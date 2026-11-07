@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders } from '@angular/common/http';
 
 import { Observable, throwError } from 'rxjs';
@@ -25,8 +25,8 @@ const API_PATH = '/json_API_v2.php';
   providedIn: 'root'
 })
 export class BackendDataService {
+  private http = inject(HttpClient);
 
-  constructor(private http: HttpClient) { }
 
   checkDeviceVersion(device: DeviceConnection): Observable<ApiResponse<VersionInfo>> {
     return this.call(device, 'version_check');

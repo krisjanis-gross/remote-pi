@@ -1,4 +1,4 @@
-import { ChangeDetectorRef, Component } from '@angular/core';
+import { ChangeDetectorRef, Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
@@ -42,6 +42,13 @@ interface SparklineChart {
     IonCardContent, IonListHeader, IonIcon, IonGrid, IonRow, IonCol, IonAlert],
 })
 export class HomePage {
+  private router = inject(Router);
+  private localAppDataService = inject(LocalAppDataService);
+  private api = inject(BackendDataService);
+  private alertController = inject(AlertController);
+  private toastController = inject(ToastController);
+  private changeDetector = inject(ChangeDetectorRef);
+
   device: Device = { deviceID: 0, deviceTitle: '', deviceURL: '', deviceKEY: '' };
   connected = false;
   statusMessage = '';
@@ -55,12 +62,7 @@ export class HomePage {
   private readonly leave$ = new Subject<void>();
   private readonly sparklines = new Map<string, SparklineChart>();
 
-  constructor(private router: Router,
-              private localAppDataService: LocalAppDataService,
-              private api: BackendDataService,
-              private alertController: AlertController,
-              private toastController: ToastController,
-              private changeDetector: ChangeDetectorRef) {
+  constructor() {
     addIcons({ analytics, createOutline });
   }
 

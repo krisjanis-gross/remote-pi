@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
@@ -25,17 +25,15 @@ import { Platform } from '@ionic/angular/standalone';
   IonContent, IonTitle, IonToolbar, IonButtons, IonHeader, IonBadge, IonButton]
 })
 export class ListPage {
+   private router = inject(Router);
+   localAppDataService = inject(LocalAppDataService);
+   backendDataService = inject(BackendDataService);
+   platform = inject(Platform);
+
 
    private readonly leave$ = new Subject<void>();
    deviceStatus: Record<number, string> = {};
    deviceStatusColor: Record<number, string> = {};
-
-  constructor(  private router: Router,
-                public localAppDataService: LocalAppDataService,
-                public backendDataService: BackendDataService,
-                public platform: Platform
-             ) {
-             }
 
   ionViewWillEnter() {
        this.localAppDataService.getDeviceList().then(() => this.findDeviceOnThisHost());

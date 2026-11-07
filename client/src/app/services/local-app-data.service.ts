@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 
 import { Storage } from '@ionic/storage-angular';
 
@@ -25,7 +25,9 @@ export class LocalAppDataService {
   /** Index of the edited device in deviceList, or null for a new device. */
   selectedItemIndex: number | null = null;
 
-  constructor(storage: Storage) {
+  constructor() {
+    const storage = inject(Storage);
+
     this.ready = storage.create();
   }
 
