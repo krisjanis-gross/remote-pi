@@ -166,8 +166,8 @@ function local_datetime_to_js_time($datetime) {
 function get_sparkline_data($sensor_log_db_tempfs, $sensor_id, $last_value) {
 	$sparkline_data = array();
 	$rows = db_rows($sensor_log_db_tempfs,
-		"SELECT datetime, value FROM sensor_log WHERE sensor_id = ? AND datetime > datetime('now','localtime','-10 minutes') ORDER BY datetime ASC",
-		array((string) $sensor_id));
+		"SELECT datetime, value FROM sensor_log WHERE sensor_id = ? AND datetime > ? ORDER BY datetime ASC",
+		array((string) $sensor_id, remote_pi_time_ago('-10 minutes')));
 	foreach ($rows as $row) {
 		$sparkline_data[] = array(local_datetime_to_js_time($row['datetime']), (float) $row['value']);
 	}
@@ -268,12 +268,12 @@ function setParameterValue($request_data) {
 }
 
 
-// SQL fragment for a period name. Only whitelisted values reach the query.
-function period_filter_sql ($period) {
+// array(sql_fragment, params) for a period name; unknown names mean the last hour.
+function period_filter ($period) {
 	$offsets = array('hour' => '-1 hour', '3hrs' => '-3 hours', '6hrs' => '-6 hours', 'day' => '-1 day',
 		'3days' => '-3 days', 'week' => '-7 days', 'month' => '-1 month');
 	$offset = isset($offsets[$period]) ? $offsets[$period] : $offsets['hour'];
-	return " AND datetime > datetime('now','localtime','$offset')";
+	return array(' AND datetime > ?', array(remote_pi_time_ago($offset)));
 }
 
 function valid_datetime_param ($value) {
@@ -288,7 +288,7 @@ function datetime_filter ($request_data) {
 	if ($period === 'date_range' && valid_datetime_param($date_from) && valid_datetime_param($date_to)) {
 		return array(' AND datetime >= datetime(?) AND datetime <= datetime(?)', array($date_from, $date_to));
 	}
-	return array(period_filter_sql(is_string($period) ? $period : 'hour'), array());
+	return period_filter(is_string($period) ? $period : 'hour');
 }
 
 function distinct_sensor_ids (array $databases) {

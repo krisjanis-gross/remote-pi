@@ -54,6 +54,34 @@ function remote_pi_dir($name, $default) {
 
 remote_pi_load_config();
 
+// Readings are stored, and the app shows them, in the device's local time, so PHP must use
+// the device's time zone. Without date.timezone PHP uses UTC while the system (and SQLite's
+// 'localtime') uses the local zone. Order: $remote_pi_timezone (written by provisioning from
+// the site's TIMEZONE), date.timezone in php.ini (older installs), the TZ variable, the
+// system zone (/etc/localtime).
+function remote_pi_device_timezone() {
+	// get_cfg_var: only a date.timezone that php.ini really sets (ini_get reports "UTC" anyway).
+	$candidates = array(remote_pi_setting('remote_pi_timezone'), get_cfg_var('date.timezone'), getenv('TZ'));
+	$link = @readlink('/etc/localtime');
+	if ($link && preg_match('#zoneinfo/(.+)$#', $link, $match)) {
+		$candidates[] = $match[1];
+	}
+	foreach ($candidates as $zone) {
+		if (is_string($zone) && $zone !== '' && in_array($zone, timezone_identifiers_list(), true)) {
+			return $zone;
+		}
+	}
+	return 'UTC';
+}
+date_default_timezone_set(remote_pi_device_timezone());
+
+// The local time $modifier ago (e.g. '-10 minutes'), formatted like the stored readings.
+// Time windows use this instead of SQLite's datetime('now','localtime',...), so they are on
+// the same clock that stamps the readings even if PHP's and the system's zones differ.
+function remote_pi_time_ago($modifier) {
+	return date('Y-m-d H:i:s', strtotime($modifier));
+}
+
 // Defaults match the original layout so existing devices keep working unchanged.
 $GLOBALS['db_storage_folder'] = remote_pi_dir('remote_pi_data_dir', '/media/usbdrive/sqlite_data/');
 $GLOBALS['tempfs_work_folder'] = remote_pi_dir('remote_pi_runtime_dir', '/tmp/');

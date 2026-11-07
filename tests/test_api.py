@@ -26,6 +26,12 @@ def free_port():
 class ApiServerCase(unittest.TestCase):
     """Runs json_API_v2.php and the other endpoints in PHP's built-in server for each test class."""
 
+    # Subclasses can add settings to the generated app.php and variables to the server's environment.
+    extra_config = ""
+    server_env = {}
+    # APCu stand-in: per request (apcu_memory.php) or kept between requests (apcu_file.php).
+    apcu_prepend = "apcu_memory.php"
+
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
@@ -44,13 +50,15 @@ class ApiServerCase(unittest.TestCase):
             f"$remote_pi_clock_sync_flag = '{tmp}/synced';\n"
             "$gpio_backend = 'pinctrl';\n"
             f"$gpio_pinctrl_path = '{pinctrl}';\n"
+            + cls.extra_config
         )
         cls.port = free_port()
         cls.errors = open(tmp / "server.log", "w+")
         cls.server = subprocess.Popen(
-            ["php", "-d", f"auto_prepend_file={ROOT}/tests/apcu_memory.php", "-d", "error_reporting=E_ALL",
+            ["php", "-d", f"auto_prepend_file={ROOT}/tests/{cls.apcu_prepend}", "-d", "error_reporting=E_ALL",
              "-d", "display_errors=stderr", "-S", f"127.0.0.1:{cls.port}", "-t", str(ROOT / "server_www")],
-            env=dict(os.environ, REMOTE_PI_APP_CONFIG=str(config)),
+            env=dict(os.environ, REMOTE_PI_APP_CONFIG=str(config), APCU_TEST_FILE=str(tmp / "apcu.json"),
+                     **cls.server_env),
             stdout=subprocess.DEVNULL, stderr=cls.errors,
         )
         for _ in range(100):

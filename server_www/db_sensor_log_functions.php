@@ -165,8 +165,8 @@ function purge_sensor_data_history ()
 	$all_data_hours = (int) remote_pi_setting('allDataSaveHours', 3);
 
 	$storage_db  = open_sensor_DB_in_STORAGE ();
-	db_exec($storage_db, "DELETE FROM sensor_log WHERE datetime < datetime('now','localtime',?)", array("-$long_term_days days"));
-	db_exec($storage_db, "DELETE FROM sensor_log WHERE datetime < datetime('now','localtime',?) AND dataSaveLevel < 3", array("-$mid_term_days days"));
-	db_exec($storage_db, "DELETE FROM sensor_log WHERE datetime < datetime('now','localtime',?) AND dataSaveLevel < 2", array("-$all_data_hours hours"));
+	db_exec($storage_db, 'DELETE FROM sensor_log WHERE datetime < ?', array(remote_pi_time_ago("-$long_term_days days")));
+	db_exec($storage_db, 'DELETE FROM sensor_log WHERE datetime < ? AND dataSaveLevel < 3', array(remote_pi_time_ago("-$mid_term_days days")));
+	db_exec($storage_db, 'DELETE FROM sensor_log WHERE datetime < ? AND dataSaveLevel < 2', array(remote_pi_time_ago("-$all_data_hours hours")));
 	$storage_db->close();
 }

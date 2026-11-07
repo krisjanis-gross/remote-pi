@@ -33,8 +33,8 @@ if ($period === 'date_range' && preg_match($date_pattern, csv_param('date_from')
 	$filter_sql = ' AND datetime >= datetime(?) AND datetime <= datetime(?)';
 	$filter_params = array(csv_param('date_from'), csv_param('date_to'));
 } else {
-	$filter_sql = " AND datetime > datetime('now','localtime',?)";
-	$filter_params = array(isset($offsets[$period]) ? $offsets[$period] : $offsets['hour']);
+	$filter_sql = ' AND datetime > ?';
+	$filter_params = array(remote_pi_time_ago(isset($offsets[$period]) ? $offsets[$period] : $offsets['hour']));
 }
 
 // flush all RAM data to storage.

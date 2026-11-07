@@ -35,6 +35,7 @@ $settings = array(
 	"remote_pi_data_dir" => getenv("DATA_DIR") . "/",
 	"remote_pi_runtime_dir" => getenv("RUNTIME_DIR") . "/",
 	"remote_pi_require_clock_sync" => true,
+	"remote_pi_timezone" => getenv("TIMEZONE"),
 	"cors_allowed_origins" => $origins,
 	"reboot_command" => "sudo -n /usr/bin/systemctl reboot",
 	"shutdown_command" => "sudo -n /usr/bin/systemctl poweroff",
