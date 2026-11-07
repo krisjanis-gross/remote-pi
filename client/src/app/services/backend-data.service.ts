@@ -26,14 +26,6 @@ const API_PATH = '/json_API_v2.php';
 })
 export class BackendDataService {
 
-  // The body is JSON; the form content type keeps browsers from sending a CORS preflight.
-  private readonly httpOptions = {
-    headers: new HttpHeaders({
-      'Accept': 'application/json',
-      'Content-Type': 'application/x-www-form-urlencoded'
-    })
-  };
-
   constructor(private http: HttpClient) { }
 
   checkDeviceVersion(device: DeviceConnection): Observable<ApiResponse<VersionInfo>> {
@@ -122,9 +114,16 @@ export class BackendDataService {
 
   private call<T = any>(device: DeviceConnection, action: string, data: unknown = ''): Observable<ApiResponse<T>> {
     const url = (device.deviceURL ?? '').replace(/\/+$/, '') + API_PATH;
+    // Devices from API 0.5 read the key from the header; older ones only from the body,
+    // so the body keeps it until API 1.0.
+    const headers = new HttpHeaders({
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      'X-API-Key': device.deviceKEY ?? '',
+    });
     const body = { API_key: device.deviceKEY, request_action: action, request_data: data };
 
-    return this.http.post<ApiResponse<T>>(url, body, this.httpOptions).pipe(
+    return this.http.post<ApiResponse<T>>(url, body, { headers }).pipe(
       map(response => {
         if (response?.response_code !== 'OK') {
           throw new ApiError(errorText(response?.response_data) ?? 'The device reported an error', 200);

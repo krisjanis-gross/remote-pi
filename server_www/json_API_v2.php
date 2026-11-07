@@ -3,11 +3,11 @@ require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db_app_data_functions.php';
 require_once __DIR__ . '/db_sensor_log_functions.php';
 
-$API_VERSION  = '0.4'; // keep in step with apiVersion in api/json_API_v2.schema.json
+$API_VERSION  = '0.5'; // keep in step with apiVersion in api/json_API_v2.schema.json
 
 api_handle_cors();
 
-// The app posts a JSON body (sent as form-urlencoded to avoid CORS preflight).
+// The body is JSON (apps before API 0.5 label it form-urlencoded; the type is not checked).
 $request_parameters = json_decode((string) file_get_contents("php://input"));
 if (!is_object($request_parameters)) {
 	api_fail(400, 'Invalid request');
@@ -15,7 +15,11 @@ if (!is_object($request_parameters)) {
 $request_action = isset($request_parameters->request_action) && is_string($request_parameters->request_action) ? $request_parameters->request_action : null;
 $request_data = isset($request_parameters->request_data) ? $request_parameters->request_data : null;
 
-if (!remote_pi_api_key_valid(isset($request_parameters->API_key) ? $request_parameters->API_key : null)) {
+// The key comes in the X-API-Key header (API 0.5); without the header, from API_key in the
+// body, as older apps send it. A header that is present is the only key checked.
+$request_api_key = isset($_SERVER['HTTP_X_API_KEY']) ? $_SERVER['HTTP_X_API_KEY']
+	: (isset($request_parameters->API_key) ? $request_parameters->API_key : null);
+if (!remote_pi_api_key_valid($request_api_key)) {
 	error_log('Rejected API request: API key not correct');
 	api_fail(403, 'API key not correct');
 }
@@ -103,7 +107,7 @@ function api_handle_cors() {
 	}
 	if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
 		header('Access-Control-Allow-Methods: POST, OPTIONS');
-		header('Access-Control-Allow-Headers: Content-Type, Accept');
+		header('Access-Control-Allow-Headers: Content-Type, Accept, X-API-Key');
 		exit(0);
 	}
 	if (!$allowed && remote_pi_hardened()) {

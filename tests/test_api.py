@@ -91,7 +91,7 @@ class ApiServerCase(unittest.TestCase):
 
 class ApiTests(ApiServerCase):
     def test_valid_key(self):
-        self.assertEqual(self.assertOk(self.api("version_check")), {"version": "0.4"})
+        self.assertEqual(self.assertOk(self.api("version_check")), {"version": "0.5"})
 
     def test_key_bypass_attempts_rejected(self):
         for key in (True, None, [KEY], "new-key", KEY + "x", ""):
@@ -110,11 +110,25 @@ class ApiTests(ApiServerCase):
                 self.assertEqual(status, 200)
                 self.assertEqual(headers.get("Access-Control-Allow-Origin"), origin)
 
+    def test_key_in_header(self):
+        def call(headers, body_key):
+            body = {"request_action": "version_check", "request_data": ""}
+            if body_key is not None:
+                body["API_key"] = body_key
+            return self.request("json_API_v2.php", body, headers={"Content-Type": "application/json", **headers})[0]
+        self.assertEqual(call({"X-API-Key": KEY}, None), 200)
+        self.assertEqual(call({"X-API-Key": KEY}, KEY), 200)
+        self.assertEqual(call({}, KEY), 200)  # apps before API 0.5
+        # A header that is present is the key that counts: a right body key does not rescue it.
+        self.assertEqual(call({"X-API-Key": "wrong-key-0123456789"}, KEY), 403)
+        self.assertEqual(call({"X-API-Key": ""}, KEY), 403)
+
     def test_preflight_needs_no_key(self):
         status, headers, _ = self.request("json_API_v2.php", method="OPTIONS",
                                           headers={"Origin": "capacitor://localhost"})
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Access-Control-Allow-Origin"), "capacitor://localhost")
+        self.assertIn("X-API-Key", headers.get("Access-Control-Allow-Headers"))
 
     def test_bad_requests(self):
         self.assertEqual(self.api("no_such_action")[0], 400)

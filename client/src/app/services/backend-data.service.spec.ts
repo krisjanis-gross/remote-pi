@@ -27,6 +27,8 @@ describe('BackendDataService', () => {
 
     const request = http.expectOne('http://192.168.1.10/json_API_v2.php');
     expect(request.request.method).toBe('POST');
+    expect(request.request.headers.get('X-API-Key')).toBe('key-for-device-one');
+    expect(request.request.headers.get('Content-Type')).toBe('application/json');
     expect(request.request.body).toEqual({
       API_key: 'key-for-device-one',
       request_action: 'set_GPIO_pin',
@@ -39,8 +41,8 @@ describe('BackendDataService', () => {
     service.checkDeviceVersion(pi).subscribe();
     service.checkDeviceVersion(otherPi).subscribe();
 
-    expect(http.expectOne('http://192.168.1.10/json_API_v2.php').request.body.API_key).toBe('key-for-device-one');
-    expect(http.expectOne('http://192.168.1.11/json_API_v2.php').request.body.API_key).toBe('key-for-device-two');
+    expect(http.expectOne('http://192.168.1.10/json_API_v2.php').request.headers.get('X-API-Key')).toBe('key-for-device-one');
+    expect(http.expectOne('http://192.168.1.11/json_API_v2.php').request.headers.get('X-API-Key')).toBe('key-for-device-two');
   });
 
   it('passes OK responses through', () => {

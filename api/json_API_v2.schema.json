@@ -1,19 +1,20 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Remote Pi device API (server_www/json_API_v2.php)",
-  "description": "Contract between the device API and the app in client/. Every request is a POST with a JSON body {API_key, request_action, request_data}; every response is {response_code, response_data}. Errors have response_code ERROR and a message in response_data; since API 0.4 they also have a 4xx/5xx status (403 wrong key or origin, 400 invalid input, 404 nothing to restore, 409 pin number in use). Checked by tests/test_contract.py (backend) and client/src/app/services/api-contract.spec.ts (app). Changing it: bump apiVersion here and $API_VERSION in json_API_v2.php together; 1.0 is reserved for a change older apps cannot handle.",
-  "apiVersion": "0.4",
+  "description": "Contract between the device API and the app in client/. Every request is a POST with a JSON body {request_action, request_data} and the key in the X-API-Key header (since 0.5; the body's API_key is still accepted and still sent by the app for devices before 0.5, until 1.0); every response is {response_code, response_data}. Errors have response_code ERROR and a message in response_data; since API 0.4 they also have a 4xx/5xx status (403 wrong key or origin, 400 invalid input, 404 nothing to restore, 409 pin number in use). Checked by tests/test_contract.py (backend) and client/src/app/services/api-contract.spec.ts (app). Changing it: bump apiVersion here and $API_VERSION in json_API_v2.php together; 1.0 is reserved for a change older apps cannot handle.",
+  "apiVersion": "0.5",
   "versions": {
     "0.2": "devices installed before November 2026",
     "0.3": "hardened install: unique key, origin checks, input validation",
-    "0.4": "failed requests use HTTP 4xx/5xx status codes"
+    "0.4": "failed requests use HTTP 4xx/5xx status codes",
+    "0.5": "API key in the X-API-Key header, Content-Type application/json; API_key in the body still accepted"
   },
   "definitions": {
     "request": {
       "type": "object",
-      "required": ["API_key", "request_action"],
+      "required": ["request_action"],
       "properties": {
-        "API_key": { "type": "string" },
+        "API_key": { "type": "string", "description": "Before API 0.5 the only place for the key; dropped in 1.0" },
         "request_action": { "type": "string" },
         "request_data": {}
       },
