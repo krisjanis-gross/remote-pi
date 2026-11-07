@@ -1,707 +1,332 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { IonHeader, IonToolbar, IonTitle, IonContent , IonButtons,
-IonButton,IonProgressBar,IonList,IonItem,IonToggle,IonLabel,
-IonItemGroup,IonCard,IonCardHeader,IonCardContent,IonListHeader,IonGrid,IonRow,IonCol,IonAlert} from '@ionic/angular/standalone';
-import {FormsModule} from  '@angular/forms';
-
-import { Router, RouterModule } from '@angular/router';
-
-import { IonIcon } from '@ionic/angular/standalone';
-import { addIcons } from 'ionicons';
-import { analytics  } from 'ionicons/icons';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
-import { AlertController, ToastController, Platform } from '@ionic/angular/standalone';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
+import { EMPTY, Observable, Subject, defer, forkJoin, of, timer } from 'rxjs';
+import { catchError, exhaustMap, finalize, switchMap, takeUntil, tap } from 'rxjs/operators';
+import {
+  AlertController, ToastController, IonAlert, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader,
+  IonCol, IonContent, IonGrid, IonHeader, IonIcon, IonItem, IonItemGroup, IonList, IonListHeader,
+  IonProgressBar, IonRow, IonTitle, IonToggle, IonToolbar,
+} from '@ionic/angular/standalone';
+import { addIcons } from 'ionicons';
+import { analytics, createOutline } from 'ionicons/icons';
+import * as Highcharts from 'highcharts';
 
 import { LocalAppDataService } from '../services/local-app-data.service';
-import { BackendDataService} from '../services/backend-data.service';
+import { API_INCOMPATIBLE, BackendDataService } from '../services/backend-data.service';
 import { ApiError, Device } from '../models/device';
-import { Relay, SensorReading, Trigger } from '../models/api';
-import { API_INCOMPATIBLE } from '../services/backend-data.service';
+import { ChartPoint, Relay, SensorReading, Trigger } from '../models/api';
 
-import * as HighCharts from 'highcharts';
+/** How often the page reloads sensors, relays and triggers. */
+const REFRESH_MS = 10_000;
+
+/** The part of a Highcharts 5 chart this page uses. */
+interface SparklineChart {
+  renderTo: HTMLElement;
+  series: { setData(data: ChartPoint[], redraw?: boolean, animation?: boolean, updatePoints?: boolean): void }[];
+  destroy(): void;
+}
 
 @Component({
   selector: 'app-home',
   templateUrl: 'home.page.html',
   styleUrls: ['home.page.scss'],
   standalone: true,
-  imports: [CommonModule, IonHeader, IonToolbar, IonTitle, IonContent,IonButtons,
-  IonButton,IonProgressBar,IonList,IonItem,IonToggle,
-  IonItemGroup,IonCard,IonCardHeader,IonCardContent,IonListHeader,RouterModule,
-  IonIcon,IonGrid,IonRow,IonCol,IonAlert,FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons,
+    IonButton, IonProgressBar, IonList, IonItem, IonToggle, IonItemGroup, IonCard, IonCardHeader,
+    IonCardContent, IonListHeader, IonIcon, IonGrid, IonRow, IonCol, IonAlert],
 })
-export class HomePage   {
- status_message:string;
- targetDeviceName: string;
- AppConfig: Device = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
- public RelayList: Relay[];
- public SensorList: SensorReading[] = [];
- public TriggerList: Trigger[];
+export class HomePage {
+  device: Device = { deviceID: 0, deviceTitle: '', deviceURL: '', deviceKEY: '' };
+  connected = false;
+  statusMessage = '';
+  relays: Relay[] = [];
+  sensors: SensorReading[] = [];
+  triggers: Trigger[] = [];
+  deviceConfig = '';
 
-connectedToDevice = false;
+  /** Requests in flight; the progress bar runs while any are. */
+  private pending = 0;
+  private readonly leave$ = new Subject<void>();
+  private readonly sparklines = new Map<string, SparklineChart>();
 
-sensors_loading = false;
-relays_loading = false;
-triggers_loading = false;
-other_loading = false;
-any_LOADING  = false;
-
-subscription:any;
-refreshIntervalID:any;
-
-DeviceConfig:any;
-
-value:any="";
-
-sparkline_chart:any[] = [];
-
-  constructor( private router: Router,
-                private localAppDataService: LocalAppDataService,
-                public backendDataService:BackendDataService,
-                 public alertController: AlertController,
-                 private toastController: ToastController,
-                  public platform: Platform,
-  ) {
-  addIcons({ analytics });
-  this.targetDeviceName = "";
-  this.RelayList = [];
-  this.TriggerList = [];
-  this.status_message = "";
-  //router.navigate(['/list'])
-
+  constructor(private router: Router,
+              private localAppDataService: LocalAppDataService,
+              private api: BackendDataService,
+              private alertController: AlertController,
+              private toastController: ToastController,
+              private changeDetector: ChangeDetectorRef) {
+    addIcons({ analytics, createOutline });
   }
 
-
-  ionViewWillEnter(){
-   //    console.log ('starting up! ');
-       this.getAppConfig ();
+  get loading(): boolean {
+    return this.pending > 0;
   }
 
-/*
- ionViewDidEnter(){ this.subscription = this.platform.backButton.subscribe(()=>{ navigator['app'].exitApp(); }); }
- ionViewWillLeave(){ this.subscription.unsubscribe(); }
-*/
-
+  async ionViewWillEnter() {
+    const device = await this.localAppDataService.getLocalAppconfig();
+    if (!device) {
+      this.router.navigate(['/list']);
+      return;
+    }
+    this.device = device;
+    this.connected = false;
+    this.clearPage();
+    // Connect, then refresh every REFRESH_MS. exhaustMap skips a tick while the previous
+    // round is still running, so a slow device never gets a pile of requests.
+    timer(0, REFRESH_MS).pipe(
+      exhaustMap(() => this.connected ? this.refresh() : this.connect()),
+      takeUntil(this.leave$),
+    ).subscribe();
+  }
 
   ionViewDidLeave() {
-      //console.log ('**********************ionViewDidLeave called. ' );
-    if (this.refreshIntervalID) {
-      clearInterval(this.refreshIntervalID);
+    this.leave$.next();
+    this.destroySparklines();
+  }
+
+  // --- loading --------------------------------------------------------------
+
+  private connect(): Observable<unknown> {
+    return this.track(this.api.connect(this.device)).pipe(
+      tap(() => {
+        this.connected = true;
+        this.statusMessage = 'Connected OK';
+        this.loadDeviceConfig();
+      }),
+      switchMap(() => this.refresh()),
+      catchError(err => {
+        // A version mismatch is not a connection problem: say which side to update.
+        this.statusMessage = err instanceof ApiError && err.status === API_INCOMPATIBLE
+          ? this.errorMessage(err) : 'Connection error: ' + this.errorMessage(err);
+        this.clearPage();
+        return EMPTY;
+      }),
+    );
+  }
+
+  private refresh(): Observable<unknown> {
+    return forkJoin([this.loadRelays(), this.loadSensors(), this.loadTriggers()]);
+  }
+
+  private loadRelays(): Observable<unknown> {
+    return this.track(this.api.getRelayData(this.device)).pipe(
+      tap(response => this.relays = response.response_data),
+      catchError(err => this.loadFailed(err, () => this.relays = [])),
+    );
+  }
+
+  private loadTriggers(): Observable<unknown> {
+    return this.track(this.api.getTriggerData(this.device)).pipe(
+      tap(response => this.triggers = response.response_data),
+      catchError(err => this.loadFailed(err, () => this.triggers = [])),
+    );
+  }
+
+  private loadSensors(): Observable<unknown> {
+    return this.track(this.api.getSensorDataAndSparkline(this.device)).pipe(
+      tap(response => {
+        this.sensors = response.response_data.data;
+        this.statusMessage = 'Last update: ' + (response.response_data.timestamp ?? 'no reading yet');
+        // Render the sensor rows now, so their chart containers exist.
+        this.changeDetector.detectChanges();
+        this.updateSparklines();
+      }),
+      catchError(err => this.loadFailed(err, () => this.sensors = [])),
+    );
+  }
+
+  private loadDeviceConfig() {
+    this.track(this.api.getDeviceConfig(this.device)).subscribe({
+      next: response => this.deviceConfig = JSON.stringify(response.response_data),
+      error: () => this.deviceConfig = '',
+    });
+  }
+
+  /** Clears what failed to load; when the device is gone, reconnects on the next tick. */
+  private loadFailed(err: unknown, clear: () => void): Observable<null> {
+    clear();
+    if (err instanceof ApiError && err.status === 0) {
+      this.connected = false;
+      this.statusMessage = 'Connection lost: ' + err.message;
     }
+    return of(null);
   }
 
- async getAppConfig () {
-   let LocalDataConfig : any=null;
-   LocalDataConfig =  await this.localAppDataService.getLocalAppconfig();
-   if (LocalDataConfig != null) {
-    //  console.log(JSON.stringify( LocalDataConfig));
-      this.AppConfig = LocalDataConfig;
-      this.connectToDevice() ;
-
-      // enable automatic reload
-      this.refreshIntervalID =  setInterval( this.dataRefresh.bind(this), 10000);
-
-   }
-   else {
-      this.router.navigate(['/list']);
-   }
-
- }
-
-  async connectToDevice () {
-      this.other_loading = true;
-      this.update_loading ();
-      // reset page data
-      this.clearPage();
-      this.backendDataService.connect(this.AppConfig)
-        .subscribe(() => {
-        //  console.log(res);
-          this.status_message = "Connected OK";
-          this.getRelayData();
-          this.getSensorData () ;
-          this.getTriggerData ();
-          this.getDeviceConfig();
-
-          this.connectedToDevice = true;
-
-          this.other_loading = false;
-          this.update_loading ();
-        }, err => {
-          // A version mismatch is not a connection problem: say which side to update.
-          this.status_message = err instanceof ApiError && err.status === API_INCOMPATIBLE
-            ? this.errorMessage(err) : 'Connection error: ' + this.errorMessage(err);
-          this.other_loading = false;
-          this.connectedToDevice = false;
-          this.update_loading ();
-        });
+  private clearPage() {
+    this.relays = [];
+    this.sensors = [];
+    this.triggers = [];
+    this.deviceConfig = '';
+    this.destroySparklines();
   }
 
-  async dataRefresh () {
-      // console.log ('APP data refresh initiated : ' );
-       if (this.connectedToDevice) {
-        this.getRelayData();
-        this.getSensorData () ;
-        this.getTriggerData ()
-       }
-       else {
-         this.connectToDevice() ;
-       }
-   }
-
-
-  async getRelayData () {
-        this.relays_loading = true;
-        this.update_loading ();
-        await this.backendDataService.getRelayData(this.AppConfig)
-          .subscribe(res => {
-            this.RelayList = res.response_data;
-            this.relays_loading = false;
-            this.update_loading ();
-          }, err => {
-            console.log(err);
-            this.relays_loading = false;
-            this.update_loading ();
-            this.RelayList = [];
-          });
+  /** Counts the request as pending from subscription until it completes or fails. */
+  private track<T>(request: Observable<T>): Observable<T> {
+    return defer(() => {
+      this.pending++;
+      return request.pipe(finalize(() => this.pending--));
+    });
   }
 
-  async getTriggerData () {
-        this.triggers_loading = true;
-        await this.backendDataService.getTriggerData(this.AppConfig)
-          .subscribe(res => {
-            this.TriggerList = res.response_data;
-            this.triggers_loading = false;
-            this.update_loading ();
-          }, err => {
-            console.log(err);
-            this.triggers_loading = false;
-            this.update_loading ();
-            this.TriggerList = [];
-          });
-        }
+  // --- sparklines -----------------------------------------------------------
 
-
-  update_loading () {
-    if ( this.sensors_loading ||
-         this.relays_loading ||
-         this.triggers_loading ||
-         this.other_loading  )
-         {
-           this.any_LOADING = true;
-         }
-    else {this.any_LOADING = false; }
-    //console.log('------------------- LOADING  :' + this.any_LOADING);
-
-  }
-
-  clearPage () {
-    this.RelayList = [];
-    this.SensorList = [];
-    this.TriggerList = [];
-    this.DeviceConfig = "";
-    //console.log('------------------- Clear page called  :' );
-
-  }
-
-
-  async getSensorData () {
-        this.sensors_loading = true;
-        this.update_loading ();
-        await this.backendDataService.getSensorDataAndSparkline(this.AppConfig)
-          .subscribe(res => {
-          //  console.log(res);
-          //  console.log(res.response_data);
-            this.SensorList = res.response_data.data;
-            this.status_message = 'Last update: ' + res.response_data.timestamp;
-
-            // update sparkline
-             this.drawSparkline(res);
-
-            this.sensors_loading = false;
-            this.update_loading ();
-
-          }, err => {
-            console.log(err);
-             this.sensors_loading = false;
-             this.update_loading ();
-             this.SensorList = [];
-          });
-
-
-        }
-
-
-
-  async setRelayValue (item:any) {
-   // console.log("setRelayValue started" );
-   // console.log(item);
-
-    let new_state = 1;
-    if (item.state) { new_state = 0;}
-    else { new_state = 1;}
-
-    this.other_loading = true;
-    this.update_loading ();
-
-    this.backendDataService.setRelayState(this.AppConfig, item.id, new_state)
-        .subscribe(res => {
-          this.other_loading = false;
-          this.update_loading ();
-        }, err => {
-          this.other_loading = false;
-          this.update_loading ();
-          this.showError('Relay not switched', err);
-          this.getRelayData(); // put the toggle back to the real pin state
-        });
-
-  }
-
-async toggleTriggerState (item:any) {
-let new_state = 0;
-if (item.state == true) { new_state = 1;}
-
-this.other_loading = true;
-this.update_loading ();
-
-this.backendDataService.toggleTriggerState(this.AppConfig, item.triggerID, new_state)
-  .subscribe(res => {
-    this.other_loading = false;
-    this.update_loading ();
-  }, err => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showError('Trigger not changed', err);
-    this.getTriggerData();
-  });
-}
-
-
-
-  async changeParameterAlert(ParameterId:any,ParameterName:any,ParameterValue:any) {
-        const alert = await this.alertController.create({
-           header:  ParameterName,
-           message: 'ID = ' + ParameterId + ' value = ' + ParameterValue,
-           inputs: [
-                    {
-                      name: 'NewValue',
-                      type: 'number',
-                      placeholder: 'Placeholder 1',
-                      value: ParameterValue,
-                    },
-                  ],
-           buttons: [
-             {
-               text: 'Cancel',
-               role: 'cancel',
-               cssClass: 'secondary',
-               handler: (blah) => {
-                // console.log('Confirm Cancel: blah');
-               }
-             }, {
-               text: 'Okay',
-               handler: (NewValue) => {
-                 this.backendDataService.setParameterValue(this.AppConfig, ParameterId, NewValue.NewValue)
-                         .subscribe(res => {
-                            this.getTriggerData ();
-                         }, err => this.showError('Parameter not saved', err));
-               }
-             }
-           ]
-         });
-
-         await alert.present();
-        }
-
-
-
-editSensor (sensorItem:any) {
-    this.editSensorOverlay(sensorItem.id,sensorItem.sensor_name);
-
-  }
-
-async editSensorOverlay (id:any,sensorName:any) {
-
-  const alert = await this.alertController.create({
-     header:  "Edit Sensor Name",
-     message: 'ID = ' + id + ' name = ' + sensorName,
-     inputs: [
-              {
-                name: 'SensorNameNew',
-                type: 'text',
-                placeholder: 'Sensor Name',
-                value: sensorName,
-              },
-            ],
-     buttons: [
-       {
-         text: 'Cancel',
-         role: 'cancel',
-         cssClass: 'secondary',
-         handler: (blah) => {
-          // console.log('Confirm Cancel: blah');
-         }
-       }, {
-         text: 'Okay',
-         handler: (NewValue) => {
-           //console.log('Edit Pin' + PinID + NewValue.PinIDNew + NewValue.PinName);
-           this.backendDataService.setSensorName(this.AppConfig, id, NewValue.SensorNameNew)
-             .subscribe(res => {
-               this.other_loading = false;
-               this.update_loading ();
-               this.getSensorData();
-             }, err => {
-               this.other_loading = false;
-               this.update_loading ();
-               this.showError('Sensor name not saved', err);
-             });
-         }
-       }
-     ]
-   });
-
-   await alert.present();
-
-}
-
-editPin (relayItem:any) {
-//  console.log('------------------- EDIT PIN   :' + relayItem.id);
-  this.editPinOverlay(relayItem.id,relayItem.description);
-//  RelayList: Array<{id: string; state: string, locked: string, description:string}>;
-}
-
-
-async editPinOverlay(PinID:any,PinName:any) {
-  const alert = await this.alertController.create({
-     header:  "Edit IO PIN",
-     message: 'ID = ' + PinID + '  value = ' + PinName + '<br/>  https://www.raspberrypi.org/documentation/usage/gpio/',
-     inputs: [
-              {
-                name: 'PinIDNew',
-                type: 'text',
-                placeholder: 'Pin number',
-                value: PinID,
-              },
-              {
-                name: 'PinName',
-                type: 'text',
-                placeholder: 'Pin name',
-                value: PinName,
-              },
-            ],
-     buttons: [
-       {
-         text: 'Cancel',
-         role: 'cancel',
-         cssClass: 'secondary',
-         handler: (blah) => {
-          // console.log('Confirm Cancel: blah');
-         }
-       }, {
-         text: 'Okay',
-         handler: (NewValue) => {
-           //console.log('Edit Pin' + PinID + NewValue.PinIDNew + NewValue.PinName);
-           this.backendDataService.setPinConfig(this.AppConfig, PinID, NewValue.PinIDNew, NewValue.PinName)
-             .subscribe(res => {
-               this.other_loading = false;
-               this.update_loading ();
-               this.getRelayData();
-             }, err => {
-               this.other_loading = false;
-               this.update_loading ();
-               this.showError('Pin not saved', err);
-             });
-
-          // this.backendData.setParameterValue(ParameterId,NewValue.NewValue)
-            //       .subscribe(res => {
-            //          this.getTriggerData ();
-          //         });
-         }
-       }
-     ]
-   });
-
-   await alert.present();
-  }
-
-
-
-async getDeviceConfig ()
-  {
-
-      await this.backendDataService.getDeviceConfig(this.AppConfig)
-        .subscribe(res => {
-          // get trigger data.
-          this.DeviceConfig =  JSON.stringify (res.response_data);
-      //    this.status_message = res.response_data.timestamp;
-
-
-        }, err => {
-          console.log(err);
-
-        });
-
-
-
-  }
-
-
-// https://stackoverflow.com/questions/42108217/how-to-use-trackby-with-ngfor/45391247#45391247
-public  triggerByID(trigger: any): number
-      {
-        return trigger?.triggerID;
+  /** Updates each sensor's chart in place; charts of sensors that are gone are destroyed. */
+  private updateSparklines() {
+    const current = new Set<string>();
+    for (const sensor of this.sensors) {
+      const id = String(sensor.id);
+      const container = document.getElementById('sparkline_' + id);
+      if (!container) {
+        continue;
       }
-
-
-
-
- async drawSparkline (sensorData:any)
-    {
-
-        await new Promise(r => setTimeout(r, 500));
-
-      //  let chart_data = [5,6,7,20,3,4,5,6,7,8,9,15];
-   //     console.log('drawSparkline');
-    //    console.log(sensorData);
-
-        sensorData.response_data.data.forEach(function(this:any, value:any)
-                                                                                    {
-                                                                                      let sensorID = value.id;
-                                                                                      let htmlDivID = 'sparkline_' + value.id;
-                                                                                      let chart_data = value.sparkline_data;
-
-                                                                                       this.udpateHighchartsSparkline (htmlDivID,chart_data);
-                                                                                    }.bind(this)
-                                                );
+      current.add(id);
+      const data = sensor.sparkline_data ?? [];
+      const chart = this.sparklines.get(id);
+      if (chart && chart.renderTo === container) {
+        chart.series[0].setData(data, true, false, false);
+      } else {
+        chart?.destroy();
+        this.sparklines.set(id, Highcharts.chart(container as any, sparklineOptions(data) as any) as unknown as SparklineChart);
+      }
     }
+    for (const [id, chart] of this.sparklines) {
+      if (!current.has(id)) {
+        chart.destroy();
+        this.sparklines.delete(id);
+      }
+    }
+  }
 
- udpateHighchartsSparkline (htmlDivID:any,chart_data:any)
-          {
-              //console.log ('html_div_id: ' + htmlDivID);
-                        // @ts-ignore
-                        let newChart = HighCharts.chart(
-                                {
-                                  chart: {
-                                          renderTo: htmlDivID,
-                                          backgroundColor: 'transparent',
-                                          borderWidth: 0,
-                                          type: 'area',
-                                          margin: [0, 0, 0, 0],
-                                        //  width: 120,
-                                        //  height: 20,
-                                          style: {
-                                              //  overflow: 'visible'
-                                           },
-                                           // small optimalization, saves 1-2 ms each sparkline
-                                         //skipClone: true
-                                  },
-                                  title: {
-                                    text: ''
-                                  },
-                                  credits: {
-                                             enabled: false
-                                  },
-                                  xAxis: {
-                                              labels: {
-                                                  enabled: false
-                                              },
-                                              title: {
-                                                  text: ""
-                                              },
-                                              tickLength: 0,
-                                              type: 'datetime',
-                                          },
-                                  yAxis: {
-                                              endOnTick: false,
+  private destroySparklines() {
+    this.sparklines.forEach(chart => chart.destroy());
+    this.sparklines.clear();
+  }
 
-                                              startOnTick: false,
-                                              labels: {
-                                                  enabled: false
-                                              },
-                                              title: {
-                                                  text: ""
-                                              },
-                                            //  tickPositions: [0]
-                                            gridLineWidth: 0,
+  sensorById(_: number, sensor: SensorReading) {
+    return sensor.id;
+  }
 
-                                          },
-                                  legend: {
-                                              enabled: false
-                                          },
-                                  tooltip: {
-                                              hideDelay: 0,
-                                          //    outside: true,
-                                              shared: true,
-                                              xDateFormat: '%H:%M:%S',
-                                          },
-                                  plotOptions: {
-                                                      series:
-                                                      {
-                                                          animation: false,
-                                                          lineWidth: 2,
-                                                          shadow: false,
-                                                          states: {
-                                                              hover: {
-                                                                  lineWidth: 1
-                                                              }
-                                                          },
-                                                          marker: {
-                                                              radius: 1,
-                                                              states: {
-                                                                  hover: {
-                                                                      radius: 2
-                                                                  }
-                                                              }
-                                                          },
-                                                          //fillOpacity: 0.25
-                                                      },
-                                                      column: {
-                                                          negativeColor: '#910000',
-                                                          borderColor: 'silver'
-                                                      }
-                                              },
+  relayById(_: number, relay: Relay) {
+    return relay.id;
+  }
 
-                                  series: [{
-                                                  data: chart_data,
-                                                  type:'area',
-                                                 //  fillColor: 'rgba(124, 181, 236, 0.3)',
-                                       //           pointStart: 1
-                                   }],
-                              });
+  triggerById(_: number, trigger: Trigger) {
+    return trigger.triggerID;
+  }
 
-                        //this.sparkline_chart.push(newChart);
+  // --- actions --------------------------------------------------------------
 
-          }
-
-
-async restartDevice () {
-
-this.other_loading = true;
-this.update_loading ();
-
-await this.backendDataService.restartDevice(this.AppConfig)
-  .subscribe(res => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showMessage('Device is restarting');
-  }, err => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showError('Restart failed', err);
-  });
-
-}
-
-async  shutdownDevice () {
-this.other_loading = true;
-this.update_loading ();
-await this.backendDataService.shutdownDevice(this.AppConfig)
-  .subscribe(res => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showMessage('Device is shutting down');
-  }, err => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showError('Shutdown failed', err);
-  });
-}
-
-
- public restartAlertButtons = [
-    {
-      text: 'Cancel',
-      role: 'cancel',
-      handler: () => {
+  setRelayValue(relay: Relay) {
+    // The toggle has not flipped the model yet: the new state is the opposite of the old one.
+    const newState = relay.state ? 0 : 1;
+    this.track(this.api.setRelayState(this.device, relay.id, newState)).subscribe({
+      error: err => {
+        this.showError('Relay not switched', err);
+        this.loadRelays().subscribe(); // put the toggle back to the real pin state
       },
-    },
-    {
-      text: 'OK',
-      role: 'confirm',
-      handler: () => {
-        this.restartDevice();
-      },
-    },
-  ];
+    });
+  }
 
- public shutdownAlertButtons = [
-    {
-      text: 'Cancel',
-      role: 'cancel',
-      handler: () => {
+  toggleTriggerState(trigger: Trigger) {
+    // [(ngModel)] has already flipped trigger.state to the wanted value.
+    const newState = trigger.state ? 1 : 0;
+    this.track(this.api.toggleTriggerState(this.device, trigger.triggerID, newState)).subscribe({
+      error: err => {
+        this.showError('Trigger not changed', err);
+        this.loadTriggers().subscribe();
       },
-    },
-    {
-      text: 'OK',
-      role: 'confirm',
-      handler: () => {
-        this.shutdownDevice();
-      },
-    },
-  ];
+    });
+  }
 
- public restoreConfigButtons = [
-    {
-      text: 'Cancel',
-      role: 'cancel',
-      handler: () => {
-      },
-    },
-    {
-      text: 'OK',
-      role: 'confirm',
-      handler: () => {
-        this.restoreConfiguration();
-      },
-    },
-  ];
-
-   public saveConfigButtons = [
-      {
-        text: 'Cancel',
-        role: 'cancel',
-        handler: () => {
+  async changeParameterAlert(parameterId: number, parameterName: string | null, value: number | string | null) {
+    const alert = await this.alertController.create({
+      header: parameterName ?? 'Parameter',
+      message: `Parameter ${parameterId}, current value ${value}`,
+      inputs: [{ name: 'newValue', type: 'number', placeholder: 'New value', value }],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Save',
+          handler: (input: { newValue: string }) => {
+            this.track(this.api.setParameterValue(this.device, parameterId, input.newValue)).subscribe({
+              next: () => this.loadTriggers().subscribe(),
+              error: err => this.showError('Parameter not saved', err),
+            });
           },
-      },
-      {
-        text: 'OK',
-        role: 'confirm',
-        handler: () => {
-            this.backupConfiguraiton();
         },
-      },
-    ];
+      ],
+    });
+    await alert.present();
+  }
 
+  async editSensor(sensor: SensorReading) {
+    const alert = await this.alertController.create({
+      header: 'Edit sensor name',
+      message: `Sensor ${sensor.id}`,
+      inputs: [{ name: 'sensorName', type: 'text', placeholder: 'Sensor name', value: sensor.sensor_name }],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Save',
+          handler: (input: { sensorName: string }) => {
+            this.track(this.api.setSensorName(this.device, String(sensor.id), input.sensorName)).subscribe({
+              next: () => this.loadSensors().subscribe(),
+              error: err => this.showError('Sensor name not saved', err),
+            });
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
 
-async  restoreConfiguration () {
-await this.backendDataService.restoreDeviceConfiguration(this.AppConfig)
-  .subscribe(res => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showMessage('Backup configuration restored');
-  }, err => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showError('Restore failed', err);
-  });
-}
+  /** Edits a relay's pin number and name; pinId 0 adds a new pin. */
+  async editPin(pinId: number, pinName: string | null) {
+    const alert = await this.alertController.create({
+      header: pinId ? 'Edit IO pin' : 'Add IO pin',
+      message: (pinId ? `Pin ${pinId}. ` : '') + 'Pin numbers: raspberrypi.com/documentation/computers/raspberry-pi.html',
+      inputs: [
+        { name: 'pinNumber', type: 'number', placeholder: 'Pin number', value: pinId || '' },
+        { name: 'pinName', type: 'text', placeholder: 'Pin name', value: pinName ?? '' },
+      ],
+      buttons: [
+        { text: 'Cancel', role: 'cancel' },
+        {
+          text: 'Save',
+          handler: (input: { pinNumber: string; pinName: string }) => {
+            this.track(this.api.setPinConfig(this.device, pinId, input.pinNumber, input.pinName)).subscribe({
+              next: () => this.loadRelays().subscribe(),
+              error: err => this.showError('Pin not saved', err),
+            });
+          },
+        },
+      ],
+    });
+    await alert.present();
+  }
 
+  private deviceAction(request: Observable<unknown>, done: string, failed: string) {
+    this.track(request).subscribe({
+      next: () => this.showMessage(done),
+      error: err => this.showError(failed, err),
+    });
+  }
 
-async  backupConfiguraiton () {
-await this.backendDataService.backupDeviceConfiguration(this.AppConfig)
-  .subscribe(res => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showMessage('Configuration saved as backup');
-  }, err => {
-    this.other_loading = false;
-    this.update_loading ();
-    this.showError('Backup failed', err);
-  });
-}
+  readonly restartAlertButtons = confirmButtons(() =>
+    this.deviceAction(this.api.restartDevice(this.device), 'Device is restarting', 'Restart failed'));
 
+  readonly shutdownAlertButtons = confirmButtons(() =>
+    this.deviceAction(this.api.shutdownDevice(this.device), 'Device is shutting down', 'Shutdown failed'));
 
+  readonly restoreConfigButtons = confirmButtons(() =>
+    this.deviceAction(this.api.restoreDeviceConfiguration(this.device), 'Backup configuration restored', 'Restore failed'));
 
+  readonly saveConfigButtons = confirmButtons(() =>
+    this.deviceAction(this.api.backupDeviceConfiguration(this.device), 'Configuration saved as backup', 'Backup failed'));
+
+  // --- messages -------------------------------------------------------------
 
   private errorMessage(err: unknown): string {
     return err instanceof ApiError ? err.message : 'Unexpected error';
@@ -715,8 +340,31 @@ await this.backendDataService.backupDeviceConfiguration(this.AppConfig)
     const toast = await this.toastController.create({ message, color, duration: 4000, position: 'bottom' });
     await toast.present();
   }
-
 }
 
+function confirmButtons(onConfirm: () => void) {
+  return [
+    { text: 'Cancel', role: 'cancel' },
+    { text: 'OK', role: 'confirm', handler: onConfirm },
+  ];
+}
 
-
+function sparklineOptions(data: ChartPoint[]) {
+  return {
+    chart: { backgroundColor: 'transparent', borderWidth: 0, type: 'area', margin: [0, 0, 0, 0] },
+    title: { text: '' },
+    credits: { enabled: false },
+    xAxis: { labels: { enabled: false }, title: { text: '' }, tickLength: 0, type: 'datetime' },
+    yAxis: { endOnTick: false, startOnTick: false, labels: { enabled: false }, title: { text: '' }, gridLineWidth: 0 },
+    legend: { enabled: false },
+    tooltip: { hideDelay: 0, shared: true, xDateFormat: '%H:%M:%S' },
+    plotOptions: {
+      series: {
+        animation: false, lineWidth: 2, shadow: false,
+        states: { hover: { lineWidth: 1 } },
+        marker: { radius: 1, states: { hover: { radius: 2 } } },
+      },
+    },
+    series: [{ data, type: 'area' }],
+  };
+}

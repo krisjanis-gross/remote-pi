@@ -1,206 +1,139 @@
-import { Component } from '@angular/core';
+import { Component, ElementRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { IonToggle , IonLabel,IonItem,IonSelect,IonSelectOption,
-IonList,IonContent,IonTitle,IonToolbar,IonButtons,IonHeader} from '@ionic/angular/standalone';
+import { RouterModule } from '@angular/router';
+import { EMPTY, Subject, timer } from 'rxjs';
+import { catchError, exhaustMap, filter, takeUntil } from 'rxjs/operators';
+import {
+  IonButton, IonButtons, IonContent, IonHeader, IonItem, IonList, IonProgressBar, IonSelect, IonSelectOption,
+  IonTitle, IonToggle, IonToolbar, ToastController,
+} from '@ionic/angular/standalone';
+import * as Highcharts from 'highcharts';
 
-import * as HighCharts from 'highcharts';
-
-import { Router, RouterModule } from '@angular/router';
-import { BackendDataService} from '../services/backend-data.service';
+import { BackendDataService } from '../services/backend-data.service';
 import { LocalAppDataService } from '../services/local-app-data.service';
-import { Device } from '../models/device';
-import { Period, SensorListItem } from '../models/api';
+import { ApiError, Device } from '../models/device';
+import { HistoricSeries, Period, SensorData, SensorListItem } from '../models/api';
+
+/** How often new readings are added to the chart while realtime update is on. */
+const LIVE_UPDATE_MS = 1_000;
+
+/** The part of a Highcharts 5 chart this page uses. */
+interface HistoryChart {
+  get(id: string | number): { addPoint(point: [number, number], redraw?: boolean, shift?: boolean): void } | undefined;
+  destroy(): void;
+}
 
 @Component({
   selector: 'app-historic-data',
   templateUrl: './historic-data.page.html',
   styleUrls: ['./historic-data.page.scss'],
   standalone: true,
-  imports: [/*IonicModule, */CommonModule, FormsModule,RouterModule,
-  IonToggle,IonItem,IonSelect,IonSelectOption,IonList,IonContent,IonTitle,
-  IonToolbar,IonButtons,IonHeader
-  ]
+  imports: [CommonModule, FormsModule, RouterModule, IonToggle, IonItem, IonSelect, IonSelectOption, IonList,
+    IonContent, IonTitle, IonToolbar, IonButtons, IonButton, IonHeader, IonProgressBar],
 })
 export class HistoricDataPage {
+  @ViewChild('chartContainer', { static: true }) chartContainer!: ElementRef<HTMLDivElement>;
 
- AppConfig: Device = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
+  sensors: SensorListItem[] = [];
+  period: Period = '3hrs';
+  selectedSensors: (string | number)[] | '' = '';
+  liveUpdate = true;
+  loading = false;
 
-  chart_data:any;
-  SensorList: SensorListItem[] = [];
-  chart_time_interval: Period = '3hrs';
-  selected_sensors: (string | number)[] | '' = '';
+  private device: Device | null = null;
+  private chart: HistoryChart | null = null;
+  private lastTimestamp: string | null = null;
+  private readonly leave$ = new Subject<void>();
 
-  any_LOADING = false;
+  constructor(private api: BackendDataService,
+              private localAppDataService: LocalAppDataService,
+              private toastController: ToastController) { }
 
-  HistoricDataChart:any;
-  ChartIsLoaded = false;
-  DataUpdateEnabled = true;
-
-  refreshIntervalID:any;
-  last_timestamp: string | null = null;
-
-
-  constructor(     public backendDataService:BackendDataService,
-                   private localAppDataService: LocalAppDataService,
-               ) { }
-
-    ionViewWillEnter(){
-          this.localAppDataService.getLocalAppconfig().then((val) =>
-                {
-                  if (val != null) {
-                      this.AppConfig = val;
-                      this.getChartData () ;
-                  //        this.loadSavedFilters();
-                      this.refreshIntervalID =  setInterval( this.getChartIncrementalData.bind(this), 1000);
-
-
-                      }
-                 });
+  async ionViewWillEnter() {
+    this.device = await this.localAppDataService.getLocalAppconfig();
+    if (!this.device) {
+      return;
     }
+    this.loadChart();
+    this.loadSensorList();
+    // Adds new readings to the chart; exhaustMap skips a tick while a request is running,
+    // and a failed request only skips that tick.
+    timer(LIVE_UPDATE_MS, LIVE_UPDATE_MS).pipe(
+      filter(() => this.liveUpdate && this.chart !== null),
+      exhaustMap(() => this.api.getSensorData(this.device!).pipe(catchError(() => EMPTY))),
+      takeUntil(this.leave$),
+    ).subscribe({ next: response => this.addReadings(response.response_data) });
+  }
 
   ionViewDidLeave() {
-      //console.log ('**********************ionViewDidLeave called. ' );
-    if (this.refreshIntervalID) {
-      clearInterval(this.refreshIntervalID);
+    this.leave$.next();
+    this.destroyChart();
+  }
+
+  /** Reloads the chart for the chosen period and sensors. */
+  loadChart() {
+    if (!this.device) {
+      return;
+    }
+    this.loading = true;
+    this.api.getChartData(this.device, this.period, this.selectedSensors).subscribe({
+      next: response => {
+        this.loading = false;
+        this.showChart(response.response_data);
+      },
+      error: err => {
+        this.loading = false;
+        this.showError('History not loaded', err);
+      },
+    });
+  }
+
+  periodChanged() {
+    this.loadChart();
+    this.loadSensorList();
+  }
+
+  private loadSensorList() {
+    this.api.getSensorList(this.device!, this.period).subscribe({
+      next: response => this.sensors = response.response_data,
+      error: () => this.sensors = [],
+    });
+  }
+
+  private showChart(series: HistoricSeries[]) {
+    this.destroyChart();
+    this.lastTimestamp = null;
+    this.chart = Highcharts.chart(this.chartContainer.nativeElement as any, {
+      chart: { type: 'spline' },
+      title: { text: 'Historic data' },
+      xAxis: { type: 'datetime', dateTimeLabelFormats: { day: '%e %b %y<br/>%H:%M:%S' } },
+      yAxis: { title: { text: 'measurement' } },
+      series,
+    } as any) as unknown as HistoryChart;
+  }
+
+  private addReadings(reading: SensorData) {
+    // timestamp is null until the device has its first reading; skip readings already shown.
+    if (!this.chart || !reading.timestamp || reading.timestamp === this.lastTimestamp) {
+      return;
+    }
+    this.lastTimestamp = reading.timestamp;
+    // The device sends local time; written as UTC it lines up with the history's points.
+    const time = Date.parse(reading.timestamp + ' UTC');
+    for (const sensor of reading.data) {
+      this.chart.get(sensor.id)?.addPoint([time, Number(sensor.value)], true, false);
     }
   }
 
-  async getChartData () {
-        this.any_LOADING = true;
+  private destroyChart() {
+    this.chart?.destroy();
+    this.chart = null;
+  }
 
-        await this.backendDataService.getChartData(this.AppConfig, this.chart_time_interval, this.selected_sensors)
-          .subscribe(res => {
-           // console.log(res);
-            this.chart_data = res.response_data;
-            this.show_chart ();
-            this.getSensorList () ;
-
-            this.any_LOADING = false;
-
-          }, err => {
-            console.log(err);
-            this.any_LOADING = false;
-          });
-    }
-
-    show_chart() {
-    this.HistoricDataChart = HighCharts.chart('container', {
-    chart: {
-      type: 'spline',
-      events: {
-            load: this.markChartLoaded.bind(this),
-       }
-    },
-    title: {
-      text: 'Historic Data'
-    },
-    xAxis: {
-    		    				type: 'datetime',
-    		    					dateTimeLabelFormats: {
-    		    					day: '%e %b \ %y <br/> %H:%M:%S'
-    		    					},
-    },
-    yAxis: {
-      title: {
-        text: 'measurement'
-      }
-    },
-    series: this.chart_data
-  });
- }
-
-markChartLoaded () {
-  this.ChartIsLoaded = true;
-}
-
-
-async getSensorList () {
-      await this.backendDataService.getSensorList(this.AppConfig, this.chart_time_interval)
-        .subscribe(res => {
-        //  console.log(res);
-          this.SensorList = res.response_data;
-        }, err => {
-          console.log(err);
-        });
-
-
-      }
-
-
-change_period () {
-    this.getChartData () ;
-}
-async select_sensors () {
-    this.getChartData () ;
-}
-
-
-async getChartIncrementalData () {
-  if (this.ChartIsLoaded && this.DataUpdateEnabled)  {
-          // check for update on backend.
-
-      //    var x = (new Date()).getTime(), // current time
-      //    y = Math.random() * 100;
-      //    console.log("adding point to chart " + x + y  );
-/*
-          var series = this.HistoricDataChart.get("rnd_data");
-          if (series) {
-                    series.addPoint([x, y], true, false);
-                    }
-*/
-
-          await this.backendDataService.getSensorData(this.AppConfig)
-              .subscribe(res => {
-                                    // console.log(JSON.stringify(res))
-                                    // check if this is new relays_loading
-                                  //  console.log("timestamp =  " + res.response_data.timestamp)
-                                    // timestamp is null until the device has its first reading
-                                    if (res.response_data.timestamp && this.last_timestamp != res.response_data.timestamp)
-                                        { // new sensor data
-                                        //  console.log("new sensor data =  " +  JSON.stringify(res.response_data.data));
-                                          this.last_timestamp = res.response_data.timestamp
-
-                                          res.response_data.data.forEach(function(this:any, response_data_element:any)
-                                                                                  {
-                                          //Object.keys(res.response_data.data).forEach(function(key:any,index:any) {}
-
-                                                                                            // key: the name of the object key
-                                                                                            // index: the ordinal position of the key within the object
-                                                                                            //console.log("key " +  key);
-                                                                                            //console.log("index " +  index);
-                                                                                            let sensorID = response_data_element.id;
-                                                                                            let sensorName = response_data_element.sensor_name;
-                                                                                            let sensorValue = response_data_element.value;
-
-                                                                                            let readingTimestamp = Date.parse(res.response_data.timestamp + ' UTC');
-
-                                                                                           // console.log("adding point to graph:  " +  sensorName);
-                                                                                           // console.log("readingTimestamp " +  readingTimestamp);
-                                                                                           // console.log("sensorID " +  sensorID);
-                                                                                           // console.log("sensorName " +  sensorName);
-                                                                                           // console.log("sensorValue " +  sensorValue);
-
-                                                                                            var series = this.HistoricDataChart.get(sensorID);
-                                                                                            var value = parseFloat(sensorValue);
-                                                                                            if (series) {
-                                                                                                      series.addPoint([readingTimestamp, value], true, false);
-                                                                                                      }
-
-
-                                                                                   }.bind(this));
-                                        }
-
-                                }, err => {
-                                          console.log(err);
-                                          });
-
-                            }
-}
-
-
-
-
-
-
+  private async showError(what: string, err: unknown) {
+    const message = what + ': ' + (err instanceof ApiError ? err.message : 'Unexpected error');
+    const toast = await this.toastController.create({ message, color: 'danger', duration: 4000, position: 'bottom' });
+    await toast.present();
+  }
 }

@@ -7,6 +7,8 @@ IonList, IonContent, IonTitle, IonToolbar, IonButtons, IonHeader, IonBadge, IonB
 
 
 import { Router, RouterModule } from '@angular/router';
+import { Observable, Subject, forkJoin, of, timer } from 'rxjs';
+import { catchError, exhaustMap, map, takeUntil } from 'rxjs/operators';
 
 import { LocalAppDataService, newDeviceTemplate } from '../services/local-app-data.service';
 import { API_INCOMPATIBLE, BackendDataService } from '../services/backend-data.service';
@@ -24,7 +26,7 @@ import { Platform } from '@ionic/angular/standalone';
 })
 export class ListPage {
 
-   refreshIntervalID: any;
+   private readonly leave$ = new Subject<void>();
    deviceStatus: Record<number, string> = {};
    deviceStatusColor: Record<number, string> = {};
 
@@ -37,13 +39,15 @@ export class ListPage {
 
   ionViewWillEnter() {
        this.localAppDataService.getDeviceList().then(() => this.findDeviceOnThisHost());
-       this.refreshIntervalID = setInterval(() => this.deviceStatusRefresh(), 3000);
+       // Ping every device every 3 s; exhaustMap waits for the slowest ping before the next round.
+       timer(0, 3000).pipe(
+         exhaustMap(() => forkJoin(this.localAppDataService.deviceList.map(device => this.ping(device)))),
+         takeUntil(this.leave$),
+       ).subscribe();
   }
 
   ionViewDidLeave() {
-      if (this.refreshIntervalID) {
-        clearInterval(this.refreshIntervalID);
-      }
+      this.leave$.next();
     }
 
 
@@ -67,26 +71,21 @@ export class ListPage {
       }
 
 
-   deviceStatusRefresh() {
-       for (const device of this.localAppDataService.deviceList) {
-         this.ping_device(device);
-       }
-   }
-
-   ping_device(device: Device) {
-     this.backendDataService.connect(device)
-       .subscribe({
-         next: () => {
-           this.deviceStatus[device.deviceID] = 'Connection OK';
-           this.deviceStatusColor[device.deviceID] = 'success';
-         },
-         error: err => {
-           // Wrong key and version mismatch get the device's or app's own message.
-           const explained = err.status === 403 || err.status === API_INCOMPATIBLE;
-           this.deviceStatus[device.deviceID] = explained ? err.message : 'Connection error';
-           this.deviceStatusColor[device.deviceID] = explained ? 'danger' : 'warning';
-         },
-       });
+   /** Checks one device and sets its status badge; never fails. */
+   private ping(device: Device): Observable<unknown> {
+     return this.backendDataService.connect(device).pipe(
+       map(() => {
+         this.deviceStatus[device.deviceID] = 'Connection OK';
+         this.deviceStatusColor[device.deviceID] = 'success';
+       }),
+       catchError(err => {
+         // Wrong key and version mismatch get the device's or app's own message.
+         const explained = err.status === 403 || err.status === API_INCOMPATIBLE;
+         this.deviceStatus[device.deviceID] = explained ? err.message : 'Connection error';
+         this.deviceStatusColor[device.deviceID] = explained ? 'danger' : 'warning';
+         return of(null);
+       }),
+     );
    }
 
   // When the app is served by a Pi, offer that Pi in the list. Its API key still has to
