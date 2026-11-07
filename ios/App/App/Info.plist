@@ -5,7 +5,8 @@
 
 <key>NSAppTransportSecurity</key>
 <dict>
-    <key>NSAllowsArbitraryLoads</key>
+    <!-- Plain HTTP only to devices on the local network (IP addresses, name.local). -->
+    <key>NSAllowsLocalNetworking</key>
     <true/>
 </dict>
 

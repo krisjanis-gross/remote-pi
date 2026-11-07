@@ -8,9 +8,10 @@
 # You can see what browsers were selected by your queries by running:
 #   npx browserslist
 
-Chrome >=79
-ChromeAndroid >=79
-Firefox >=70
-Edge >=79
-Safari >=14
-iOS >=14
+# Ionic 8's minimum supported browsers (https://ionicframework.com/docs/reference/browser-support)
+Chrome >=89
+ChromeAndroid >=89
+Firefox >=75
+Edge >=89
+Safari >=15
+iOS >=15

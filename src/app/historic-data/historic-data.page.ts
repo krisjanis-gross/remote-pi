@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonToggle , IonLabel,IonItem,IonSelect,IonSelectOption,
@@ -9,6 +9,7 @@ import * as HighCharts from 'highcharts';
 import { Router, RouterModule } from '@angular/router';
 import { BackendDataService} from '../services/backend-data.service';
 import { LocalAppDataService } from '../services/local-app-data.service';
+import { Device } from '../models/device';
 
 @Component({
   selector: 'app-historic-data',
@@ -20,9 +21,9 @@ import { LocalAppDataService } from '../services/local-app-data.service';
   IonToolbar,IonButtons,IonHeader
   ]
 })
-export class HistoricDataPage implements OnInit {
+export class HistoricDataPage {
 
- AppConfig = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
+ AppConfig: Device = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
 
   chart_data:any;
   SensorList:any;
@@ -43,18 +44,11 @@ export class HistoricDataPage implements OnInit {
                    private localAppDataService: LocalAppDataService,
                ) { }
 
-  ngOnInit() {
-  }
-
-
     ionViewWillEnter(){
           this.localAppDataService.getLocalAppconfig().then((val) =>
                 {
                   if (val != null) {
                       this.AppConfig = val;
-                  //    console.log ('app config : ' + JSON.stringify(this.AppConfig) );
-                      this.backendDataService.ServerURL = this.AppConfig.deviceURL;
-                      this.backendDataService.ServerKEY = this.AppConfig.deviceKEY;
                       this.getChartData () ;
                   //        this.loadSavedFilters();
                       this.refreshIntervalID =  setInterval( this.getChartIncrementalData.bind(this), 1000);
@@ -74,10 +68,9 @@ export class HistoricDataPage implements OnInit {
   async getChartData () {
         this.any_LOADING = true;
 
-        await this.backendDataService.getChartData(this.chart_time_interval, this.selected_sensors)
+        await this.backendDataService.getChartData(this.AppConfig, this.chart_time_interval, this.selected_sensors)
           .subscribe(res => {
            // console.log(res);
-               console.log(res.response_data);
             this.chart_data = res.response_data;
             this.show_chart ();
             this.getSensorList () ;
@@ -122,7 +115,7 @@ markChartLoaded () {
 
 
 async getSensorList () {
-      await this.backendDataService.getSensorList(this.chart_time_interval)
+      await this.backendDataService.getSensorList(this.AppConfig, this.chart_time_interval)
         .subscribe(res => {
         //  console.log(res);
           this.SensorList = res.response_data;
@@ -156,7 +149,7 @@ async getChartIncrementalData () {
                     }
 */
 
-          await this.backendDataService.getSensorData()
+          await this.backendDataService.getSensorData(this.AppConfig)
               .subscribe(res => {
                                     // console.log(JSON.stringify(res))
                                     // check if this is new relays_loading

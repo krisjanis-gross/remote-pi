@@ -1,56 +1,59 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 
 import { Router, RouterModule } from '@angular/router';
 
-import { IonLabel,IonItem,IonList,IonContent,IonTitle,
-IonToolbar,IonButtons,IonHeader,IonButton,IonInput,IonCard} from '@ionic/angular/standalone';
+import { IonItem, IonList, IonContent, IonTitle, IonNote,
+IonToolbar, IonButtons, IonHeader, IonButton, IonInput, IonInputPasswordToggle, IonCard } from '@ionic/angular/standalone';
 
 import { IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
-import { save  } from 'ionicons/icons';
-
+import { save } from 'ionicons/icons';
 
 import { LocalAppDataService } from '../services/local-app-data.service';
+import { MIN_API_KEY_LENGTH } from '../models/device';
 
 @Component({
   selector: 'app-device-data',
   templateUrl: './device-data.page.html',
   styleUrls: ['./device-data.page.scss'],
   standalone: true,
-  imports: [ CommonModule, FormsModule,RouterModule,
-  IonItem,IonList,IonContent,IonTitle,
-  IonToolbar,IonButtons,IonHeader,IonButton,IonInput,IonCard,IonIcon]
+  imports: [ CommonModule, FormsModule, RouterModule,
+  IonItem, IonList, IonContent, IonTitle, IonNote,
+  IonToolbar, IonButtons, IonHeader, IonButton, IonInput, IonInputPasswordToggle, IonCard, IonIcon]
 })
-export class DeviceDataPage implements OnInit {
+export class DeviceDataPage {
+
+  readonly minKeyLength = MIN_API_KEY_LENGTH;
 
   constructor(private router: Router,
               public localAppDataService: LocalAppDataService
               ) {
-    addIcons({ save } );
+    addIcons({ save });
+  }
+
+  get urlValid(): boolean {
+    return /^https?:\/\/[^\s/]+/.test(this.localAppDataService.selectedItemforEdit.deviceURL.trim());
+  }
+
+  // Legacy (not yet provisioned) devices still accept short keys, so this only warns.
+  get keyTooShort(): boolean {
+    return this.localAppDataService.selectedItemforEdit.deviceKEY.length < MIN_API_KEY_LENGTH;
+  }
+
+  async saveDeviceData() {
+    const device = this.localAppDataService.selectedItemforEdit;
+    device.deviceURL = device.deviceURL.trim();
+    device.deviceKEY = device.deviceKEY.trim();
+    if (!this.urlValid) {
+      return;
     }
-
-  ngOnInit() {
+    if (this.localAppDataService.selectedItemIndex === null) {
+      await this.localAppDataService.saveNewDeviceItem();
+    } else {
+      await this.localAppDataService.saveExistingDeviceItem();
+    }
+    this.router.navigate(['/list']);
   }
-
-
-saveDeviceData () {
-  //  console.log("save device data: this.dataService.selectedItemIndex " + this.dataService.selectedItemIndex);
-    if (this.localAppDataService.selectedItemIndex == null) {
-        // new device
-    //    console.log("saving new device");
-        this.localAppDataService.saveNewDeviceItem();
-     }
-     else {
-    //   console.log("saving existing device");
-       // save existing device data
-       this.localAppDataService.saveExistingDeviceItem();
-     }
-     this.router.navigate(['/list']);
-  }
-
-
-
-
 }
