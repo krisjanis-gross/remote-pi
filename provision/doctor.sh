@@ -104,7 +104,8 @@ api() {
 }
 check "API answers with this device's key" grep -q '"response_code":"OK"' <<<"$(api version_check)"
 check "API rejects the old default key" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST --data '{"API_key":"new-key","request_action":"version_check"}' http://127.0.0.1/json_API_v2.php)" = 403
-sample_age=$(api get_sensor_data | php -r '$r = json_decode(stream_get_contents(STDIN), true); $t = $r["response_data"]["timestamp"] ?? null; echo $t ? time() - strtotime($t) : -1;')
+# The timestamp is device-local time (the app's time zone), so parse it in the system zone.
+sample_age=$(api get_sensor_data | php -d date.timezone="$(timedatectl show -p Timezone --value)" -r '$r = json_decode(stream_get_contents(STDIN), true); $t = $r["response_data"]["timestamp"] ?? null; echo $t ? time() - strtotime($t) : -1;')
 if [[ "$sample_age" -ge 0 && "$sample_age" -le 30 ]]; then pass "sensor loop is running (sample ${sample_age}s old)"; else fail "no fresh sensor sample (age: $sample_age)"; fi
 if [[ -f /etc/remote-pi/monitor.php ]]; then
 	state=/run/remote-pi-monitor/sender-state.json
