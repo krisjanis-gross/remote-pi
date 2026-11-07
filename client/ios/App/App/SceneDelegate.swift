@@ -5,6 +5,10 @@ import Capacitor
 // stops the app at launch. The window and the Capacitor view controller come from
 // Main.storyboard (UISceneStoryboardFile in Info.plist). URL opens and user activities now
 // arrive here instead of in AppDelegate, so they are passed on to Capacitor from here.
+//
+// With scenes, UIKit posts willEnterForeground at launch too; Capacitor then sends a
+// "resume" event before the page exists and logs "⚡️ JS Eval error" once at start-up.
+// That message is harmless: the page loads right after, and later resumes work.
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
