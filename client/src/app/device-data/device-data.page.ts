@@ -1,11 +1,23 @@
 import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+
 import { FormsModule } from '@angular/forms';
 
 import { Router, RouterModule } from '@angular/router';
 
-import { IonItem, IonList, IonContent, IonTitle, IonNote,
-IonToolbar, IonButtons, IonHeader, IonButton, IonInput, IonInputPasswordToggle, IonCard } from '@ionic/angular/standalone';
+import {
+  IonItem,
+  IonList,
+  IonContent,
+  IonTitle,
+  IonNote,
+  IonToolbar,
+  IonButtons,
+  IonHeader,
+  IonButton,
+  IonInput,
+  IonInputPasswordToggle,
+  IonCard,
+} from '@ionic/angular/standalone';
 
 import { IonIcon } from '@ionic/angular/standalone';
 import { addIcons } from 'ionicons';
@@ -19,14 +31,27 @@ import { MIN_API_KEY_LENGTH } from '../models/device';
   templateUrl: './device-data.page.html',
   styleUrls: ['./device-data.page.scss'],
   standalone: true,
-  imports: [ CommonModule, FormsModule, RouterModule,
-  IonItem, IonList, IonContent, IonTitle, IonNote,
-  IonToolbar, IonButtons, IonHeader, IonButton, IonInput, IonInputPasswordToggle, IonCard, IonIcon]
+  imports: [
+    FormsModule,
+    RouterModule,
+    IonItem,
+    IonList,
+    IonContent,
+    IonTitle,
+    IonNote,
+    IonToolbar,
+    IonButtons,
+    IonHeader,
+    IonButton,
+    IonInput,
+    IonInputPasswordToggle,
+    IonCard,
+    IonIcon,
+  ],
 })
 export class DeviceDataPage {
   private router = inject(Router);
   localAppDataService = inject(LocalAppDataService);
-
 
   readonly minKeyLength = MIN_API_KEY_LENGTH;
 
@@ -35,12 +60,17 @@ export class DeviceDataPage {
   }
 
   get urlValid(): boolean {
-    return /^https?:\/\/[^\s/]+/.test(this.localAppDataService.selectedItemforEdit.deviceURL.trim());
+    return /^https?:\/\/[^\s/]+/.test(
+      this.localAppDataService.selectedItemforEdit.deviceURL.trim()
+    );
   }
 
   // Legacy (not yet provisioned) devices still accept short keys, so this only warns.
   get keyTooShort(): boolean {
-    return this.localAppDataService.selectedItemforEdit.deviceKEY.length < MIN_API_KEY_LENGTH;
+    return (
+      this.localAppDataService.selectedItemforEdit.deviceKEY.length <
+      MIN_API_KEY_LENGTH
+    );
   }
 
   async saveDeviceData() {

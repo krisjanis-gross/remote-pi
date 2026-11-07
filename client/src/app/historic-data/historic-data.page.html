@@ -5,14 +5,21 @@
     </ion-buttons>
     <ion-title>Historic data</ion-title>
   </ion-toolbar>
-  <ion-progress-bar *ngIf="loading" type="indeterminate"></ion-progress-bar>
+  @if (loading) {
+  <ion-progress-bar type="indeterminate"></ion-progress-bar>
+  }
 </ion-header>
 
 <ion-content class="ion-padding">
   <h3>Filter</h3>
   <ion-list>
     <ion-item>
-      <ion-select label="Data period" interface="popover" [(ngModel)]="period" (ionChange)="periodChanged()">
+      <ion-select
+        label="Data period"
+        interface="popover"
+        [(ngModel)]="period"
+        (ionChange)="periodChanged()"
+      >
         <ion-select-option value="hour">hour</ion-select-option>
         <ion-select-option value="3hrs">3 hours</ion-select-option>
         <ion-select-option value="6hrs">6 hours</ion-select-option>
@@ -23,12 +30,25 @@
       </ion-select>
     </ion-item>
     <ion-item>
-      <ion-select label="Select sensors" [multiple]="true" cancelText="Cancel" okText="OK" [(ngModel)]="selectedSensors" (ionChange)="loadChart()">
-        <ion-select-option *ngFor="let sensor of sensors" [value]="sensor.id">{{ sensor.name }}</ion-select-option>
+      <ion-select
+        label="Select sensors"
+        [multiple]="true"
+        cancelText="Cancel"
+        okText="OK"
+        [(ngModel)]="selectedSensors"
+        (ionChange)="loadChart()"
+      >
+        @for (sensor of sensors; track sensor.id) {
+        <ion-select-option [value]="sensor.id"
+          >{{ sensor.name }}</ion-select-option
+        >
+        }
       </ion-select>
     </ion-item>
     <ion-item>
-      <ion-toggle [enableOnOffLabels]="true" [(ngModel)]="liveUpdate">Realtime data update</ion-toggle>
+      <ion-toggle [enableOnOffLabels]="true" [(ngModel)]="liveUpdate"
+        >Realtime data update</ion-toggle
+      >
     </ion-item>
   </ion-list>
 

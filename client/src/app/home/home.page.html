@@ -9,34 +9,63 @@
   <ion-progress-bar [hidden]="loading"></ion-progress-bar>
 </ion-header>
 <ion-content class="ion-padding">
-
   <h3 [hidden]="!connected">Sensors</h3>
   <ion-grid>
-    <ion-row *ngFor="let sensor of sensors; trackBy: sensorById" (click)="editSensor(sensor)">
-      <ion-col size="4" size-md="2" size-lg="1">{{ sensor.sensor_name }}</ion-col>
-      <ion-col size="6" size-md="9" size-lg="10"><div class="sparkline" id="sparkline_{{ sensor.id }}"></div></ion-col>
-      <ion-col size="2" size-md="1" size-lg="1"><b>{{ sensor.value }}</b></ion-col>
+    @for (sensor of sensors; track sensorById($index, sensor)) {
+    <ion-row (click)="editSensor(sensor)">
+      <ion-col size="4" size-md="2" size-lg="1"
+        >{{ sensor.sensor_name }}</ion-col
+      >
+      <ion-col size="6" size-md="9" size-lg="10"
+        ><div class="sparkline" id="sparkline_{{ sensor.id }}"></div
+      ></ion-col>
+      <ion-col size="2" size-md="1" size-lg="1"
+        ><b>{{ sensor.value }}</b></ion-col
+      >
     </ion-row>
+    }
   </ion-grid>
-  <ion-button [hidden]="!connected" size="default" fill="outline" [routerLink]="['/historic-data']"><ion-icon name="analytics"></ion-icon>Historic data</ion-button>
+  <ion-button
+    [hidden]="!connected"
+    size="default"
+    fill="outline"
+    [routerLink]="['/historic-data']"
+    ><ion-icon name="analytics"></ion-icon>Historic data</ion-button
+  >
 
   <h3 [hidden]="!connected">Relays (IO pins)</h3>
   <ion-list>
-    <ion-item *ngFor="let relay of relays; trackBy: relayById">
-      <ion-toggle [enableOnOffLabels]="true" [checked]="relay.state" [disabled]="relay.locked" (ionChange)="setRelayValue(relay)">
+    @for (relay of relays; track relayById($index, relay)) {
+    <ion-item>
+      <ion-toggle
+        [enableOnOffLabels]="true"
+        [checked]="relay.state"
+        [disabled]="relay.locked"
+        (ionChange)="setRelayValue(relay)"
+      >
         {{ relay.description }}
       </ion-toggle>
-      <ion-button slot="end" fill="clear" size="small" aria-label="Edit pin" (click)="editPin(relay.id, relay.description)">
+      <ion-button
+        slot="end"
+        fill="clear"
+        size="small"
+        aria-label="Edit pin"
+        (click)="editPin(relay.id, relay.description)"
+      >
         <ion-icon slot="icon-only" name="create-outline"></ion-icon>
       </ion-button>
     </ion-item>
+    }
     <ion-item [hidden]="!connected">
-      <ion-button size="default" fill="outline" (click)="editPin(0, '')">Configure new pin</ion-button>
+      <ion-button size="default" fill="outline" (click)="editPin(0, '')"
+        >Configure new pin</ion-button
+      >
     </ion-item>
   </ion-list>
 
   <h3 [hidden]="!connected">Trigger scripts</h3>
-  <ion-item-group *ngFor="let trigger of triggers; trackBy: triggerById">
+  @for (trigger of triggers; track triggerById($index, trigger)) {
+  <ion-item-group>
     <ion-card>
       <ion-card-header>
         <h4>{{ trigger.description }}</h4>
@@ -44,48 +73,78 @@
       <ion-card-content>
         <ion-list>
           <ion-item>
-            <ion-toggle [enableOnOffLabels]="true" [(ngModel)]="trigger.state" (ionChange)="toggleTriggerState(trigger)">Enabled</ion-toggle>
+            <ion-toggle
+              [enableOnOffLabels]="true"
+              [(ngModel)]="trigger.state"
+              (ionChange)="toggleTriggerState(trigger)"
+              >Enabled</ion-toggle
+            >
           </ion-item>
-          <ion-list-header>
-            Parameters (tap to change)
-          </ion-list-header>
+          <ion-list-header> Parameters (tap to change) </ion-list-header>
           <ion-list>
-            <ion-item *ngFor="let parameter of trigger.parameters">
-              <ion-button size="default" fill="outline" (click)="changeParameterAlert(parameter.id, parameter.name, parameter.par_value)">{{ parameter.name }} = {{ parameter.par_value }}</ion-button>
+            @for (parameter of trigger.parameters; track parameter.id) {
+            <ion-item>
+              <ion-button
+                size="default"
+                fill="outline"
+                (click)="changeParameterAlert(parameter.id, parameter.name, parameter.par_value)"
+                >{{ parameter.name }} = {{ parameter.par_value }}</ion-button
+              >
             </ion-item>
+            }
           </ion-list>
         </ion-list>
       </ion-card-content>
     </ion-card>
   </ion-item-group>
+  }
 
   <h3>Settings</h3>
   <ion-card>
-    <ion-card-content>
-      Status: {{ statusMessage }}
-    </ion-card-content>
+    <ion-card-content> Status: {{ statusMessage }} </ion-card-content>
   </ion-card>
 
   <ion-card [hidden]="!connected">
     <ion-card-content class="device-actions">
-      <ion-button fill="outline" size="default" id="restart-device-alert">Restart device</ion-button>
-      <ion-alert trigger="restart-device-alert" header="Are you sure you want to restart the device?" [buttons]="restartAlertButtons"></ion-alert>
+      <ion-button fill="outline" size="default" id="restart-device-alert"
+        >Restart device</ion-button
+      >
+      <ion-alert
+        trigger="restart-device-alert"
+        header="Are you sure you want to restart the device?"
+        [buttons]="restartAlertButtons"
+      ></ion-alert>
 
-      <ion-button fill="outline" size="default" id="shutdown-device-alert">Shut down device</ion-button>
-      <ion-alert trigger="shutdown-device-alert" header="Are you sure you want to shut down the device?" [buttons]="shutdownAlertButtons"></ion-alert>
+      <ion-button fill="outline" size="default" id="shutdown-device-alert"
+        >Shut down device</ion-button
+      >
+      <ion-alert
+        trigger="shutdown-device-alert"
+        header="Are you sure you want to shut down the device?"
+        [buttons]="shutdownAlertButtons"
+      ></ion-alert>
 
-      <ion-button fill="outline" size="default" id="restore-config-alert">Restore backup configuration</ion-button>
-      <ion-alert trigger="restore-config-alert" header="Restore the backup configuration?" [buttons]="restoreConfigButtons"></ion-alert>
+      <ion-button fill="outline" size="default" id="restore-config-alert"
+        >Restore backup configuration</ion-button
+      >
+      <ion-alert
+        trigger="restore-config-alert"
+        header="Restore the backup configuration?"
+        [buttons]="restoreConfigButtons"
+      ></ion-alert>
 
-      <ion-button fill="outline" size="default" id="save-config-alert">Save this configuration as backup</ion-button>
-      <ion-alert trigger="save-config-alert" header="Save this configuration as backup?" [buttons]="saveConfigButtons"></ion-alert>
+      <ion-button fill="outline" size="default" id="save-config-alert"
+        >Save this configuration as backup</ion-button
+      >
+      <ion-alert
+        trigger="save-config-alert"
+        header="Save this configuration as backup?"
+        [buttons]="saveConfigButtons"
+      ></ion-alert>
     </ion-card-content>
   </ion-card>
 
   <ion-card [hidden]="!connected">
-    <ion-card-content>
-      Device config: {{ deviceConfig }}
-    </ion-card-content>
+    <ion-card-content> Device config: {{ deviceConfig }} </ion-card-content>
   </ion-card>
-
 </ion-content>

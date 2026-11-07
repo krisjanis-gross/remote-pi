@@ -1,13 +1,10 @@
 import { ComponentFixture, TestBed, discardPeriodicTasks, fakeAsync, flushMicrotasks, tick } from '@angular/core/testing';
 import { HttpTestingController, TestRequest } from '@angular/common/http/testing';
-import { provideHttpClient } from '@angular/common/http';
-import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideRouter } from '@angular/router';
-import { provideIonicAngular } from '@ionic/angular/standalone';
 import * as Highcharts from 'highcharts';
 
 import { HomePage } from './home.page';
-import { FakeStorage, provideFakeStorage } from '../testing/fake-storage';
+import { FakeStorage } from '../testing/fake-storage';
+import { providePageTesting } from '../testing/page-providers';
 
 describe('HomePage', () => {
   let fixture: ComponentFixture<HomePage>;
@@ -48,10 +45,7 @@ describe('HomePage', () => {
   beforeEach(() => {
     const storage = new FakeStorage();
     storage.data.set('LocalAppConfig', device);
-    TestBed.configureTestingModule({
-      providers: [provideRouter([]), provideIonicAngular(), provideHttpClient(), provideHttpClientTesting(),
-                  ...provideFakeStorage(storage)],
-    });
+    TestBed.configureTestingModule({ providers: providePageTesting(storage) });
     fixture = TestBed.createComponent(HomePage);
     page = fixture.componentInstance;
     http = TestBed.inject(HttpTestingController);

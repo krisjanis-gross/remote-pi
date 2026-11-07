@@ -2,7 +2,7 @@
   <ion-toolbar>
     <ion-title>Device Data</ion-title>
     <ion-buttons slot="start">
-      <ion-button   fill="solid"  [routerLink]="['/list']" >&lt; Back</ion-button>
+      <ion-button fill="solid" [routerLink]="['/list']">&lt; Back</ion-button>
     </ion-buttons>
   </ion-toolbar>
 </ion-header>
@@ -11,31 +11,54 @@
   <ion-card>
     <ion-list>
       <ion-item>
-        <ion-input type="text" label="Title" labelPlacement="floating"  [(ngModel)]="localAppDataService.selectedItemforEdit.deviceTitle" ></ion-input>
+        <ion-input
+          type="text"
+          label="Title"
+          labelPlacement="floating"
+          [(ngModel)]="localAppDataService.selectedItemforEdit.deviceTitle"
+        ></ion-input>
       </ion-item>
       <ion-item>
-        <ion-input type="url" label="URL" labelPlacement="floating" placeholder="http://192.168.1.10"
+        <ion-input
+          type="url"
+          label="URL"
+          labelPlacement="floating"
+          placeholder="http://192.168.1.10"
           [(ngModel)]="localAppDataService.selectedItemforEdit.deviceURL"
           [errorText]="urlValid ? '' : 'Enter an address starting with http:// or https://'"
-          [class.ion-invalid]="!urlValid" [class.ion-touched]="!urlValid"></ion-input>
+          [class.ion-invalid]="!urlValid"
+          [class.ion-touched]="!urlValid"
+        ></ion-input>
       </ion-item>
 
       <ion-item>
-        <ion-input type="password" label="API key" labelPlacement="floating" autocomplete="off"
-          [(ngModel)]="localAppDataService.selectedItemforEdit.deviceKEY">
+        <ion-input
+          type="password"
+          label="API key"
+          labelPlacement="floating"
+          autocomplete="off"
+          [(ngModel)]="localAppDataService.selectedItemforEdit.deviceKEY"
+        >
           <ion-input-password-toggle slot="end"></ion-input-password-toggle>
         </ion-input>
       </ion-item>
-      <ion-item lines="none" *ngIf="keyTooShort">
+      @if (keyTooShort) {
+      <ion-item lines="none">
         <ion-note color="warning">
-          Provisioned devices only accept keys of at least {{ minKeyLength }} characters.
-          The key is printed when the device is installed.
+          Provisioned devices only accept keys of at least {{ minKeyLength }}
+          characters. The key is printed when the device is installed.
         </ion-note>
       </ion-item>
-
+      }
     </ion-list>
     <ion-item>
-    <ion-button size="default" [disabled]="!urlValid" (click)="saveDeviceData()">  <ion-icon slot="start" name="save"></ion-icon> Save</ion-button>
+      <ion-button
+        size="default"
+        [disabled]="!urlValid"
+        (click)="saveDeviceData()"
+      >
+        <ion-icon slot="start" name="save"></ion-icon> Save</ion-button
+      >
     </ion-item>
   </ion-card>
 </ion-content>
