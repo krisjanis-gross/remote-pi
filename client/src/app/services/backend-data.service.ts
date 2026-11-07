@@ -5,6 +5,11 @@ import { Observable, throwError } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 
 import { ApiError, ApiResponse, DeviceConnection } from '../models/device';
+import { DeviceConfig, HistoricSeries, Period, Relay, SensorData, SensorListItem, Trigger, VersionInfo } from '../models/api';
+import { checkApiCompatibility } from '../models/api-version';
+
+/** ApiError.status when the device answers but its API version does not fit this app. */
+export const API_INCOMPATIBLE = -2;
 
 const API_PATH = '/json_API_v2.php';
 
@@ -31,19 +36,35 @@ export class BackendDataService {
 
   constructor(private http: HttpClient) { }
 
-  checkDeviceVersion(device: DeviceConnection): Observable<ApiResponse> {
+  checkDeviceVersion(device: DeviceConnection): Observable<ApiResponse<VersionInfo>> {
     return this.call(device, 'version_check');
   }
 
-  getSensorData(device: DeviceConnection): Observable<ApiResponse> {
+  /**
+   * version_check plus the app's version check: emits the device's API version, or fails
+   * with an ApiError (status API_INCOMPATIBLE) that says whether to update the device or the app.
+   */
+  connect(device: DeviceConnection): Observable<string> {
+    return this.checkDeviceVersion(device).pipe(
+      map(response => {
+        const compatibility = checkApiCompatibility(response.response_data?.version);
+        if (!compatibility.ok) {
+          throw new ApiError(compatibility.message, API_INCOMPATIBLE);
+        }
+        return compatibility.version;
+      }),
+    );
+  }
+
+  getSensorData(device: DeviceConnection): Observable<ApiResponse<SensorData>> {
     return this.call(device, 'get_sensor_data');
   }
 
-  getSensorDataAndSparkline(device: DeviceConnection): Observable<ApiResponse> {
+  getSensorDataAndSparkline(device: DeviceConnection): Observable<ApiResponse<SensorData>> {
     return this.call(device, 'get_sensor_data_sparkline');
   }
 
-  getRelayData(device: DeviceConnection): Observable<ApiResponse> {
+  getRelayData(device: DeviceConnection): Observable<ApiResponse<Relay[]>> {
     return this.call(device, 'get_GPIO_list');
   }
 
@@ -51,7 +72,7 @@ export class BackendDataService {
     return this.call(device, 'set_GPIO_pin', { pin_id: relayID, command: newState });
   }
 
-  getTriggerData(device: DeviceConnection): Observable<ApiResponse> {
+  getTriggerData(device: DeviceConnection): Observable<ApiResponse<Trigger[]>> {
     return this.call(device, 'get_Trigger_list');
   }
 
@@ -71,15 +92,15 @@ export class BackendDataService {
     return this.call(device, 'setPinConfig', { pinID, newPinId, pinDescription });
   }
 
-  getDeviceConfig(device: DeviceConnection): Observable<ApiResponse> {
+  getDeviceConfig(device: DeviceConnection): Observable<ApiResponse<DeviceConfig>> {
     return this.call(device, 'getDeviceConfig');
   }
 
-  getChartData(device: DeviceConnection, period: string, selectedSensors: unknown): Observable<ApiResponse> {
+  getChartData(device: DeviceConnection, period: Period, selectedSensors: (string | number)[] | ''): Observable<ApiResponse<HistoricSeries[]>> {
     return this.call(device, 'get_historic_data', { period, selected_sensors: selectedSensors });
   }
 
-  getSensorList(device: DeviceConnection, period: string): Observable<ApiResponse> {
+  getSensorList(device: DeviceConnection, period: Period): Observable<ApiResponse<SensorListItem[]>> {
     return this.call(device, 'get_sensor_list', { period });
   }
 

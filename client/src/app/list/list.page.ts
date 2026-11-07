@@ -9,7 +9,7 @@ IonList, IonContent, IonTitle, IonToolbar, IonButtons, IonHeader, IonBadge, IonB
 import { Router, RouterModule } from '@angular/router';
 
 import { LocalAppDataService, newDeviceTemplate } from '../services/local-app-data.service';
-import { BackendDataService } from '../services/backend-data.service';
+import { API_INCOMPATIBLE, BackendDataService } from '../services/backend-data.service';
 import { Device } from '../models/device';
 
 import { Platform } from '@ionic/angular/standalone';
@@ -74,15 +74,17 @@ export class ListPage {
    }
 
    ping_device(device: Device) {
-     this.backendDataService.checkDeviceVersion(device)
+     this.backendDataService.connect(device)
        .subscribe({
          next: () => {
            this.deviceStatus[device.deviceID] = 'Connection OK';
            this.deviceStatusColor[device.deviceID] = 'success';
          },
          error: err => {
-           this.deviceStatus[device.deviceID] = err.status === 403 ? err.message : 'Connection error';
-           this.deviceStatusColor[device.deviceID] = err.status === 403 ? 'danger' : 'warning';
+           // Wrong key and version mismatch get the device's or app's own message.
+           const explained = err.status === 403 || err.status === API_INCOMPATIBLE;
+           this.deviceStatus[device.deviceID] = explained ? err.message : 'Connection error';
+           this.deviceStatusColor[device.deviceID] = explained ? 'danger' : 'warning';
          },
        });
    }

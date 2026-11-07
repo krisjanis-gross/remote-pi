@@ -1,11 +1,11 @@
 name: Client app checks
 # Lint, test and build the Ionic app in client/ (the browser build is what deploy.sh
-# installs on devices). Runs only when the app or this workflow changes.
+# installs on devices). Runs when the app, the API contract in api/ or this workflow changes.
 on:
   push:
-    paths: ['client/**', '.github/workflows/client.yml']
+    paths: ['client/**', 'api/**', '.github/workflows/client.yml']
   pull_request:
-    paths: ['client/**', '.github/workflows/client.yml']
+    paths: ['client/**', 'api/**', '.github/workflows/client.yml']
 permissions:
   contents: read
 jobs:

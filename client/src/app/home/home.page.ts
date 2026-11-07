@@ -16,6 +16,8 @@ import { AlertController, ToastController, Platform } from '@ionic/angular/stand
 import { LocalAppDataService } from '../services/local-app-data.service';
 import { BackendDataService} from '../services/backend-data.service';
 import { ApiError, Device } from '../models/device';
+import { Relay, SensorReading, Trigger } from '../models/api';
+import { API_INCOMPATIBLE } from '../services/backend-data.service';
 
 import * as HighCharts from 'highcharts';
 
@@ -33,9 +35,9 @@ export class HomePage   {
  status_message:string;
  targetDeviceName: string;
  AppConfig: Device = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
- public RelayList: Array<{id: string; state: string, locked: string, description:string}>;
- public SensorList: Array<{id:string, sensor_name:string, value:string}> = [];
- public TriggerList: Array<{triggerID:string, state:number, description:string, parameters:Array<{id:string,name:string,par_value:string}>}>;
+ public RelayList: Relay[];
+ public SensorList: SensorReading[] = [];
+ public TriggerList: Trigger[];
 
 connectedToDevice = false;
 
@@ -112,8 +114,8 @@ sparkline_chart:any[] = [];
       this.update_loading ();
       // reset page data
       this.clearPage();
-      await this.backendDataService.checkDeviceVersion(this.AppConfig)
-        .subscribe(res => {
+      this.backendDataService.connect(this.AppConfig)
+        .subscribe(() => {
         //  console.log(res);
           this.status_message = "Connected OK";
           this.getRelayData();
@@ -126,7 +128,9 @@ sparkline_chart:any[] = [];
           this.other_loading = false;
           this.update_loading ();
         }, err => {
-          this.status_message = 'Connection error: ' + this.errorMessage(err);
+          // A version mismatch is not a connection problem: say which side to update.
+          this.status_message = err instanceof ApiError && err.status === API_INCOMPATIBLE
+            ? this.errorMessage(err) : 'Connection error: ' + this.errorMessage(err);
           this.other_loading = false;
           this.connectedToDevice = false;
           this.update_loading ();

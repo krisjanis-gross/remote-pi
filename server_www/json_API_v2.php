@@ -3,7 +3,7 @@ require_once __DIR__ . '/bootstrap.php';
 require_once __DIR__ . '/db_app_data_functions.php';
 require_once __DIR__ . '/db_sensor_log_functions.php';
 
-$API_VERSION  = '0.3';
+$API_VERSION  = '0.4'; // keep in step with apiVersion in api/json_API_v2.schema.json
 
 api_handle_cors();
 

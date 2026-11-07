@@ -10,6 +10,7 @@ import { Router, RouterModule } from '@angular/router';
 import { BackendDataService} from '../services/backend-data.service';
 import { LocalAppDataService } from '../services/local-app-data.service';
 import { Device } from '../models/device';
+import { Period, SensorListItem } from '../models/api';
 
 @Component({
   selector: 'app-historic-data',
@@ -26,9 +27,9 @@ export class HistoricDataPage {
  AppConfig: Device = {deviceID:0, deviceTitle: "", deviceURL: "", deviceKEY: ""};
 
   chart_data:any;
-  SensorList:any;
-  chart_time_interval = "3hrs";
-  selected_sensors = "";
+  SensorList: SensorListItem[] = [];
+  chart_time_interval: Period = '3hrs';
+  selected_sensors: (string | number)[] | '' = '';
 
   any_LOADING = false;
 
@@ -37,7 +38,7 @@ export class HistoricDataPage {
   DataUpdateEnabled = true;
 
   refreshIntervalID:any;
-  last_timestamp = "";
+  last_timestamp: string | null = null;
 
 
   constructor(     public backendDataService:BackendDataService,
@@ -154,7 +155,8 @@ async getChartIncrementalData () {
                                     // console.log(JSON.stringify(res))
                                     // check if this is new relays_loading
                                   //  console.log("timestamp =  " + res.response_data.timestamp)
-                                    if (this.last_timestamp != res.response_data.timestamp)
+                                    // timestamp is null until the device has its first reading
+                                    if (res.response_data.timestamp && this.last_timestamp != res.response_data.timestamp)
                                         { // new sensor data
                                         //  console.log("new sensor data =  " +  JSON.stringify(res.response_data.data));
                                           this.last_timestamp = res.response_data.timestamp

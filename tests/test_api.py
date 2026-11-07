@@ -23,7 +23,9 @@ def free_port():
         return sock.getsockname()[1]
 
 
-class ApiTests(unittest.TestCase):
+class ApiServerCase(unittest.TestCase):
+    """Runs json_API_v2.php and the other endpoints in PHP's built-in server for each test class."""
+
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
@@ -86,8 +88,10 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(json.loads(body)["response_code"], "OK", body)
         return json.loads(body)["response_data"]
 
+
+class ApiTests(ApiServerCase):
     def test_valid_key(self):
-        self.assertEqual(self.assertOk(self.api("version_check")), {"version": "0.3"})
+        self.assertEqual(self.assertOk(self.api("version_check")), {"version": "0.4"})
 
     def test_key_bypass_attempts_rejected(self):
         for key in (True, None, [KEY], "new-key", KEY + "x", ""):

@@ -1,0 +1,261 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Remote Pi device API (server_www/json_API_v2.php)",
+  "description": "Contract between the device API and the app in client/. Every request is a POST with a JSON body {API_key, request_action, request_data}; every response is {response_code, response_data}. Errors have response_code ERROR and a message in response_data; since API 0.4 they also have a 4xx/5xx status (403 wrong key or origin, 400 invalid input, 404 nothing to restore, 409 pin number in use). Checked by tests/test_contract.py (backend) and client/src/app/services/api-contract.spec.ts (app). Changing it: bump apiVersion here and $API_VERSION in json_API_v2.php together; 1.0 is reserved for a change older apps cannot handle.",
+  "apiVersion": "0.4",
+  "versions": {
+    "0.2": "devices installed before November 2026",
+    "0.3": "hardened install: unique key, origin checks, input validation",
+    "0.4": "failed requests use HTTP 4xx/5xx status codes"
+  },
+  "definitions": {
+    "request": {
+      "type": "object",
+      "required": ["API_key", "request_action"],
+      "properties": {
+        "API_key": { "type": "string" },
+        "request_action": { "type": "string" },
+        "request_data": {}
+      },
+      "additionalProperties": false
+    },
+    "okResponse": {
+      "type": "object",
+      "required": ["response_code", "response_data"],
+      "properties": { "response_code": { "const": "OK" }, "response_data": {} },
+      "additionalProperties": false
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["response_code", "response_data"],
+      "properties": { "response_code": { "const": "ERROR" }, "response_data": { "type": "string" } },
+      "additionalProperties": false
+    },
+    "noData": { "const": "" },
+    "emptyResult": { "const": "" },
+    "intLike": { "anyOf": [{ "type": "integer" }, { "type": "string", "pattern": "^-?[0-9]+$" }] },
+    "command": { "enum": [0, 1, "0", "1"] },
+    "period": { "enum": ["hour", "3hrs", "6hrs", "day", "3days", "week", "month"] },
+    "sensorId": { "type": ["string", "integer"] },
+    "numberOrString": { "type": ["number", "string"] },
+    "point": {
+      "description": "[time in ms (local time written as UTC), value]",
+      "type": "array",
+      "items": [{ "type": "number" }, { "type": "number" }],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "sensorReading": {
+      "type": "object",
+      "required": ["id", "sensor_name", "value"],
+      "properties": {
+        "id": { "$ref": "#/definitions/sensorId" },
+        "sensor_name": { "$ref": "#/definitions/sensorId" },
+        "value": { "$ref": "#/definitions/numberOrString" },
+        "sparkline_data": { "type": "array", "items": { "$ref": "#/definitions/point" } }
+      },
+      "additionalProperties": false
+    },
+    "sensorData": {
+      "type": "object",
+      "required": ["timestamp", "data"],
+      "properties": {
+        "timestamp": { "type": ["string", "null"] },
+        "data": { "type": "array", "items": { "$ref": "#/definitions/sensorReading" } }
+      },
+      "additionalProperties": false
+    },
+    "sensorListItem": {
+      "type": "object",
+      "required": ["id", "name"],
+      "properties": { "id": { "$ref": "#/definitions/sensorId" }, "name": { "$ref": "#/definitions/sensorId" } },
+      "additionalProperties": false
+    }
+  },
+  "actions": {
+    "version_check": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": {
+        "type": "object",
+        "required": ["version"],
+        "properties": { "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" } },
+        "additionalProperties": false
+      }
+    },
+    "get_sensor_data": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": { "$ref": "#/definitions/sensorData" }
+    },
+    "get_sensor_data_sparkline": {
+      "description": "As get_sensor_data, with each reading's last 10 minutes in sparkline_data",
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": { "$ref": "#/definitions/sensorData" }
+    },
+    "get_GPIO_list": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "state", "locked", "description"],
+          "properties": {
+            "id": { "type": "integer" },
+            "state": { "enum": [0, 1] },
+            "locked": { "enum": [0, 1] },
+            "description": { "type": ["string", "null"] }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "set_GPIO_pin": {
+      "request_data": {
+        "type": "object",
+        "required": ["pin_id", "command"],
+        "properties": { "pin_id": { "$ref": "#/definitions/intLike" }, "command": { "$ref": "#/definitions/command" } },
+        "additionalProperties": false
+      },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "get_Trigger_list": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["triggerID", "state", "description", "parameters"],
+          "properties": {
+            "triggerID": { "type": "integer" },
+            "state": { "enum": [0, 1] },
+            "description": { "type": ["string", "null"] },
+            "parameters": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["id", "name", "par_value"],
+                "properties": {
+                  "id": { "type": "integer" },
+                  "name": { "type": ["string", "null"] },
+                  "par_value": { "type": ["number", "string", "null"] }
+                },
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "set_trigger_state": {
+      "request_data": {
+        "type": "object",
+        "required": ["triggerID", "command"],
+        "properties": { "triggerID": { "$ref": "#/definitions/intLike" }, "command": { "$ref": "#/definitions/command" } },
+        "additionalProperties": false
+      },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "setParameterValue": {
+      "request_data": {
+        "type": "object",
+        "required": ["parameterID", "newValue"],
+        "properties": {
+          "parameterID": { "$ref": "#/definitions/intLike" },
+          "newValue": { "anyOf": [{ "type": "number" }, { "type": "string", "pattern": "^-?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?$" }] }
+        },
+        "additionalProperties": false
+      },
+      "response_data": { "const": null }
+    },
+    "setSensorName": {
+      "request_data": {
+        "type": "object",
+        "required": ["sensorID", "sensorName"],
+        "properties": {
+          "sensorID": { "type": "string", "minLength": 1, "maxLength": 50 },
+          "sensorName": { "type": "string", "maxLength": 200 }
+        },
+        "additionalProperties": false
+      },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "setPinConfig": {
+      "description": "pinID 0 adds a pin; otherwise pin pinID gets number newPinId and name pinDescription",
+      "request_data": {
+        "type": "object",
+        "required": ["pinID", "newPinId", "pinDescription"],
+        "properties": {
+          "pinID": { "$ref": "#/definitions/intLike" },
+          "newPinId": { "$ref": "#/definitions/intLike" },
+          "pinDescription": { "type": "string", "maxLength": 200 }
+        },
+        "additionalProperties": false
+      },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "getDeviceConfig": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": {
+        "type": "object",
+        "required": ["allDataSaveHours", "allDataSaveIntervalSeconds", "midTermSaveDays",
+                     "midTermSaveIntervalSeconds", "longTermSaveDays", "longTermSaveIntervalSeconds"],
+        "additionalProperties": { "type": ["number", "string", "null"] }
+      }
+    },
+    "get_historic_data": {
+      "request_data": {
+        "type": "object",
+        "required": ["period"],
+        "properties": {
+          "period": { "anyOf": [{ "$ref": "#/definitions/period" }, { "const": "date_range" }] },
+          "date_from": { "type": "string" },
+          "date_to": { "type": "string" },
+          "selected_sensors": {
+            "description": "Sensor IDs; empty or \"\" means all sensors",
+            "anyOf": [{ "type": "array", "items": { "$ref": "#/definitions/sensorId" } }, { "const": "" }]
+          }
+        },
+        "additionalProperties": false
+      },
+      "response_data": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": ["id", "name", "data", "type"],
+          "properties": {
+            "id": { "$ref": "#/definitions/sensorId" },
+            "name": { "$ref": "#/definitions/sensorId" },
+            "data": { "type": "array", "items": { "$ref": "#/definitions/point" } },
+            "type": { "const": "spline" }
+          },
+          "additionalProperties": false
+        }
+      }
+    },
+    "get_sensor_list": {
+      "request_data": {
+        "type": "object",
+        "required": ["period"],
+        "properties": { "period": { "$ref": "#/definitions/period" } },
+        "additionalProperties": false
+      },
+      "response_data": { "type": "array", "items": { "$ref": "#/definitions/sensorListItem" } }
+    },
+    "restart_device": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "shutdown_device": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "restore_device_configuration": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    },
+    "backup_device_configuration": {
+      "request_data": { "$ref": "#/definitions/noData" },
+      "response_data": { "$ref": "#/definitions/emptyResult" }
+    }
+  }
+}

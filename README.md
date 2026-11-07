@@ -28,6 +28,16 @@ npx cap sync ios  # copy the build into the iOS project, then open ios/App/App.x
 `provision/deploy.sh` builds `client/` and installs it on the device with the PHP code, so a
 device always serves the app that matches its API.
 
+## API contract
+
+[`api/json_API_v2.schema.json`](api/json_API_v2.schema.json) describes every request and
+response of `server_www/json_API_v2.php`. The backend tests (`tests/test_contract.py`) and the
+app tests (`client/src/app/services/api-contract.spec.ts`) both check against it, so a change
+on one side that the other side does not expect fails a test. When the API changes, update
+the schema and bump `apiVersion` there and `$API_VERSION` in `json_API_v2.php` together. The
+app accepts API 0.2 (devices installed before November 2026) up to, not including, 1.0
+(`client/src/app/models/api-version.ts`); 1.0 is for a change older apps cannot handle.
+
 ## Tests
 
 ```sh
