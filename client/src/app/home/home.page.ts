@@ -21,9 +21,13 @@ import { ChartPoint, Relay, SensorReading, Trigger } from '../models/api';
 /** How often the page reloads sensors, relays and triggers. */
 const REFRESH_MS = 10_000;
 
+/** Height of a sensor's sparkline, in px (also set in home.page.scss). */
+const SPARKLINE_HEIGHT = 48;
+
 /** The part of a Highcharts 5 chart this page uses. */
 interface SparklineChart {
   renderTo: HTMLElement;
+  reflow(): void;
   series: { setData(data: ChartPoint[], redraw?: boolean, animation?: boolean, updatePoints?: boolean): void }[];
   destroy(): void;
 }
@@ -186,6 +190,9 @@ export class HomePage {
       const chart = this.sparklines.get(id);
       if (chart && chart.renderTo === container) {
         chart.series[0].setData(data, true, false, false);
+        // A chart created while the page was still being shown gets Highcharts' default
+        // width; fit it to its row.
+        chart.reflow();
       } else {
         chart?.destroy();
         this.sparklines.set(id, Highcharts.chart(container as any, sparklineOptions(data) as any) as unknown as SparklineChart);
@@ -351,7 +358,7 @@ function confirmButtons(onConfirm: () => void) {
 
 function sparklineOptions(data: ChartPoint[]) {
   return {
-    chart: { backgroundColor: 'transparent', borderWidth: 0, type: 'area', margin: [0, 0, 0, 0] },
+    chart: { backgroundColor: 'transparent', borderWidth: 0, type: 'area', margin: [0, 0, 0, 0], height: SPARKLINE_HEIGHT },
     title: { text: '' },
     credits: { enabled: false },
     xAxis: { labels: { enabled: false }, title: { text: '' }, tickLength: 0, type: 'datetime' },
