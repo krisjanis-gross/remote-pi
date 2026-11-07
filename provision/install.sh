@@ -58,7 +58,7 @@ set +a
 : "${DATA_CREATE_PARTITION:=yes}"
 : "${ROOT_SIZE_GB:=0}"
 : "${SITE_FILES_DIR:=}"
-: "${UI_SOURCE:=ui}"
+: "${UI_SOURCE:=client}"
 : "${UI_REF:=master}"
 : "${UI_SUBDIR:=}"
 : "${API_KEY:=}"
@@ -83,7 +83,9 @@ export DEVICE_HOSTNAME TIMEZONE ADMIN_USER LAN_CIDRS EXTRA_HTTP_PORTS ALLOW_INTE
 # Relative paths in the site file are relative to the site file itself.
 if [[ -n "$SITE_FILES_DIR" && "$SITE_FILES_DIR" != /* ]]; then SITE_FILES_DIR="$SITE_CONFIG_DIR_BASE/$SITE_FILES_DIR"; fi
 if [[ -n "$MONITOR_KEY_FILE" && "$MONITOR_KEY_FILE" != /* ]]; then MONITOR_KEY_FILE="$SITE_CONFIG_DIR_BASE/$MONITOR_KEY_FILE"; fi
-if [[ "$UI_SOURCE" != /* && "$UI_SOURCE" != *://* && -d "$SITE_CONFIG_DIR_BASE/$UI_SOURCE" ]]; then UI_SOURCE="$SITE_CONFIG_DIR_BASE/$UI_SOURCE"; fi
+# "client" is the app built from this repository's client/ (provision/deploy.sh builds it).
+if [[ "$UI_SOURCE" == client ]]; then UI_SOURCE="$REPO_DIR/client/www"
+elif [[ "$UI_SOURCE" != /* && "$UI_SOURCE" != *://* && -d "$SITE_CONFIG_DIR_BASE/$UI_SOURCE" ]]; then UI_SOURCE="$SITE_CONFIG_DIR_BASE/$UI_SOURCE"; fi
 
 # Fixed layout used by the steps and the generated configuration (see provision/README.md).
 export INSTALL_DIR=/opt/remote-pi

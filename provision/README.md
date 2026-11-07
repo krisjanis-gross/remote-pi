@@ -26,7 +26,7 @@ model. The script can be re-run at any time; each step converges to the same sta
 | Path | What | Survives a reboot |
 |---|---|---|
 | `/opt/remote-pi/VERSION` | installed version, site, time; `state=running` = the install did not finish | yes* |
-| `/opt/remote-pi/ui/` | built Ionic app; the only folder nginx serves | yes* |
+| `/opt/remote-pi/ui/` | built Ionic app (`client/`); the only folder nginx serves | yes* |
 | `/opt/remote-pi/app/` | PHP code (`server_www/`), reached only through the PHP endpoints | yes* |
 | `/opt/remote-pi/site/` | this site's `custom_*.php` (from `sites/<name>/php/`) | yes* |
 | `/opt/remote-pi/worker/worker.py` | Python worker: calls the sensor and monitor endpoints on 127.0.0.1 | yes* |
@@ -49,7 +49,7 @@ Each device has a folder `sites/<name>/` in this repository:
 | `site.env` | settings, copied from `provision/site.env.example` | yes |
 | `php/` | `custom_*.php`: sensors, triggers, GPIO hooks, startup script | yes |
 | `secrets/` | key files, e.g. `monitor-api-key` | no |
-| `ui/` | built app: the contents of `www/` after `npm run build` in remote-pi-ionic-v7 | no |
+| `ui/` | optional prebuilt app, used only with `UI_SOURCE="ui"`; by default `deploy.sh` builds `client/` | no |
 
 Anything else in the folder (old databases, notes) stays local and is not sent to the device.
 Sites in `custom_configuration/` still call the old Python scripts and need porting

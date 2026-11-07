@@ -5,9 +5,10 @@
 # 2. copies this repository and the site folder to /opt/remote-pi/src on the device,
 # 3. runs the installer there through remote-pi-update (it keeps going if SSH drops),
 # 4. reboots into the read-only root and runs remote-pi-doctor.
-# SITE_DIR holds site.env, php/, secrets/ and ui/ (see provision/README.md). The device is
-# SSH_TARGET from site.env (default ADMIN_USER@DEVICE_HOSTNAME.local); set SSH="ssh -F FILE"
-# for other ssh options. Written for the bash 3.2 that macOS ships.
+# SITE_DIR holds site.env, php/, secrets/ and optionally ui/ (see provision/README.md). The
+# device is SSH_TARGET from site.env (default ADMIN_USER@DEVICE_HOSTNAME.local); set
+# SSH="ssh -F FILE" for other ssh options. With UI_SOURCE="client" (the default) the app in
+# client/ is built here first, which needs Node.js. Written for the bash 3.2 that macOS ships.
 set -euo pipefail
 
 die() { printf '\033[31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -35,6 +36,8 @@ site=$(basename "$site_dir")
 
 # shellcheck disable=SC1091 # the site file is plain VAR="value" lines
 target=$(set +u; . "$site_dir/site.env"; echo "${SSH_TARGET:-${ADMIN_USER:-pi}@${DEVICE_HOSTNAME}.local}")
+# shellcheck disable=SC1091
+ui_source=$(set +u; . "$site_dir/site.env"; echo "${UI_SOURCE:-client}")
 ssh_cmd=${SSH:-ssh}
 src=/opt/remote-pi/src
 install_log=/var/log/remote-pi-install.log
@@ -57,6 +60,19 @@ wait_for_reboot() {
 	die "$target did not come back within 10 minutes"
 }
 
+# Build the app before touching the device, so a build error leaves the device as it is.
+if [ "$ui_source" = client ]; then
+	log "Building the app in client/"
+	command -v npm >/dev/null || die "npm not found: install Node.js to build the app in client/"
+	client=$repo/client
+	# npm ci only when dependencies are missing or package-lock.json changed since the last install.
+	if [ ! -f "$client/node_modules/.package-lock.json" ] || [ "$client/package-lock.json" -nt "$client/node_modules/.package-lock.json" ]; then
+		(cd "$client" && npm ci --no-audit --no-fund) || die "npm ci failed in client/"
+	fi
+	(cd "$client" && npm run build) || die "building the app in client/ failed"
+	[ -f "$client/www/index.html" ] || die "the build left no client/www/index.html"
+fi
+
 log "Checking $target"
 boot=$(boot_id) || die "cannot reach $target over SSH"
 if [ "$(remote findmnt -no FSTYPE /)" = overlay ]; then
@@ -69,7 +85,12 @@ rev=$(git -C "$repo" describe --always --dirty 2>/dev/null || echo unknown)
 log "Copying version $rev and site $site to $src"
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
-rsync -a --exclude .git --exclude /sites/ --exclude /test-results/ --exclude .DS_Store --exclude __pycache__ "$repo"/ "$stage"/
+# client/ (sources and node_modules) stays here; only its built www/ goes to the device.
+rsync -a --exclude .git --exclude /sites/ --exclude /client/ --exclude /test-results/ --exclude .DS_Store --exclude __pycache__ "$repo"/ "$stage"/
+if [ "$ui_source" = client ]; then
+	mkdir -p "$stage/client"
+	rsync -a "$repo/client/www" "$stage/client/"
+fi
 mkdir -p "$stage/sites/$site"
 for part in site.env php secrets ui; do
 	if [ -e "$site_dir/$part" ]; then rsync -a --exclude .DS_Store "$site_dir/$part" "$stage/sites/$site/"; fi
