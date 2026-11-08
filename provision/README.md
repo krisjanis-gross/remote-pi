@@ -15,7 +15,7 @@ model. The script can be re-run at any time; each step converges to the same sta
 |---|---|
 | `php` (default) | the PHP backend: nginx, PHP-FPM and the Python worker |
 | `php+watch` | the PHP backend, with the core (`core/`, Rust + Lua) next to it in watch-only mode: it switches nothing and writes nothing, and logs `DIFFERS:` where it would have acted differently (`journalctl -u remote-pi-core`). Its read-only API answers on `127.0.0.1:8081` |
-| `core` | the core alone (`remote-pi-core.service`): rules, GPIO, sensors, sensor log, monitor check-ins and the app; nginx, PHP and the worker are removed. About 130 MB less memory |
+| `core` | the core alone (`remote-pi-core.service`): rules, GPIO, sensors, sensor log, monitor check-ins and the app; nginx, PHP and the worker are removed. On pi-laistisana: 126 MB of memory in use instead of 191 MB |
 
 `php+watch` and `core` need the site's `rules/` (`rules.lua`, `device.toml`; see
 `core/README.md`), and Docker on the computer that runs `deploy.sh`: it builds the core for

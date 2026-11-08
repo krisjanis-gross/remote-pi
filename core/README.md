@@ -16,7 +16,8 @@ Each device's own logic is a short Lua file, `sites/<name>/rules/rules.lua`.
 - The installer sets it up (`BACKEND` in `site.env`, see `provision/README.md`): next to
   PHP in watch-only mode, or alone in place of PHP, nginx and the Python worker.
 
-The PHP backend is unchanged and still runs the devices.
+pi-laistisana runs on the core (`BACKEND="core"`) since 2026-11-08; the other sites still
+run the PHP backend.
 
 ## A site's rules
 
@@ -308,7 +309,8 @@ Measured on pi-laistisana (Pi 2):
 - The simulator (2026-11-07): 16–49 µs per 1-second tick, under 0.01% CPU; the rules' Lua
   state is about 40 KB.
 
-Today PHP-FPM and the Python worker use about 136 MB.
+On pi-laistisana with `BACKEND="core"` (2026-11-08): the core uses 5 MB, and the Pi has
+126 MB of memory in use instead of 191 MB with nginx, PHP-FPM and the Python worker.
 
 ## Next steps
 
@@ -323,7 +325,19 @@ Today PHP-FPM and the Python worker use about 136 MB.
    `deploy.sh` builds the ARMv6 binary; the installer puts in place the core, its config and
    the reboot/power-off units, and with `core` removes PHP, nginx and the worker;
    `remote-pi-doctor` checks each backend.
-5. **Switch pi-laistisana over:** test the valves for real first, and keep the PHP version
-   ready to roll back to for a while.
+5. **Switch pi-laistisana over:** done on 2026-11-08, with the valves disconnected:
+   - Before, with `php+watch`, a valve and the watering sequence switched through PHP: the
+     core followed, with one difference (below).
+   - With `BACKEND="core"`: valves on and off from the app at the right relay levels, the
+     safety timer, the sequence, settings, readings, sensor log, sparklines, history, CSV,
+     Home Assistant, the app on ports 80 and 1111, the monitor, and a reboot from the app
+     (the RAM sensor log and the settings were saved first; all relays off after it).
+   - Still to see: watering with the valves connected, and the daily sensor log backup on
+     the device (tested in `sensor_log.rs`).
+   - Back to PHP if needed: `BACKEND="php"` in `sites/laistisana/site.env`, then deploy.
+
+   **Differs from PHP on purpose:** stopping the watering sequence (trigger 5) from the app
+   closes its open valve. PHP left it open, and once the 45-minute safety trigger was also
+   stopped, nothing closed it.
 6. **Port the other sites:** move the sites in `custom_configuration/` to
    `sites/<name>/rules`, and check each one in the simulator against what its PHP did.
