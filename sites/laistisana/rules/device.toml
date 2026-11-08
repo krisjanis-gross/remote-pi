@@ -26,3 +26,7 @@ max_on_minutes = 60
 [sensors]
 # Every DS18B20 on the 1-wire bus, named by its id (28-...).
 ds18b20 = true
+
+# How long sensor readings are kept (from the PHP site's custom_app_config.php).
+[log]
+mid_term_save_days = 10

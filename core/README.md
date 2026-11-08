@@ -5,12 +5,14 @@ The core owns the outputs and the 1-second loop, and it enforces the safety limi
 Each device's own logic is a short Lua file, `sites/<name>/rules/rules.lua`.
 
 **Status:**
-- Done and tested: the rules engine, the simulator, and `remote-pi run` (GPIO through
-  `pinctrl`, DS18B20 and DHT sensors, the settings database, and a watch-only mode that runs
-  next to PHP).
+- Done and tested:
+  - the rules engine and the simulator;
+  - `remote-pi run`: GPIO through `pinctrl`, DS18B20 and DHT sensors, the settings
+    database, and a watch-only mode that runs next to PHP;
+  - the app's API (`json_API_v2.php`'s 17 actions, `json_ha.php`, `csv_export.php`) and
+    the built app, held to the same contract tests as PHP.
 - Not built yet:
-  - the JSON API and the static UI;
-  - the sensor log and monitor check-ins;
+  - writing the sensor log, and monitor check-ins;
   - the provisioning step that installs the core.
 
 The PHP backend is unchanged and still runs the devices.
@@ -40,6 +42,11 @@ interval_seconds = 5  # default
 device = "iio:device0"
 temperature = "DHT11_TEMP"
 humidity = "DHT11_HUMIDITY"
+
+[log]                 # how long readings are kept ($allDataSaveHours etc. in PHP); defaults:
+all_data_save_hours = 3              # every reading, one per all_data_save_interval_seconds (60)
+mid_term_save_days = 90              # then one per mid_term_save_interval_seconds (600)
+long_term_save_days = 365            # then one per long_term_save_interval_seconds (3600)
 ```
 
 A sensor that stops answering for three read intervals (at least 30 s) reads as nil.
@@ -155,8 +162,9 @@ Everything it does goes to the journal: `journalctl -u remote-pi-core`.
 - **Live mode at startup:** every output is switched off. Triggers that were on start again
   from the beginning.
 - **Live mode while running:** pin and trigger changes are written back to the database.
-  Copying the database to `/data` is still done by PHP; it moves to the core with the
-  sensor log.
+  A minute after a change (`save_delay_seconds`), the database is copied to the data folder
+  as `static_data_<YYYYmmddHHMMSS>.db`; the newest 20 are kept, as PHP did. After a reboot
+  the core starts from the newest good copy, or from an empty database.
 - **Stopping:** on SIGTERM (`systemctl stop`) the core switches every output off.
 - **Rules that do not load:** the core still runs, with every output off, and logs the
   error.
@@ -167,10 +175,67 @@ Everything it does goes to the journal: `journalctl -u remote-pi-core`.
   - It runs its own rules on that, and logs `DIFFERS:` when its pins or triggers disagree
     with PHP's for more than 5 seconds. It logs `agrees again` when they match.
 
-The systemd unit is `provision/files/remote-pi-core.service`:
-- It runs as `www-data` in the `gpio` group.
-- It has no network access.
-- It can write only to `/run/remote-pi`.
+### Configuration: `/etc/remote-pi/core.toml`
+
+The installation's settings; it takes the place of PHP's `/etc/remote-pi/app.php`. Without
+the file the defaults apply and there is no API. `--config FILE` uses another file.
+
+```toml
+runtime_dir = "/run/remote-pi"   # static_data.db and the RAM sensor log
+data_dir = "/data/sqlite"        # copies that survive a reboot
+
+[settings]
+save_delay_seconds = 60          # copy the settings to data_dir this long after a change
+
+[api]
+listen = ["0.0.0.0:80"]
+key_file = "/etc/remote-pi/api-key"     # or key = "..."; at least 16 characters
+ui_dir = "/opt/remote-pi/ui"            # the built app
+# cors_allowed_origins = ["capacitor://localhost", "ionic://localhost", "http://localhost", "https://localhost"]
+# reboot_command = ["sudo", "-n", "/usr/bin/systemctl", "reboot"]
+# shutdown_command = ["sudo", "-n", "/usr/bin/systemctl", "poweroff"]
+```
+
+### The app's API
+
+The same contract as the PHP backend (`api/json_API_v2.schema.json`, version 0.5), so the
+app needs no changes:
+- `/json_API_v2.php`: the 17 actions, with the same key handling (the `X-API-Key` header,
+  or `API_key` in the body), CORS and origin rules, validation and error codes.
+- `/json_ha.php`: Home Assistant's RESTful switch.
+- `/csv_export.php`: the sensor log as CSV.
+- Any other path: the built app, as nginx served it. App routes such as `/home` get
+  `index.html`, and a missing file gets a 404.
+
+How it works:
+- **Reads** go straight to the databases, as PHP did: the settings in `static_data.db`, and
+  the sensor log (the RAM copy and the newest `sensor_log<time>.db` in the data folder).
+  History windows such as "the last day" count back from the core's local time.
+- **Changes** run on the rules' thread, between ticks. The rules see them at once, and the
+  core is the only writer.
+- **Pins:** a pin in `device.toml` goes through the rules and limits. A pin above 40 that
+  is not listed has no hardware and is only recorded, as PHP did. Any other header pin is
+  refused.
+- **Triggers:** switching a trigger the rules don't define only records its state, as PHP did.
+- **Restore:** the settings come back from `staticDataBackup.db`. The outputs stay as they
+  are, and the restored database is corrected to match them.
+- **Watch-only mode:** the API only reads; any change gets `503`.
+
+The tests in `tests/test_api.py` and `tests/test_contract.py` run against either backend:
+
+```bash
+docker run --rm -v "$PWD/..:/app" -w /app/tests -e REMOTE_PI_CORE=/app/core/target-linux/release/remote-pi \
+  remote-pi-tests python3 -m unittest test_api test_contract
+```
+
+(`remote-pi-tests` is built from `tests/Dockerfile`; build the core for Linux into
+`core/target-linux` first. CI does the same with a native build.)
+
+### The systemd unit
+
+`provision/files/remote-pi-core.service`:
+- It runs as `www-data` in the `gpio` group, and may bind port 80.
+- It can write only to `/run/remote-pi` and `/data/sqlite`.
 
 ## Build
 
@@ -191,7 +256,17 @@ docker run --rm -v "$PWD:/work" -w /work -v remote-pi-cargo:/usr/local/cargo/reg
 ```
 
 Measured on pi-laistisana (Pi 2):
-- 1.8 MB binary, with Lua and SQLite built in.
+- 2.1 MB binary, with Lua, SQLite and the HTTP server built in (1.8 MB before the API).
+- With the API, read-only, next to PHP (2026-11-08): 6.1 MB of memory, 11 threads. The
+  answers matched PHP's on the device's real data: pins, triggers, readings, sparklines,
+  and history from an hour to a month. Middle of 5 calls:
+
+  | | PHP | core |
+  |---|---|---|
+  | `get_GPIO_list` | 11 ms | 7 ms |
+  | `get_sensor_data_sparkline` | 13 ms | 9 ms |
+  | `get_historic_data`, day (881 points) | 94 ms | 31 ms |
+  | `get_historic_data`, month (1554 points) | 155 ms | 48 ms |
 - `remote-pi run --watch-only` as a service (2026-11-08): 3.6 MB of memory, and 127 s of
   CPU in its first 8.4 hours (0.4% of one core). Most of that is probably the kernel's
   DS18B20 driver, read every 5 s; a longer `interval_seconds` reduces it.
@@ -204,11 +279,12 @@ Today PHP-FPM and the Python worker use about 136 MB.
 
 1. **Device loop:** done. Still to do: a watch-only trial of a few days on pi-laistisana,
    including some watering from the app, with no unexplained `DIFFERS` lines.
-2. **JSON API:** the same actions as `json_API_v2.php`, so the app needs no changes. Also
-   `json_ha.php`, CSV export, and serving the built UI. After that, nginx and PHP are no
-   longer needed.
-3. **Logging and monitoring:** the sensor log levels and moving data to `/data`, as
-   `read_sensor_data.php` does now, plus monitor check-ins.
+2. **JSON API:** done, and read-only on pi-laistisana next to PHP. Not tried yet: changes
+   from the app in live mode on a device. Open for step 4: the reboot and shutdown
+   commands use `sudo`, which the unit's `NoNewPrivileges` blocks.
+3. **Logging and monitoring:** writing the sensor log with its save levels, moving it to
+   `/data`, purging and backups, as `read_sensor_data.php` does now; monitor check-ins.
+   After that, nginx, PHP and the Python worker are no longer needed.
 4. **Provisioning:** CI builds the ARM binary; the installer puts it in place with its
    systemd unit and removes PHP-FPM, the Python worker and phpLiteAdmin. `remote-pi-doctor`
    checks the new service.

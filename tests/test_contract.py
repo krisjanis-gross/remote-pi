@@ -5,13 +5,15 @@ The app checks its side of the same contract in client/src/app/services/api-cont
 
 import json
 import re
+import time
 
 import jsonschema
 
-from test_api import KEY, ROOT, ApiServerCase
+from test_api import CORE, KEY, ROOT, ApiServerCase
 
 SCHEMA = json.loads((ROOT / "api" / "json_API_v2.schema.json").read_text())
 API_SOURCE = (ROOT / "server_www" / "json_API_v2.php").read_text()
+CORE_SOURCE = (ROOT / "core" / "src" / "api.rs").read_text()
 
 # One valid request per action. restart_device and shutdown_device are left out: they
 # would run the reboot and shutdown commands.
@@ -50,17 +52,26 @@ class ContractTests(ApiServerCase):
         handlers = re.search(r"\$handlers = array\((.*?)\n\);", API_SOURCE, re.S).group(1)
         # Only the array's own keys: they start a line ('version' => inside a handler does not).
         self.assertEqual(set(re.findall(r"^\s*'(\w+)'\s*=>", handlers, re.M)), set(SCHEMA["actions"]))
+        # The core's list, and its dispatch (each action is a match arm).
+        actions = re.search(r"pub const ACTIONS: \[&str; \d+\] = \[(.*?)\];", CORE_SOURCE, re.S).group(1)
+        self.assertEqual(set(re.findall(r'"(\w+)"', actions)), set(SCHEMA["actions"]))
+        self.assertEqual(set(re.findall(r'^\s*"(\w+)" =>', CORE_SOURCE, re.M)) & set(SCHEMA["actions"]), set(SCHEMA["actions"]))
 
     def test_schema_version_matches_the_api(self):
         version = re.search(r"\$API_VERSION\s*=\s*'([0-9.]+)'", API_SOURCE).group(1)
         self.assertEqual(version, SCHEMA["apiVersion"])
         self.assertIn(version, SCHEMA["versions"])
+        core_version = re.search(r'pub const API_VERSION: &str = "([0-9.]+)";', CORE_SOURCE).group(1)
+        self.assertEqual(core_version, SCHEMA["apiVersion"])
 
     def test_every_action_is_exercised(self):
         self.assertEqual({action for action, _ in SAMPLE_REQUESTS} | NOT_CALLED, set(SCHEMA["actions"]))
 
     def test_requests_and_responses_match_the_contract(self):
-        self.request("read_sensor_data.php", method="GET")  # one sensor sample, so data lists are not empty
+        if not CORE:  # the core samples on its own
+            self.request("read_sensor_data.php", method="GET")  # one sensor sample, so data lists are not empty
+        else:
+            time.sleep(1.2)  # one tick, so the readings are there
         for action, data in SAMPLE_REQUESTS:
             with self.subTest(action=action, data=data):
                 validate({"API_key": KEY, "request_action": action, "request_data": data}, "#/definitions/request")

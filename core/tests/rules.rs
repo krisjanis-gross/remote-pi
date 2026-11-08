@@ -280,6 +280,10 @@ fn device_file_is_checked() {
     assert!(bad("[pins.11]\nmax_on_minutes = 0").contains("above 0"));
     assert!(bad("[pins.11]\n[sensors]\ninterval_seconds = 0.5").contains("interval_seconds"));
     assert!(bad("[pins.11]\n[[sensors.dht]]\ndevice = \"iio:device0\"").contains("temperature or humidity"));
+    assert!(bad("[pins.11]\n[log]\nmid_term_save_days = 0").contains("[log]"));
+    assert!(bad("[pins.11]\n[log]\nmid_term_days = 10").contains("unknown field"));
+    let site = Site::from_strings("", "[pins.11]\n[log]\nmid_term_save_days = 10").unwrap();
+    assert_eq!((site.log.mid_term_save_days, site.log.long_term_save_days), (10.0, 365.0));
     assert!(bad("[pins.11]\n[gpio]\nactive_lo = true").contains("unknown field"));
     let ok = Site::from_strings("", "[gpio]\nactive_low = true\n[pins.11]\n[pins.123]\nname = \"virtual\"\n").unwrap();
     assert!(ok.gpio.active_low && ok.pins.contains_key(&123));

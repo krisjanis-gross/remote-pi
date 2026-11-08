@@ -8,16 +8,48 @@
 //!   writes to the database (pins and triggers switched from the app, parameter
 //!   changes), runs its own rules on that, and logs a DIFFERS line whenever its
 //!   pins or triggers disagree with PHP's for longer than a few seconds.
+//!
+//! The rules engine lives on the loop's thread. The app's API runs on other
+//! threads and sends its changes here as jobs, which run between ticks; it
+//! reads the database itself, and the latest readings from `Live`.
 
+use crate::api::ApiError;
+use crate::clock::{local_datetime, local_stamp, wall_now};
 use crate::engine::{describe, By, Engine, Outputs, What};
 use crate::sim::format_readings;
+use crate::site::{Site, LAST_HEADER_PIN};
 use crate::store::{Snapshot, Store};
-use crate::site::Site;
+use rusqlite::Connection;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
+
+pub use crate::clock::utc_offset_seconds;
+
+/// A change from the API, run on the loop's thread between ticks. It returns
+/// lines for the log.
+pub type Job = Box<dyn FnOnce(&mut Runner) -> Vec<String> + Send>;
+
+/// What the API shows as the current readings.
+#[derive(Debug, Clone, Default)]
+pub struct Live {
+    /// Local time of the last tick, as PHP's date('Y-m-d H:i:s'); None before the first.
+    pub timestamp: Option<String>,
+    /// Sensor readings, then the rules' published values.
+    pub readings: Vec<(String, f64)>,
+}
+
+/// Copies of the settings in the data folder (live mode).
+struct Copies {
+    dir: PathBuf,
+    delay: f64,
+    /// The first change not yet copied (engine time).
+    pending_since: Option<f64>,
+}
 
 /// How long the core and PHP may disagree before it is logged. PHP reacts on
 /// its own 1-second cycle, so a second or two is normal.
@@ -71,6 +103,11 @@ pub struct Runner {
     differences: BTreeMap<Thing, Difference>,
     /// DIFFERS lines logged so far (watch-only mode).
     pub differences_logged: u64,
+    copies: Option<Copies>,
+    /// Whether the clock was synced at the last tick (copies are named by time).
+    clock_synced: bool,
+    /// Log lines from API jobs.
+    messages: Vec<String>,
 }
 
 fn on_off(on: bool) -> &'static str {
@@ -133,6 +170,9 @@ impl Runner {
             db_error: None,
             differences: BTreeMap::new(),
             differences_logged: 0,
+            copies: None,
+            clock_synced: clock.synced,
+            messages: Vec::new(),
         };
         lines.extend(runner.journal());
 
@@ -178,6 +218,17 @@ impl Runner {
         Ok((runner, lines))
     }
 
+    /// Live mode: copy the settings to `dir` once a change is `delay` seconds old.
+    pub fn keep_copies(&mut self, dir: PathBuf, delay: f64) {
+        if self.mode == Mode::Live {
+            self.copies = Some(Copies { dir, delay, pending_since: None });
+        }
+    }
+
+    pub fn mode(&self) -> Mode {
+        self.mode
+    }
+
     /// Ends pulses that are due before the next tick.
     pub fn advance(&mut self, now: f64) -> Vec<String> {
         self.engine.advance_to(now);
@@ -214,7 +265,143 @@ impl Runner {
         if self.mode == Mode::WatchOnly {
             lines.extend(self.compare(clock.now));
         }
+        self.clock_synced = clock.synced;
+        lines.extend(self.save_copy(clock.wall, false));
         lines
+    }
+
+    /// Copies the settings to the data folder if a change is due (or now, with
+    /// `force`). Waits for a synced clock, since copies are named by the time.
+    fn save_copy(&mut self, wall: f64, force: bool) -> Vec<String> {
+        let now = self.engine.now();
+        let (Some(copies), Some(store)) = (self.copies.as_mut(), self.store.as_mut()) else { return Vec::new() };
+        if store.take_changed() && copies.pending_since.is_none() {
+            copies.pending_since = Some(now);
+        }
+        let Some(since) = copies.pending_since else { return Vec::new() };
+        if !self.clock_synced || (!force && now - since < copies.delay) {
+            return Vec::new();
+        }
+        match store.save_copy(&copies.dir, &local_stamp(wall)) {
+            Ok(_) => {
+                copies.pending_since = None;
+                Vec::new()
+            }
+            Err(e) => {
+                // Try again after another delay.
+                copies.pending_since = Some(now);
+                vec![format!("cannot keep a copy of the settings: {e}")]
+            }
+        }
+    }
+
+    /// Copies any unsaved settings now: before a reboot, and when the core stops.
+    pub fn save_now(&mut self) -> Vec<String> {
+        self.save_copy(wall_now(), true)
+    }
+
+    /// Log lines from the API jobs that ran since the last call.
+    pub fn take_messages(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.messages)
+    }
+
+    fn writable(&self) -> Result<(), ApiError> {
+        match self.mode {
+            Mode::WatchOnly => Err(ApiError::watch_only()),
+            Mode::Live => Ok(()),
+        }
+    }
+
+    fn no_store() -> ApiError {
+        ApiError::failed("the core runs without a settings database")
+    }
+
+    /// set_GPIO_pin from the app. Pins in device.toml go through the rules and
+    /// limits; other pins above 40 have no hardware and are only recorded, as
+    /// the PHP backend did; other header pins are refused.
+    pub fn api_set_pin(&mut self, pin: u16, on: bool) -> Result<(), ApiError> {
+        self.writable()?;
+        if self.names.contains_key(&pin) {
+            let result = self.engine.app_set_pin(pin, on);
+            let lines = self.journal();
+            self.messages.extend(lines);
+            return result.map_err(ApiError::failed);
+        }
+        if pin <= LAST_HEADER_PIN {
+            return Err(ApiError::bad(format!("pin {pin} is not an output in device.toml")));
+        }
+        self.store.as_mut().ok_or_else(Self::no_store)?.write_pin(pin, on).map_err(ApiError::failed)?;
+        let on = if on { "ON" } else { "off" };
+        self.messages.push(format!("pin {pin:<3} {on:<3}  (app)  not in device.toml: recorded only"));
+        Ok(())
+    }
+
+    /// set_trigger_state from the app. Starting a trigger that is on restarts it.
+    pub fn api_set_trigger(&mut self, id: u32, on: bool) -> Result<(), ApiError> {
+        self.writable()?;
+        self.engine.app_set_trigger(id, on);
+        let lines = self.journal();
+        self.messages.extend(lines);
+        Ok(())
+    }
+
+    /// setParameterValue from the app: saved, and the rules see it at once.
+    pub fn api_set_param(&mut self, id: i64, value: f64) -> Result<(), ApiError> {
+        self.writable()?;
+        self.store.as_mut().ok_or_else(Self::no_store)?.write_param(id, value).map_err(ApiError::failed)?;
+        if let Ok(id) = u32::try_from(id) {
+            self.engine.set_param(id, value);
+        }
+        Ok(())
+    }
+
+    /// Other changes to the settings from the app (pin and sensor names).
+    pub fn api_write<T>(&mut self, f: impl FnOnce(&Connection) -> Result<T, ApiError>) -> Result<T, ApiError> {
+        self.writable()?;
+        self.store.as_mut().ok_or_else(Self::no_store)?.write_with(f)
+    }
+
+    /// Before the app reboots or powers off the device: save the settings now.
+    pub fn api_prepare_power_off(&mut self) -> Result<(), ApiError> {
+        self.writable()?;
+        let lines = self.save_now();
+        self.messages.extend(lines);
+        Ok(())
+    }
+
+    /// backup_device_configuration: a copy of the settings at `target`.
+    pub fn api_backup(&mut self, target: &Path) -> Result<(), ApiError> {
+        self.writable()?;
+        self.store.as_ref().ok_or_else(Self::no_store)?.copy_to(target).map_err(ApiError::failed)?;
+        self.messages.push(format!("settings backed up to {}", target.display()));
+        Ok(())
+    }
+
+    /// restore_device_configuration: the settings from `source`. Parameters
+    /// apply at once; the outputs stay as they are, and the restored database
+    /// is corrected to say so.
+    pub fn api_restore(&mut self, source: &Path) -> Result<(), ApiError> {
+        self.writable()?;
+        let store = self.store.as_mut().ok_or_else(Self::no_store)?;
+        match store.replace_with(source) {
+            Ok(()) => {}
+            Err(None) => return Err(ApiError::not_found("No valid backup to restore")),
+            Err(Some(e)) => return Err(ApiError::failed(e)),
+        }
+        let restored = store.read().map_err(ApiError::failed)?;
+        for &pin in restored.pins.keys().filter(|pin| self.names.contains_key(pin)) {
+            store.write_pin(pin, self.engine.pin_on(pin)).map_err(ApiError::failed)?;
+        }
+        for &id in restored.triggers.keys() {
+            store.write_trigger(id, self.engine.trigger_on(id)).map_err(ApiError::failed)?;
+        }
+        for (&id, &value) in &restored.params {
+            self.engine.set_param(id, value);
+        }
+        self.messages.push(format!("settings restored from {}", source.display()));
+        let lines = self.save_now();
+        self.messages.extend(lines);
+        Ok(())
     }
 
     /// Switches every output off; for when the program stops.
@@ -308,37 +495,33 @@ impl Runner {
     }
 }
 
-/// The local time zone's offset from UTC at `wall`, in seconds.
-pub fn utc_offset_seconds(wall: f64) -> f64 {
-    // SAFETY: localtime_r only writes into the tm we pass.
-    unsafe {
-        let t = wall as libc::time_t;
-        let mut tm: libc::tm = std::mem::zeroed();
-        if libc::localtime_r(&t, &mut tm).is_null() {
-            0.0
-        } else {
-            tm.tm_gmtoff as f64
-        }
-    }
-}
-
 static STOP: AtomicBool = AtomicBool::new(false);
 
 extern "C" fn request_stop(_: libc::c_int) {
     STOP.store(true, Ordering::SeqCst);
 }
 
+/// How run_forever runs.
+pub struct LoopOptions<'a> {
+    /// Exists once the clock has been synced.
+    pub clock_flag: &'a Path,
+    /// Log the readings and the rules' published values this often (seconds).
+    pub readings_every: Option<f64>,
+    /// Changes from the API.
+    pub jobs: Option<Receiver<Job>>,
+    /// Where the latest readings go, for the API.
+    pub live: Option<Arc<Mutex<Live>>>,
+}
+
 /// Runs until SIGTERM or SIGINT. `sensors` gives the latest readings and any
-/// messages about sensors that stopped or started answering. With
-/// `readings_every` (seconds), the readings and the rules' published values
-/// are logged that often.
+/// messages about sensors that stopped or started answering.
 pub fn run_forever(
     mut runner: Runner,
     sensors: impl Fn() -> (BTreeMap<String, f64>, Vec<String>),
-    clock_flag: &Path,
-    readings_every: Option<f64>,
+    options: LoopOptions,
     print: impl Fn(&str),
 ) {
+    let LoopOptions { clock_flag, readings_every, jobs, live } = options;
     // SAFETY: the handler only stores to an atomic.
     unsafe {
         libc::signal(libc::SIGTERM, request_stop as libc::sighandler_t);
@@ -348,7 +531,7 @@ pub fn run_forever(
     let start_now = runner.engine.now();
     let now = || start_now + started.elapsed().as_secs_f64();
     let clock = || {
-        let wall = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0);
+        let wall = wall_now();
         Clock { now: now(), wall, utc_offset: utc_offset_seconds(wall), synced: clock_flag.exists() }
     };
 
@@ -359,7 +542,19 @@ pub fn run_forever(
         let wake = runner.engine.next_pulse_end().map_or(next_tick, |end| end.min(next_tick));
         let wait = wake - now();
         if wait > 0.0 {
-            thread::sleep(Duration::from_secs_f64(wait.min(1.0)));
+            let wait = Duration::from_secs_f64(wait.min(1.0));
+            match jobs.as_ref().map(|jobs| jobs.recv_timeout(wait)) {
+                Some(Ok(job)) => {
+                    for line in runner.advance(now()) {
+                        print(&line);
+                    }
+                    for line in job(&mut runner) {
+                        print(&line);
+                    }
+                }
+                Some(Err(RecvTimeoutError::Timeout)) => {}
+                Some(Err(RecvTimeoutError::Disconnected)) | None => thread::sleep(wait),
+            }
             continue;
         }
         if now() < next_tick {
@@ -373,8 +568,16 @@ pub fn run_forever(
             print(&line);
         }
         let mut shown = readings_every.filter(|_| next_tick >= readings_due).map(|_| readings.clone());
-        for line in runner.tick(clock(), readings) {
+        let tick_clock = clock();
+        let current = live.as_ref().map(|_| readings.clone());
+        for line in runner.tick(tick_clock, readings) {
             print(&line);
+        }
+        if let (Some(live), Some(current)) = (&live, current) {
+            let mut readings: Vec<(String, f64)> = current.into_iter().collect();
+            readings.extend(runner.engine.published());
+            let mut live = live.lock().unwrap_or_else(|e| e.into_inner());
+            *live = Live { timestamp: Some(local_datetime(tick_clock.wall)), readings };
         }
         if let (Some(all), Some(every)) = (shown.as_mut(), readings_every) {
             all.extend(runner.engine.published());
@@ -386,6 +589,9 @@ pub fn run_forever(
     }
     if runner.mode == Mode::Live {
         for line in runner.shutdown() {
+            print(&line);
+        }
+        for line in runner.save_now() {
             print(&line);
         }
     }

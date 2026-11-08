@@ -2,12 +2,15 @@ use clap::{Parser, Subcommand};
 use remote_pi_core::engine::{self, format_number, Engine, Entry, NoHardware};
 use remote_pi_core::sim::{self, Action};
 use remote_pi_core::hardware::Pinctrl;
-use remote_pi_core::run::{self, Clock, Mode, Runner};
+use remote_pi_core::api::{self, Context};
+use remote_pi_core::config::{self, Config};
+use remote_pi_core::run::{self, Clock, Live, LoopOptions, Mode, Runner};
 use remote_pi_core::sensors::{self, Sensors};
 use remote_pi_core::site::Site;
 use remote_pi_core::store::{self, Store};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::sync::{mpsc, Arc, Mutex};
 
 #[derive(Parser)]
 #[command(name = "remote-pi", version, about = "Remote PI device core")]
@@ -54,7 +57,7 @@ enum Command {
         #[arg(long, value_name = "INTERVAL")]
         readings: Option<String>,
     },
-    /// Run the device: GPIO, sensors and the rules, once a second until stopped.
+    /// Run the device: GPIO, sensors, the rules and the app's API, until stopped.
     ///
     /// Example: remote-pi run /opt/remote-pi/site/rules --watch-only
     Run {
@@ -62,11 +65,16 @@ enum Command {
         site: PathBuf,
         /// Switch nothing and write nothing: follow the PHP backend through the
         /// database and log where the core would have done something different.
+        /// The API, if configured, only answers reads.
         #[arg(long)]
         watch_only: bool,
-        /// The settings database (pins, triggers, trigger_parameters).
-        #[arg(long, default_value = store::DEFAULT_DB, value_name = "FILE")]
-        db: PathBuf,
+        /// Data folders and the API [default: /etc/remote-pi/core.toml, if it exists].
+        #[arg(long, value_name = "FILE")]
+        config: Option<PathBuf>,
+        /// The settings database [default: static_data.db in the config's runtime_dir,
+        /// /run/remote-pi].
+        #[arg(long, value_name = "FILE")]
+        db: Option<PathBuf>,
         /// Run without the settings database: the rules use their default parameters.
         #[arg(long, conflicts_with = "db")]
         no_db: bool,
@@ -91,8 +99,8 @@ fn main() -> ExitCode {
         Command::Sim { site, duration, start, trigger, pin, param, sensor, at, readings } => {
             simulate(site, &duration, &start, trigger, pin, param, sensor, at, readings)
         }
-        Command::Run { site, watch_only, db, no_db, no_sensors, pinctrl, clock_flag, log_readings } => {
-            let options = RunOptions { watch_only, db: (!no_db).then_some(db), no_sensors, pinctrl, clock_flag, log_readings };
+        Command::Run { site, watch_only, config, db, no_db, no_sensors, pinctrl, clock_flag, log_readings } => {
+            let options = RunOptions { watch_only, config, db, no_db, no_sensors, pinctrl, clock_flag, log_readings };
             run_device(site, options)
         }
     };
@@ -243,7 +251,9 @@ fn describe(entry: &Entry, names: &std::collections::BTreeMap<u16, String>) -> O
 
 struct RunOptions {
     watch_only: bool,
+    config: Option<PathBuf>,
     db: Option<PathBuf>,
+    no_db: bool,
     no_sensors: bool,
     pinctrl: PathBuf,
     clock_flag: PathBuf,
@@ -251,10 +261,15 @@ struct RunOptions {
 }
 
 fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String> {
-    let RunOptions { watch_only, db, no_sensors, pinctrl, clock_flag, log_readings } = options;
+    let RunOptions { watch_only, config, db, no_db, no_sensors, pinctrl, clock_flag, log_readings } = options;
     let readings_every = log_readings.map(|r| sim::parse_duration(&r)).transpose()?.map(|s| s.max(1.0));
     // Lines go to stdout, which systemd sends to the journal with a timestamp.
     let print = |line: &str| println!("{line}");
+    let config = match &config {
+        Some(path) => Config::load(path, true)?,
+        None => Config::load(Path::new(config::DEFAULT_PATH), false)?,
+    };
+    let db = (!no_db).then(|| db.unwrap_or_else(|| config.static_db()));
     let site = Site::load(&site_dir)?;
     let mode = if watch_only { Mode::WatchOnly } else { Mode::Live };
     let active_low = site.gpio.active_low;
@@ -265,10 +280,7 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
             Box::new(Pinctrl { path: pinctrl.clone(), active_low })
         }
     };
-    let wall = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
+    let wall = remote_pi_core::clock::wall_now();
     let clock = Clock { now: wall, wall, utc_offset: run::utc_offset_seconds(wall), synced: clock_flag.exists() };
 
     print(&format!(
@@ -280,10 +292,50 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
     if !clock.synced {
         print("the clock is not synced yet: time_of_day() may be wrong until it is");
     }
-    let (runner, lines) = Runner::start(&site, mode, db.as_deref().map(Store::new), outputs, clock)?;
+    // After a reboot the settings in RAM are gone: start from the saved copy.
+    if let (Mode::Live, Some(db)) = (mode, &db) {
+        match store::ensure_db(db, &config.data_dir) {
+            Ok(Some(message)) => print(&message),
+            Ok(None) => {}
+            Err(e) => print(&format!("cannot prepare the settings database: {e}")),
+        }
+    }
+    let (mut runner, lines) = Runner::start(&site, mode, db.as_deref().map(Store::new), outputs, clock)?;
+    runner.keep_copies(config.data_dir.clone(), config.settings.save_delay_seconds);
     print(&describe_site(&site, &runner.engine));
     for line in lines {
         print(&line);
+    }
+
+    // The app's API, if configured. A problem with it is logged and the rules keep running.
+    let mut jobs = None;
+    let mut live = None;
+    if let Some(api_config) = &config.api {
+        match api_config.api_key() {
+            Err(e) => print(&format!("api: off: {e}")),
+            Ok(key) => {
+                let (sender, receiver) = mpsc::channel();
+                let shared = Arc::new(Mutex::new(Live::default()));
+                let context = Context {
+                    key,
+                    api: api_config.clone(),
+                    log: site.log.clone(),
+                    static_db: db.clone().unwrap_or_else(|| config.static_db()),
+                    runtime_dir: config.runtime_dir.clone(),
+                    data_dir: config.data_dir.clone(),
+                    live: shared.clone(),
+                    jobs: sender,
+                    watch_only,
+                };
+                match api::serve(Arc::new(context)) {
+                    Ok(()) => {
+                        jobs = Some(receiver);
+                        live = Some(shared);
+                    }
+                    Err(e) => print(&format!("api: off: {e}")),
+                }
+            }
+        }
     }
 
     let mut sensor_config = site.sensors.clone();
@@ -292,6 +344,7 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
         sensor_config.dht.clear();
     }
     let sensors = Sensors::start(sensor_config, sensors::W1_DIR.into(), sensors::IIO_DIR.into());
-    run::run_forever(runner, || (sensors.current(), sensors.take_messages()), &clock_flag, readings_every, print);
+    let loop_options = LoopOptions { clock_flag: &clock_flag, readings_every, jobs, live };
+    run::run_forever(runner, || (sensors.current(), sensors.take_messages()), loop_options, print);
     Ok(ExitCode::SUCCESS)
 }

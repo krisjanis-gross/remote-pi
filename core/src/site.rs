@@ -1,5 +1,6 @@
 //! A site's rules folder: `rules.lua` (what to do) and `device.toml` (the
-//! hardware: which pins the rules may switch, their hard limits, and the sensors).
+//! hardware: which pins the rules may switch, their hard limits, the sensors,
+//! and how long their readings are kept).
 
 use crate::hardware::board_to_bcm;
 use serde::Deserialize;
@@ -66,6 +67,53 @@ impl Default for SensorConfig {
     }
 }
 
+/// How often readings go to the sensor log, and how long they are kept
+/// ($allDataSaveHours and the rest in the PHP sites' custom_app_config.php).
+/// Every reading is kept for all_data_save_hours at all_data_save_interval_seconds;
+/// then one per mid-term interval for mid_term_save_days; then one per
+/// long-term interval for long_term_save_days.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LogConfig {
+    #[serde(default = "default_all_hours")]
+    pub all_data_save_hours: f64,
+    #[serde(default = "default_all_interval")]
+    pub all_data_save_interval_seconds: f64,
+    #[serde(default = "default_mid_days")]
+    pub mid_term_save_days: f64,
+    #[serde(default = "default_mid_interval")]
+    pub mid_term_save_interval_seconds: f64,
+    #[serde(default = "default_long_days")]
+    pub long_term_save_days: f64,
+    #[serde(default = "default_long_interval")]
+    pub long_term_save_interval_seconds: f64,
+}
+
+fn default_all_hours() -> f64 {
+    3.0
+}
+fn default_all_interval() -> f64 {
+    60.0
+}
+fn default_mid_days() -> f64 {
+    90.0
+}
+fn default_mid_interval() -> f64 {
+    600.0
+}
+fn default_long_days() -> f64 {
+    365.0
+}
+fn default_long_interval() -> f64 {
+    3600.0
+}
+
+impl Default for LogConfig {
+    fn default() -> Self {
+        toml::from_str("").expect("defaults")
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct DeviceFile {
@@ -74,6 +122,8 @@ struct DeviceFile {
     pins: BTreeMap<String, PinConfig>,
     #[serde(default)]
     sensors: SensorConfig,
+    #[serde(default)]
+    log: LogConfig,
 }
 
 #[derive(Debug, Clone)]
@@ -83,6 +133,7 @@ pub struct Site {
     pub gpio: GpioConfig,
     pub pins: BTreeMap<u16, PinConfig>,
     pub sensors: SensorConfig,
+    pub log: LogConfig,
 }
 
 impl Site {
@@ -131,6 +182,18 @@ impl Site {
                 return Err(format!("sensors.dht {}: reading ids must be 1-50 characters", dht.device));
             }
         }
-        Ok(Site { rules_path: PathBuf::from("rules.lua"), rules: rules.to_string(), gpio: file.gpio, pins, sensors })
+        let log = file.log;
+        let values = [
+            log.all_data_save_hours,
+            log.all_data_save_interval_seconds,
+            log.mid_term_save_days,
+            log.mid_term_save_interval_seconds,
+            log.long_term_save_days,
+            log.long_term_save_interval_seconds,
+        ];
+        if values.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+            return Err("every [log] value must be above 0".into());
+        }
+        Ok(Site { rules_path: PathBuf::from("rules.lua"), rules: rules.to_string(), gpio: file.gpio, pins, sensors, log })
     }
 }

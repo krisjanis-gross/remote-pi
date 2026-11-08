@@ -1,5 +1,9 @@
+pub mod api;
+pub mod clock;
+pub mod config;
 pub mod engine;
 pub mod hardware;
+pub mod history;
 pub mod run;
 pub mod sensors;
 pub mod sim;

@@ -9,9 +9,11 @@ import json
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from test_api import ApiServerCase
+from test_api import ApiServerCase, php_only
 
 
+# They sample readings through read_sensor_data.php; the core writes the sensor log in step 3.
+@php_only
 class SystemZoneTests(ApiServerCase):
     # System zone (seen by SQLite and the C library) differs from PHP's default (UTC); the
     # device zone comes from the system, as on a Pi without remote_pi_timezone.

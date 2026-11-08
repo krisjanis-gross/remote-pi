@@ -16,6 +16,5 @@ server_www/.ftpconfig
 !/sites/*/rules/
 # written into the copy provision/deploy.sh sends
 /REVISION
-# Rust build output
-/core/target/
-/core/target-armv7/
+# Rust build output (target-armv7/ and target-linux/ are Docker builds)
+/core/target*/

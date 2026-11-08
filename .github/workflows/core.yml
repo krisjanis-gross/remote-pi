@@ -1,9 +1,9 @@
 name: Core (Rust + Lua rules)
 on:
   push:
-    paths: ["core/**", "sites/*/rules/**", ".github/workflows/core.yml"]
+    paths: ["core/**", "sites/*/rules/**", "api/**", "tests/test_api.py", "tests/test_contract.py", ".github/workflows/core.yml"]
   pull_request:
-    paths: ["core/**", "sites/*/rules/**", ".github/workflows/core.yml"]
+    paths: ["core/**", "sites/*/rules/**", "api/**", "tests/test_api.py", "tests/test_contract.py", ".github/workflows/core.yml"]
 permissions:
   contents: read
 jobs:
@@ -21,3 +21,8 @@ jobs:
       - run: cargo clippy --locked --all-targets -- -D warnings
       - name: Every site's rules load
         run: for site in ../sites/*/rules; do cargo run --locked --quiet -- check "$site"; done
+      - name: The app's API contract, as the PHP backend is tested
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends python3-jsonschema
+          cargo build --locked --release
+          cd ../tests && REMOTE_PI_CORE="$PWD/../core/target/release/remote-pi" python3 -m unittest -v test_api test_contract
