@@ -1,0 +1,42 @@
+# b_katlumaja's hardware (from custom_configuration/b_katlumaja). Pins are header
+# pins (BOARD numbering, as in the PHP backend).
+#
+# No max_on_minutes: the pumps run as long as there is heat to move, and the
+# lights as long as someone wants them.
+
+[gpio]
+# The old control_pins.py switched a relay on with a high signal.
+active_low = false
+
+[pins.11]
+name = "k.uud. suuknis"
+
+[pins.12]
+name = "kolektoru suuknis"
+
+[pins.13]
+name = "istabas apgaismojums"
+
+[pins.16]
+name = "koridora apgaismojums"
+
+[pins.18]
+name = "GPIO pin 18"
+
+[pins.22]
+name = "GPIO pin 22"
+
+# The light button (lights/button_1.py): pressing it pulls the pin low. The pull-up
+# keeps the pin high when the button is open (with or without an outside resistor);
+# 50 ms debounce, as the script read it every 50 ms.
+[inputs.15]
+name = "gaismas poga"
+pull = "up"
+debounce_ms = 50
+
+[sensors]
+ds18b20 = true
+
+[log]
+all_data_save_hours = 1
+mid_term_save_days = 3

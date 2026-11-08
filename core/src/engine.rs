@@ -21,6 +21,8 @@ const MAX_INSTRUCTIONS_PER_CALL: u64 = 5_000_000;
 /// Pin and trigger changes handled per event before the rules count as looping.
 const MAX_CHANGES_PER_EVENT: usize = 200;
 const MAX_PULSE_MS: f64 = 600_000.0;
+/// after(): a day at most.
+const MAX_TIMER_SECONDS: f64 = 86_400.0;
 
 /// Where pin changes go: GPIO on a device, nowhere in the simulator.
 pub trait Outputs {
@@ -48,6 +50,8 @@ pub enum By {
     Database,
     /// The program is stopping.
     Shutdown,
+    /// An input reached the level a run_until() waited for.
+    Input,
 }
 
 impl fmt::Display for By {
@@ -61,6 +65,7 @@ impl fmt::Display for By {
             By::Failsafe => "failsafe",
             By::Database => "database",
             By::Shutdown => "shutdown",
+            By::Input => "input",
         })
     }
 }
@@ -76,6 +81,10 @@ pub enum What {
     RulesFailed(String),
     /// The rules asked for this moment's readings to go to the long-term log.
     SaveNow,
+    /// An input pin changed level.
+    Input { pin: u16, high: bool },
+    /// The rules locked a pin (the app shows it greyed out) or unlocked it.
+    Lock { pin: u16, locked: bool },
 }
 
 #[derive(Debug, Clone)]
@@ -93,6 +102,14 @@ struct Pin {
 enum Change {
     Pin(u16, bool),
     Trigger(u32, bool),
+    Input(u16, bool),
+}
+
+/// run_until(): `pin` stays on until `input` reads `high` (or its pulse ends).
+struct Hold {
+    pin: u16,
+    input: u16,
+    high: bool,
 }
 
 struct State {
@@ -107,8 +124,19 @@ struct State {
     triggers: BTreeMap<u32, bool>,
     params: BTreeMap<u32, f64>,
     sensors: BTreeMap<String, f64>,
+    /// Values the rules published during this tick.
     published: BTreeMap<String, f64>,
+    /// Values published between ticks (timers, inputs), shown with the next tick.
+    published_between: BTreeMap<String, f64>,
+    ticking: bool,
     pulses: Vec<(f64, u16)>,
+    /// after(): (when, id); the callbacks live in the prelude.
+    timers: Vec<(f64, u64)>,
+    next_timer: u64,
+    holds: Vec<Hold>,
+    /// Input pins in device.toml: None until read.
+    inputs: BTreeMap<u16, Option<bool>>,
+    locks: BTreeMap<u16, bool>,
     queue: VecDeque<Change>,
     journal: Vec<Entry>,
     outputs: Box<dyn Outputs>,
@@ -131,6 +159,7 @@ impl State {
         state.since = now;
         if !on {
             self.pulses.retain(|&(_, p)| p != pin);
+            self.holds.retain(|h| h.pin != pin);
         }
         self.record(What::Pin { pin, on, by });
         if notify {
@@ -155,6 +184,38 @@ impl State {
 
     fn pin_on(&self, pin: u16) -> Result<bool, String> {
         self.pins.get(&pin).map(|p| p.on).ok_or_else(|| format!("pin {pin} is not in device.toml"))
+    }
+
+    fn input(&self, pin: u16) -> Result<Option<bool>, String> {
+        self.inputs.get(&pin).copied().ok_or_else(|| format!("input {pin} is not in device.toml [inputs]"))
+    }
+
+    fn lock(&mut self, pin: u16, locked: bool) -> Result<(), String> {
+        if !self.pins.contains_key(&pin) {
+            return Err(format!("pin {pin} is not in device.toml"));
+        }
+        if self.locks.get(&pin).copied().unwrap_or(false) != locked {
+            self.locks.insert(pin, locked);
+            self.record(What::Lock { pin, locked });
+        }
+        Ok(())
+    }
+
+    /// An input's new level: ends any run_until() waiting for it, and tells the rules.
+    fn set_input(&mut self, pin: u16, high: bool) {
+        let Some(slot) = self.inputs.get_mut(&pin) else { return };
+        if *slot == Some(high) {
+            return;
+        }
+        *slot = Some(high);
+        self.record(What::Input { pin, high });
+        let done: Vec<u16> = self.holds.iter().filter(|h| h.input == pin && h.high == high).map(|h| h.pin).collect();
+        for p in done {
+            if let Err(e) = self.switch(p, false, By::Input, true) {
+                self.record(What::Safety(e));
+            }
+        }
+        self.queue.push_back(Change::Input(pin, high));
     }
 }
 
@@ -192,7 +253,14 @@ impl Engine {
             params: BTreeMap::new(),
             sensors: BTreeMap::new(),
             published: BTreeMap::new(),
+            published_between: BTreeMap::new(),
+            ticking: false,
             pulses: Vec::new(),
+            timers: Vec::new(),
+            next_timer: 1,
+            holds: Vec::new(),
+            inputs: site.inputs.keys().map(|&pin| (pin, None)).collect(),
+            locks: BTreeMap::new(),
             queue: VecDeque::new(),
             journal: Vec::new(),
             outputs,
@@ -246,32 +314,56 @@ impl Engine {
 
     /// One pass of the 1-second loop.
     pub fn tick(&mut self) {
-        self.state.borrow_mut().published.clear();
+        {
+            let mut s = self.state.borrow_mut();
+            // What timers and inputs published since the last tick is shown with this one.
+            s.published = std::mem::take(&mut s.published_between);
+            s.ticking = true;
+        }
         self.enforce_limits();
         self.settle();
         self.call("tick", ());
         self.settle();
+        self.state.borrow_mut().ticking = false;
     }
 
-    /// Moves the clock forward, ending any pulses that are due on the way.
+    /// Moves the clock forward, ending pulses and running after() timers that
+    /// are due on the way, in order.
     pub fn advance_to(&mut self, time: f64) {
+        enum Due {
+            Pulse(usize, u16),
+            Timer(usize, u64),
+        }
         loop {
             let due = {
                 let s = self.state.borrow();
-                s.pulses
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, (at, _))| *at <= time)
-                    .min_by(|a, b| a.1 .0.total_cmp(&b.1 .0))
-                    .map(|(i, &(at, pin))| (i, at, pin))
+                let pulse = s.pulses.iter().enumerate().filter(|(_, (at, _))| *at <= time).min_by(|a, b| a.1 .0.total_cmp(&b.1 .0));
+                let timer = s.timers.iter().enumerate().filter(|(_, (at, _))| *at <= time).min_by(|a, b| a.1 .0.total_cmp(&b.1 .0));
+                match (pulse, timer) {
+                    // A pulse ending at the same moment goes first.
+                    (Some((i, &(at, pin))), Some((_, &(t, _)))) if at <= t => Some((at, Due::Pulse(i, pin))),
+                    (Some((i, &(at, pin))), None) => Some((at, Due::Pulse(i, pin))),
+                    (_, Some((i, &(at, id)))) => Some((at, Due::Timer(i, id))),
+                    (None, None) => None,
+                }
             };
-            let Some((index, at, pin)) = due else { break };
-            {
-                let mut s = self.state.borrow_mut();
-                s.pulses.remove(index);
-                s.now = s.now.max(at);
-                if let Err(e) = s.switch(pin, false, By::Pulse, true) {
-                    s.record(What::Safety(e));
+            let Some((at, due)) = due else { break };
+            match due {
+                Due::Pulse(index, pin) => {
+                    let mut s = self.state.borrow_mut();
+                    s.pulses.remove(index);
+                    s.now = s.now.max(at);
+                    if let Err(e) = s.switch(pin, false, By::Pulse, true) {
+                        s.record(What::Safety(e));
+                    }
+                }
+                Due::Timer(index, id) => {
+                    {
+                        let mut s = self.state.borrow_mut();
+                        s.timers.remove(index);
+                        s.now = s.now.max(at);
+                    }
+                    self.call("timer", id);
                 }
             }
             self.settle();
@@ -280,8 +372,32 @@ impl Engine {
         s.now = s.now.max(time);
     }
 
-    pub fn next_pulse_end(&self) -> Option<f64> {
-        self.state.borrow().pulses.iter().map(|&(at, _)| at).min_by(f64::total_cmp)
+    /// When the next pulse ends or after() timer is due, if any.
+    pub fn next_event(&self) -> Option<f64> {
+        let s = self.state.borrow();
+        s.pulses.iter().map(|&(at, _)| at).chain(s.timers.iter().map(|&(at, _)| at)).min_by(f64::total_cmp)
+    }
+
+    /// An input pin's level, read by the core. Ends a run_until() waiting for it,
+    /// and runs the rules' on_input handlers.
+    pub fn set_input(&mut self, pin: u16, high: bool) {
+        self.state.borrow_mut().set_input(pin, high);
+        self.settle();
+    }
+
+    /// An input's level before startup, without telling the rules.
+    pub fn preset_input(&mut self, pin: u16, high: bool) {
+        if let Some(slot) = self.state.borrow_mut().inputs.get_mut(&pin) {
+            *slot = Some(high);
+        }
+    }
+
+    pub fn inputs(&self) -> BTreeMap<u16, Option<bool>> {
+        self.state.borrow().inputs.clone()
+    }
+
+    pub fn locked(&self, pin: u16) -> bool {
+        self.state.borrow().locks.get(&pin).copied().unwrap_or(false)
     }
 
     /// A pin switched from the app or API.
@@ -352,6 +468,7 @@ impl Engine {
         std::mem::take(&mut self.state.borrow_mut().journal)
     }
 
+    /// What the rules published in the last tick.
     pub fn published(&self) -> BTreeMap<String, f64> {
         self.state.borrow().published.clone()
     }
@@ -440,6 +557,7 @@ impl Engine {
             match change {
                 Change::Pin(pin, on) => self.call("pin", (pin, on)),
                 Change::Trigger(id, on) => self.call("trigger", (id, on)),
+                Change::Input(pin, high) => self.call("input", (pin, high)),
             }
         }
     }
@@ -462,11 +580,15 @@ impl Engine {
         s.record(What::RulesFailed(message));
         s.queue.clear();
         s.pulses.clear();
+        s.timers.clear();
+        s.holds.clear();
         let pins: Vec<u16> = s.pins.keys().copied().collect();
         for pin in pins {
             if let Err(e) = s.switch(pin, false, By::Failsafe, false) {
                 s.record(What::Safety(e));
             }
+            // The app can switch them by hand again.
+            let _ = s.lock(pin, false);
         }
         let running: Vec<u32> = s.triggers.iter().filter(|(_, &on)| on).map(|(&id, _)| id).collect();
         for id in running {
@@ -529,6 +651,11 @@ pub fn describe(what: &What, names: &BTreeMap<u16, String>) -> Option<String> {
         What::Safety(text) => format!("SAFETY: {text}"),
         What::RulesFailed(text) => format!("RULES STOPPED, all outputs off: {text}"),
         What::SaveNow => return None,
+        What::Input { pin, high } => {
+            let name = names.get(pin).map(String::as_str).unwrap_or("");
+            format!("input {pin:<3} {:<4} {name}", if *high { "high" } else { "low" })
+        }
+        What::Lock { pin, locked } => format!("pin {pin:<3} {}  (rules)", if *locked { "locked" } else { "unlocked" }),
     })
 }
 
@@ -563,7 +690,7 @@ fn register(lua: &Lua, state: &Rc<RefCell<State>>) -> mlua::Result<()> {
         "reading",
         lua.create_function(move |_, id: String| {
             let s = s.borrow();
-            Ok(s.sensors.get(&id).or_else(|| s.published.get(&id)).copied())
+            Ok(s.sensors.get(&id).or_else(|| s.published.get(&id)).or_else(|| s.published_between.get(&id)).copied())
         })?,
     )?;
 
@@ -574,7 +701,12 @@ fn register(lua: &Lua, state: &Rc<RefCell<State>>) -> mlua::Result<()> {
             if id.is_empty() || id.len() > 50 {
                 return Err(runtime_error("publish: the reading id must be 1-50 characters".into()));
             }
-            s.borrow_mut().published.insert(id, value);
+            let mut s = s.borrow_mut();
+            if s.ticking {
+                s.published.insert(id, value);
+            } else {
+                s.published_between.insert(id, value);
+            }
             Ok(())
         })?,
     )?;
@@ -619,6 +751,68 @@ fn register(lua: &Lua, state: &Rc<RefCell<State>>) -> mlua::Result<()> {
             let end = s.now + ms / 1000.0;
             s.pulses.retain(|&(_, p)| p != pin);
             s.pulses.push((end, pin));
+            Ok(())
+        })?,
+    )?;
+
+    let s = state.clone();
+    g.set(
+        "input",
+        lua.create_function(move |_, pin: u16| s.borrow().input(pin).map_err(runtime_error))?,
+    )?;
+
+    let s = state.clone();
+    g.set(
+        "lock_pin",
+        lua.create_function(move |_, (pin, locked): (u16, Value)| {
+            let locked = as_on(&locked)?;
+            s.borrow_mut().lock(pin, locked).map_err(runtime_error)
+        })?,
+    )?;
+
+    // The prelude wraps these (run_until, after, cancel) and hides them from rules.
+    let s = state.clone();
+    g.set(
+        "_run_until",
+        lua.create_function(move |_, (pin, input, high, seconds): (u16, u16, bool, f64)| {
+            if !(seconds > 0.0 && seconds * 1000.0 <= MAX_PULSE_MS) {
+                return Err(runtime_error(format!("run_until: {seconds} s is outside 0..{} s", MAX_PULSE_MS / 1000.0)));
+            }
+            let mut s = s.borrow_mut();
+            if s.input(input).map_err(runtime_error)? == Some(high) {
+                return Ok(false); // already there: nothing to do
+            }
+            s.switch(pin, true, By::Rules, true).map_err(runtime_error)?;
+            let end = s.now + seconds;
+            s.pulses.retain(|&(_, p)| p != pin);
+            s.pulses.push((end, pin));
+            s.holds.retain(|h| h.pin != pin);
+            s.holds.push(Hold { pin, input, high });
+            Ok(true)
+        })?,
+    )?;
+
+    let s = state.clone();
+    g.set(
+        "_schedule",
+        lua.create_function(move |_, seconds: f64| {
+            if !(0.0..=MAX_TIMER_SECONDS).contains(&seconds) {
+                return Err(runtime_error(format!("after: {seconds} s is outside 0..{MAX_TIMER_SECONDS} s")));
+            }
+            let mut s = s.borrow_mut();
+            let id = s.next_timer;
+            s.next_timer += 1;
+            let at = s.now + seconds;
+            s.timers.push((at, id));
+            Ok(id)
+        })?,
+    )?;
+
+    let s = state.clone();
+    g.set(
+        "_cancel",
+        lua.create_function(move |_, id: u64| {
+            s.borrow_mut().timers.retain(|&(_, t)| t != id);
             Ok(())
         })?,
     )?;

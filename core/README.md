@@ -16,8 +16,9 @@ Each device's own logic is a short Lua file, `sites/<name>/rules/rules.lua`.
 - The installer sets it up (`BACKEND` in `site.env`, see `provision/README.md`): next to
   PHP in watch-only mode, or alone in place of PHP, nginx and the Python worker.
 
-pi-laistisana runs on the core (`BACKEND="core"`) since 2026-11-08; the other sites still
-run the PHP backend.
+pi-laistisana runs on the core (`BACKEND="core"`) since 2026-11-08. The six other sites
+have their rules too (`sites/<name>/rules`, step 6), checked in the simulator against what
+their PHP did; on their devices they still run the PHP backend.
 
 ## A site's rules
 
@@ -37,9 +38,16 @@ active_low = true     # relay boards that switch on when the signal is low ($GPI
 name = "Varsts 1 - Tūjas"
 max_on_minutes = 60   # the core switches it off after this, whatever the rules or the app do
 
+[inputs.15]           # a header pin the rules read: a button, a limit switch
+name = "button"
+pull = "up"           # "up", "down" or "none" (default, as RPi.GPIO's GPIO.setup(pin, GPIO.IN))
+debounce_ms = 50      # a new level counts once it has held this long (default 0: at once)
+
 [sensors]
 ds18b20 = true        # every DS18B20 on the 1-wire bus (dtoverlay=w1-gpio), as "28-..."
 interval_seconds = 5  # default
+max_change = 1.0      # optional: ignore a reading this far from the last one kept (a glitch)...
+max_change_rejects = 10   # ...until it has come up more than this many times in a row
 [[sensors.dht]]       # the kernel's dht11 driver (dtoverlay=dht11,gpiopin=N), also for DHT22
 device = "iio:device0"
 temperature = "DHT11_TEMP"
@@ -96,6 +104,10 @@ end)
 | `publish(id, value)` | Shows a value in the app next to the readings |
 | `param(id, default)`, `param_ref(id, default)` | Trigger parameters set in the app. A `param_ref` is read again each time it is used |
 | `pin(n)`, `set_pin(n, on)`, `pins_off{...}`, `pulse(n, ms)` | Outputs. Only pins listed in `device.toml` |
+| `lock_pin(n, locked)`, `lock_pins{...}`, `locks = {...}` in a trigger | The app shows a locked pin's switch greyed out (PHP's `lock_pin`). A trigger with `locks` locks them while it is on. Every lock is cleared at startup and if the rules fail |
+| `input(n)` → true/false/nil, `on_input(pins, fn(pin, high))` | Input pins (`[inputs.N]`), read every 5 ms. nil if not read (watch-only mode) |
+| `run_until { pin, input, seconds, high, done }` | A pin on until an input reads high (or low), for `seconds` at most; the core switches it off within about 5 ms. `done(elapsed)` runs once the pin is off |
+| `after(seconds, fn)`, `cancel(id)` | Runs `fn` once, later (fractions of a second too) |
 | `trigger_on(id)`, `start_trigger(id)`, `stop_trigger(id)` | Starting a trigger that is already on restarts it, as in PHP |
 | `now()`, `time_of_day()`, `clock_synced()` | Seconds for measuring durations; local time in hours (6.5 = 06:30); whether the clock has been synced since boot |
 | `log(...)` / `print(...)` | Writes to the device log |
@@ -118,7 +130,8 @@ at `types/remote-pi.d.lua`. That gives autocomplete and warnings for everything 
   - about 5 million Lua instructions per call at most.
 - If the rules fail, for example with an error, an endless loop or pins switching each other
   back and forth:
-  - every output goes off and every trigger stops;
+  - every output goes off, every trigger stops, and pending `after()` timers and
+    `run_until()` waits are dropped; locked pins are unlocked;
   - the error is logged with its line number;
   - the rules are not called again until they are reloaded.
 
@@ -135,8 +148,12 @@ time:
 cargo run -- sim ../sites/laistisana --trigger 5 --param 7=20 --param 8=30 --param 9=0 --param 10=30 --for 2h --readings 10m
 cargo run -- sim examples/misting --trigger 2 --trigger 4 --start 05:00 --for 3h \
     --sensor surf_hum_1=50 --at 30m sensor:surf_hum_1=75
+cargo run -- sim ../sites/griezeejs --param 1=2 --trigger 1@1s --at 1.4s input:11=1 --for 5s
 cargo run -- check ../sites/laistisana    # load only: syntax, unknown pins, duplicate triggers
 ```
+
+Inputs start at the level their pull resistor gives them (low without one); `--at` takes
+fractions of a second for them.
 
 Output is a timeline of every pin and trigger change, with who made it (app, rules, pulse,
 safety limit, failsafe). It ends with each pin's total on-time. The exit code is 1 if the
@@ -170,6 +187,11 @@ Everything it does goes to the journal: `journalctl -u remote-pi-core`.
 - **Stopping:** on SIGTERM (`systemctl stop`) the core switches every output off.
 - **Rules that do not load:** the core still runs, with every output off, and logs the
   error.
+- **Input pins (live mode):** read through the kernel's GPIO character device
+  (`/dev/gpiochipN`) every 5 ms on their own thread; a change reaches the rules at once,
+  between ticks. If a line is held by another program (an old Python script), the core
+  logs it and runs with `input()` nil. Watch-only mode does not read them: PHP's scripts
+  may be using them.
 - **Sensor log (live mode):** as `read_sensor_data.php` did, in the same files:
   - Each second's readings (the sensors' and the rules' published values) go to the RAM
     log, `<runtime_dir>/sensor_log_tmp_db.db`, with a save level: 3 (long term) once per
@@ -266,7 +288,8 @@ docker run --rm -v "$PWD/..:/app" -w /app/tests -e REMOTE_PI_CORE=/app/core/targ
 ### The systemd unit
 
 `provision/files/remote-pi-core.service`, installed by `provision/steps/65-core.sh`:
-- It runs as `www-data` in the `gpio` group, and may bind port 80.
+- It runs as `www-data` in the `gpio` group, and may bind port 80. Its only devices are
+  `/dev/gpiomem*` (pinctrl) and `/dev/gpiochip*` (inputs).
 - It can write only to `/run/remote-pi` and `/data/sqlite`.
 - It cannot gain privileges, so no sudo: for the app's restart and shutdown it touches
   `/run/remote-pi/reboot-request` (or `poweroff-request`), and root's
@@ -332,12 +355,19 @@ On pi-laistisana with `BACKEND="core"` (2026-11-08): the core uses 5 MB, and the
      safety timer, the sequence, settings, readings, sensor log, sparklines, history, CSV,
      Home Assistant, the app on ports 80 and 1111, the monitor, and a reboot from the app
      (the RAM sensor log and the settings were saved first; all relays off after it).
-   - Still to see: watering with the valves connected, and the daily sensor log backup on
-     the device (tested in `sensor_log.rs`).
+   - Later the same day, with the valves connected again, the user confirmed that valve
+     control from the app works.
+   - Still to see: the daily sensor log backup on the device (tested in `sensor_log.rs`).
    - Back to PHP if needed: `BACKEND="php"` in `sites/laistisana/site.env`, then deploy.
 
    **Differs from PHP on purpose:** stopping the watering sequence (trigger 5) from the app
    closes its open valve. PHP left it open, and once the 45-minute safety trigger was also
    stopped, nothing closed it.
-6. **Port the other sites:** move the sites in `custom_configuration/` to
-   `sites/<name>/rules`, and check each one in the simulator against what its PHP did.
+6. **Port the other sites:** rules written for all six (`sites/fabrika-1`, `fabrika-2`,
+   `fabrika-3`, `mazais-pagrabs`, `katlumaja`, `griezeejs`) and checked in the simulator
+   against what their PHP did; `tests/rules.rs` keeps the main cases. Each site's
+   `README.md` lists its hardware, where it does something different from PHP (bugs
+   fixed), and what to check on the device before `BACKEND="core"`. New in the core for
+   them: input pins, `run_until`, `after`, pin locks, and the sensors' `max_change` filter.
+   Not yet on a device: each site needs a `site.env` (its address, network and DHT
+   overlay), then `php+watch` for a few days, then `core`.

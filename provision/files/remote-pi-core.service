@@ -14,7 +14,7 @@ After=local-fs.target network.target
 ExecStart=@CORE_BIN@ run @CORE_RULES@ --config /etc/remote-pi/core.toml @CORE_FLAGS@
 User=www-data
 Group=www-data
-# pinctrl writes the GPIO registers through /dev/gpiomem.
+# pinctrl writes the GPIO registers through /dev/gpiomem; inputs use /dev/gpiochipN.
 SupplementaryGroups=gpio
 # The API on port 80, without running as root.
 AmbientCapabilities=CAP_NET_BIND_SERVICE
@@ -35,6 +35,8 @@ RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
 DevicePolicy=closed
 DeviceAllow=/dev/gpiomem rw
 DeviceAllow=/dev/gpiomem0 rw
+# Input pins ([inputs] in device.toml) through the GPIO character device.
+DeviceAllow=char-gpiochip rw
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

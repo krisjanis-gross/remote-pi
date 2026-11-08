@@ -3,7 +3,13 @@
 -- calls; rules cannot reach it.
 
 local triggers, trigger_ids = {}, {}
-local tick_handlers, pin_handlers, startup_handlers = {}, {}, {}
+local tick_handlers, pin_handlers, startup_handlers, input_handlers = {}, {}, {}, {}
+-- after() callbacks by timer id, and run_until() callbacks by pin.
+local timers, pin_waiters = {}, {}
+
+-- The core's primitives behind after(), cancel() and run_until(); rules use those.
+local schedule, cancel_timer, hold_until = _schedule, _cancel, _run_until
+_schedule, _cancel, _run_until = nil, nil, nil
 
 local function check_function(value, what)
 	if type(value) ~= "function" then
@@ -43,10 +49,14 @@ function trigger(id, handler)
 	if type(handler) == "function" then handler = { tick = handler } end
 	if type(handler) ~= "table" then error("trigger " .. id .. " needs a function or a table", 2) end
 	for key, fn in pairs(handler) do
-		if key ~= "on_start" and key ~= "tick" and key ~= "on_stop" then
-			error("trigger " .. id .. ": unknown handler '" .. tostring(key) .. "' (use on_start, tick, on_stop)", 2)
+		if key == "locks" then
+			if type(fn) ~= "table" then error("trigger " .. id .. ": locks must be a list of pins", 2) end
+			for _, p in ipairs(fn) do pin(p) end -- fails now if a pin is not in device.toml
+		elseif key ~= "on_start" and key ~= "tick" and key ~= "on_stop" then
+			error("trigger " .. id .. ": unknown handler '" .. tostring(key) .. "' (use on_start, tick, on_stop, locks)", 2)
+		else
+			check_function(fn, "trigger " .. id .. " " .. key)
 		end
-		check_function(fn, "trigger " .. id .. " " .. key)
 	end
 	triggers[id] = { handler = handler, state = {} }
 	trigger_ids[#trigger_ids + 1] = id
@@ -76,6 +86,61 @@ function on_startup(fn)
 	startup_handlers[#startup_handlers + 1] = fn
 end
 
+-- Runs when an input pin ([inputs.N] in device.toml) changes: fn(pin, high).
+function on_input(pins, fn)
+	if type(pins) == "number" then pins = { pins } end
+	check_function(fn, "on_input")
+	for _, p in ipairs(pins) do
+		input(p) -- fails now if the pin is not an input in device.toml
+		input_handlers[p] = input_handlers[p] or {}
+		table.insert(input_handlers[p], fn)
+	end
+end
+
+-- Runs fn once, `seconds` from now (fractions too: 0.25). Returns an id for cancel().
+-- Timers are not kept when the rules stop or the core restarts.
+function after(seconds, fn)
+	check_function(fn, "after")
+	local id = schedule(seconds)
+	timers[id] = fn
+	return id
+end
+
+function cancel(id)
+	if id ~= nil and timers[id] then
+		timers[id] = nil
+		cancel_timer(id)
+	end
+end
+
+-- Switch a pin on until an input reads high (or low, with high = false), at most
+-- `seconds`. The core watches the input every few milliseconds and switches the
+-- pin off itself. If the input already reads so, the pin is not switched on.
+-- done(elapsed_seconds) runs once the pin is off again, whatever switched it off.
+--   run_until { pin = 12, input = 11, seconds = param(1, 2), done = function(t) ... end }
+function run_until(o)
+	assert(type(o.pin) == "number", "run_until needs pin = <number>")
+	assert(type(o.input) == "number", "run_until needs input = <number>")
+	assert(o.seconds ~= nil, "run_until needs seconds")
+	if o.done ~= nil then check_function(o.done, "run_until done") end
+	local started = now()
+	local on = hold_until(o.pin, o.input, o.high ~= false, value(o.seconds))
+	if o.done then
+		if on then
+			pin_waiters[o.pin] = function() o.done(now() - started) end
+		else
+			after(0, function() o.done(0) end)
+		end
+	end
+	return on
+end
+
+-- Lock pins (the app shows them greyed out, as PHP's lock_pin did) or unlock them.
+-- A trigger with locks = { ... } does this itself while it is on.
+function lock_pins(list, locked)
+	for _, p in ipairs(list) do lock_pin(p, locked) end
+end
+
 ---------------------------------------------------------------------------
 -- Helpers for the common patterns. Each returns a trigger handler.
 ---------------------------------------------------------------------------
@@ -87,6 +152,7 @@ function auto_off(o)
 	assert(type(o.pins) == "table", "auto_off needs pins = { ... }")
 	assert(o.minutes ~= nil, "auto_off needs minutes")
 	return {
+		locks = o.locks,
 		tick = function(state, id)
 			local left = value(o.minutes) * 60 - (now() - state.started)
 			if o.reading then publish(o.reading, math.max(0, round(left / 60))) end
@@ -127,6 +193,7 @@ function sequence(o)
 		set_pin(steps[n].pin, true)
 	end
 	return {
+		locks = o.locks,
 		on_start = function(state, id) start_step(state, id, 1) end,
 		tick = function(state, id)
 			local step = steps[state.step]
@@ -156,6 +223,7 @@ function daily(o)
 		return h >= from or h < to
 	end
 	return {
+		locks = o.locks,
 		tick = function()
 			if clock_synced() then set_pin(o.pin, inside()) end
 		end,
@@ -171,6 +239,7 @@ function pulse_below(o)
 	assert(type(o.pin) == "number", "pulse_below needs pin = <number>")
 	assert(type(o.reading) == "string", "pulse_below needs reading = \"sensor id\"")
 	return {
+		locks = o.locks,
 		tick = function(state)
 			local v = reading(o.reading)
 			if v == nil then return end
@@ -203,13 +272,28 @@ return {
 		if not t then return end
 		if on then
 			t.state = { started = now() }
+			if t.handler.locks then lock_pins(t.handler.locks, true) end
 			if t.handler.on_start then t.handler.on_start(t.state, id) end
-		elseif t.handler.on_stop then
-			t.handler.on_stop(t.state, id)
+		else
+			if t.handler.on_stop then t.handler.on_stop(t.state, id) end
+			if t.handler.locks then lock_pins(t.handler.locks, false) end
 		end
 	end,
 	pin = function(p, on)
 		for _, fn in ipairs(pin_handlers[p] or {}) do fn(p, on) end
+		if not on and pin_waiters[p] then
+			local done = pin_waiters[p]
+			pin_waiters[p] = nil
+			done()
+		end
+	end,
+	input = function(p, high)
+		for _, fn in ipairs(input_handlers[p] or {}) do fn(p, high) end
+	end,
+	timer = function(id)
+		local fn = timers[id]
+		timers[id] = nil
+		if fn then fn() end
 	end,
 	defined_triggers = function()
 		return trigger_ids

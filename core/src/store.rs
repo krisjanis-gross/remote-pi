@@ -121,6 +121,17 @@ impl Store {
         self.write("UPDATE triggers SET state = ?1 WHERE id = ?2", on, id as i64)
     }
 
+    /// Whether the app shows the pin greyed out (PHP's lock_pin / unlock_pin).
+    pub fn write_lock(&mut self, pin: u16, locked: bool) -> Result<(), String> {
+        self.write("UPDATE pins SET locked = ?1 WHERE id = ?2", locked, pin as i64)
+    }
+
+    /// At startup: no pin is locked until a trigger that runs locks it again.
+    pub fn unlock_all(&mut self) -> Result<(), String> {
+        self.write_with(|db| db.execute("UPDATE pins SET locked = 0 WHERE locked <> 0", []).map_err(|e| e.to_string()))
+            .map(|_| ())
+    }
+
     pub fn write_param(&mut self, id: i64, value: f64) -> Result<(), String> {
         self.write_with(|db| db.execute("UPDATE trigger_parameters SET value = ?1 WHERE id = ?2", (value, id)).map_err(|e| e.to_string()))
             .map(|_| ())

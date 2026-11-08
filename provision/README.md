@@ -167,3 +167,7 @@ The web user has no sudo rights any more. Site scripts that call
 - Scripts that need RPi.GPIO timing loops: run with `python3` (no sudo) and set `PYTHON_GPIO=yes`
 
 The installer warns when a site file still contains `sudo` or Python 2 calls.
+
+With `BACKEND="core"` none of this is needed: every site in `custom_configuration/` has
+its rules in `sites/<name>/rules` (the core reads buttons and limit switches itself,
+through `/dev/gpiochipN`), and its `README.md` says what to check on the device first.

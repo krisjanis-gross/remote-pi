@@ -1,0 +1,25 @@
+# b_mazais-pagrabs' hardware (from custom_configuration/b_mazais-pagrabs). Pins
+# are header pins (BOARD numbering, as in the PHP backend). Pins 8 and 10 are the
+# serial port's (GPIO14/15): the serial console must stay off on this device.
+#
+# No max_on_minutes: the fan runs as long as the cellar needs cooling.
+
+[gpio]
+# info.txt: "pins reversed"; the site's control_pins.py switched on with a low signal.
+active_low = true
+
+[pins.8]
+name = "Relejs 1 (#8) - ventilators"
+
+[pins.10]
+name = "Relejs 2 (#10)"
+
+[sensors]
+ds18b20 = true
+# PHP's validate_temp_reading(): a reading more than 1 °C from the last one kept is
+# ignored, unless it has come up more than 10 times in a row (then it is real).
+max_change = 1.0
+max_change_rejects = 11
+
+[log]
+all_data_save_hours = 6

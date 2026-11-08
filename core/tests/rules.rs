@@ -288,3 +288,255 @@ fn device_file_is_checked() {
     let ok = Site::from_strings("", "[gpio]\nactive_low = true\n[pins.11]\n[pins.123]\nname = \"virtual\"\n").unwrap();
     assert!(ok.gpio.active_low && ok.pins.contains_key(&123));
 }
+
+const MACHINE: &str = r#"
+[pins.12]
+[pins.16]
+[inputs.11]
+name = "limit switch"
+[inputs.13]
+pull = "up"
+"#;
+
+fn machine(rules: &str) -> Engine {
+    let site = Site::from_strings(rules, MACHINE).unwrap();
+    let mut e = Engine::new(&site, Box::new(NoHardware), 0.0).expect("rules load");
+    e.preset_input(11, false);
+    e.preset_input(13, false);
+    e.startup();
+    e
+}
+
+/// (time, pin, on, by) for every pin change.
+fn changes_by(journal: &[Entry]) -> Vec<(f64, u16, bool, By)> {
+    journal
+        .iter()
+        .filter_map(|x| match x.what {
+            What::Pin { pin, on, by } => Some((x.time, pin, on, by)),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn run_until_stops_on_the_input_or_the_time_limit() {
+    let mut e = machine(
+        r#"
+        trigger(1, { on_start = function(state, id)
+            run_until { pin = 12, input = 11, seconds = 2, done = function(t) publish("took", t) end }
+            stop_trigger(id)
+        end })
+        "#,
+    );
+    // The switch closes after 0.75 s: the relay goes off then, not at the 2 s limit.
+    let journal = journal_of(
+        &mut e,
+        vec![(0.0, Action::Trigger(1, true)), (0.75, Action::Input(11, true)), (2.5, Action::Input(11, false))],
+        3,
+    );
+    assert_eq!(changes_by(&journal), vec![(0.0, 12, true, By::Rules), (0.75, 12, false, By::Input)]);
+    assert!(!e.trigger_on(1), "a one-shot trigger switches itself off");
+
+    // The switch never closes: off at the limit. (Times count from where the last run ended, 3 s.)
+    let journal = journal_of(&mut e, vec![(1.0, Action::Trigger(1, true))], 5);
+    assert_eq!(changes_by(&journal), vec![(4.0, 12, true, By::Rules), (6.0, 12, false, By::Pulse)]);
+
+    // Already closed: the relay is not switched on at all.
+    let journal = journal_of(&mut e, vec![(0.0, Action::Input(11, true)), (1.0, Action::Trigger(1, true))], 5);
+    assert!(changes_by(&journal).is_empty(), "{journal:?}");
+    assert!(e.fault().is_none(), "{:?}", e.fault());
+}
+
+#[test]
+fn after_runs_in_order_at_fractions_of_a_second_and_can_be_cancelled() {
+    let mut e = machine(
+        r#"
+        trigger(2, { on_start = function()
+            after(0.5, function() set_pin(16, true) end)
+            after(0.9, function() set_pin(16, false) end)
+            local never = after(0.7, function() set_pin(12, true) end)
+            cancel(never)
+            after(0.2, function() publish("between", 1) end)
+        end })
+        "#,
+    );
+    let mut published = Vec::new();
+    let mut journal = e.take_journal();
+    sim::run(&mut e, vec![(0.0, Action::Trigger(2, true))], 2, |e, _| {
+        journal.extend(e.take_journal());
+        published.push(e.published().get("between").copied());
+    });
+    assert_eq!(changes_by(&journal), vec![(0.5, 16, true, By::Rules), (0.9, 16, false, By::Rules)]);
+    // Published between ticks, shown with the next tick only.
+    assert_eq!(published, vec![None, Some(1.0), None]);
+}
+
+#[test]
+fn inputs_reach_on_input_and_input() {
+    let mut e = machine(
+        r#"
+        on_input(13, function(p, high)
+            if not high then set_pin(16, not pin(16)) end   -- a button to ground: toggle on press
+        end)
+        every_tick(function() publish("limit", input(11) and 1 or 0) end)
+        "#,
+    );
+    let journal = journal_of(
+        &mut e,
+        vec![
+            (1.0, Action::Input(13, true)),
+            (2.0, Action::Input(13, false)),
+            (2.3, Action::Input(13, true)),
+            (4.0, Action::Input(13, false)),
+            (5.0, Action::Input(11, true)),
+        ],
+        6,
+    );
+    assert_eq!(changes_by(&journal), vec![(2.0, 16, true, By::Rules), (4.0, 16, false, By::Rules)]);
+    assert!(journal.iter().any(|x| x.what == What::Input { pin: 13, high: false }));
+    assert_eq!(e.published()["limit"], 1.0);
+}
+
+#[test]
+fn triggers_lock_their_pins_and_a_failure_unlocks_them() {
+    let mut e = machine(
+        r#"
+        trigger(3, { locks = { 12, 16 }, tick = function(state)
+            if now() - state.started >= 3 then local x = nil; return x.y end
+        end })
+        "#,
+    );
+    let journal = journal_of(&mut e, vec![(0.0, Action::Trigger(3, true)), (1.0, Action::Trigger(3, false))], 1);
+    assert!(journal.iter().any(|x| x.what == What::Lock { pin: 12, locked: true }));
+    assert!(journal.iter().any(|x| x.what == What::Lock { pin: 16, locked: false }));
+    assert!(!e.locked(12));
+
+    let _ = journal_of(&mut e, vec![(2.0, Action::Trigger(3, true))], 3);
+    assert!(e.locked(16));
+    let _ = journal_of(&mut e, vec![], 4);
+    assert!(e.fault().is_some());
+    assert!(!e.locked(16), "a failure unlocks the pins, so the app can switch them");
+}
+
+#[test]
+fn inputs_in_device_file_are_checked() {
+    let bad = |toml: &str| Site::from_strings("", toml).unwrap_err();
+    assert!(bad("[pins.12]\n[inputs.12]").contains("both an output"));
+    assert!(bad("[pins.12]\n[inputs.50]").contains("GPIO pin on the header"));
+    assert!(bad("[pins.12]\n[inputs.11]\npull = \"sideways\"").contains("unknown variant"));
+    let site = Site::from_strings("", MACHINE).unwrap();
+    assert_eq!(site.inputs[&13].pull, remote_pi_core::site::Pull::Up);
+    let error = Engine::new(&Site::from_strings("on_input(15, function() end)", MACHINE).unwrap(), Box::new(NoHardware), 0.0)
+        .err()
+        .unwrap();
+    assert!(error.contains("input 15 is not in device.toml"), "{error}");
+}
+
+// ---- The sites ported from custom_configuration/ (step 6) ----
+
+fn site_engine(name: &str, params: &[(u32, f64)], sensors: &[(&str, f64)]) -> Engine {
+    let site = Site::load(&site_dir(&format!("../sites/{name}"))).unwrap();
+    let mut e = Engine::new(&site, Box::new(NoHardware), 0.0).expect("rules load");
+    for &(id, v) in params {
+        e.set_param(id, v);
+    }
+    for &(id, v) in sensors {
+        e.set_sensor(id, Some(v));
+    }
+    for (&pin, input) in &site.inputs {
+        e.preset_input(pin, input.pull == remote_pi_core::site::Pull::Up);
+    }
+    e.startup();
+    e
+}
+
+#[test]
+fn every_ported_site_loads() {
+    let expected: [(&str, &[u32]); 6] = [
+        ("fabrika-1", &[2, 4, 5, 6]),
+        ("fabrika-2", &[1]),
+        ("fabrika-3", &[1]),
+        ("mazais-pagrabs", &[1]),
+        ("katlumaja", &[1, 2, 3, 4, 5]),
+        ("griezeejs", &[1, 2, 3, 4, 5, 6, 7, 8]),
+    ];
+    for (name, triggers) in expected {
+        let e = site_engine(name, &[], &[]);
+        assert_eq!(e.defined_triggers(), triggers, "{name}");
+        assert!(e.fault().is_none(), "{name}: {:?}", e.fault());
+    }
+}
+
+#[test]
+fn fabrika_1_cooler_cycles_while_humid_and_rests_while_cold() {
+    let cooler = "28-0315a83ee3ff";
+    let mut e = site_engine(
+        "fabrika-1",
+        &[(3, 25.0), (4, 2.0), (5, 7.0), (6, 2.0), (22, 15.0), (23, 3.0)],
+        &[("dht_humidity", 35.0), (cooler, 10.0), ("28-0115a8683aff", 36.0)],
+    );
+    let actions = vec![
+        (0.0, Action::Trigger(2, true)),
+        (1200.0, Action::Sensor(cooler.into(), Some(4.0))), // cold: rests...
+        (1800.0, Action::Sensor(cooler.into(), Some(6.0))), // ...until it warms up
+        (2400.0, Action::Sensor("dht_humidity".into(), Some(22.0))), // dry enough
+    ];
+    let cooler_changes: Vec<_> = pin_changes(&mut e, actions, 2500).into_iter().filter(|c| c.1 == 29).collect();
+    assert_eq!(
+        cooler_changes,
+        vec![(0.0, 29, true), (901.0, 29, false), (1082.0, 29, true), (1200.0, 29, false), (1800.0, 29, true), (2400.0, 29, false)]
+    );
+    assert!(e.pin_on(16), "the fan runs while drying");
+    assert!(e.locked(29));
+}
+
+#[test]
+fn mazais_pagrabs_fan_needs_a_warm_cellar_and_colder_air() {
+    let (cellar, outside) = ("28-0316224c1dff", "28-0415a86941ff");
+    let mut e = site_engine("mazais-pagrabs", &[(1, 4.0), (2, 1.0), (3, 0.5), (4, 0.2)], &[(cellar, 6.0), (outside, 3.0)]);
+    let actions = vec![
+        (0.0, Action::Trigger(1, true)),
+        (600.0, Action::Sensor(outside.into(), Some(5.9))), // outside no longer colder: off
+        (1200.0, Action::Sensor(outside.into(), Some(2.0))),
+        (1800.0, Action::Sensor(cellar.into(), Some(4.0))), // between the limits: left on
+        (2400.0, Action::Sensor(cellar.into(), Some(2.9))), // cool enough: off
+    ];
+    assert_eq!(
+        pin_changes(&mut e, actions, 2500),
+        vec![(0.0, 8, true), (600.0, 8, false), (1200.0, 8, true), (2400.0, 8, false)]
+    );
+}
+
+#[test]
+fn katlumaja_intervals_repeat_in_full_and_trigger_2_stops_its_own_pump() {
+    let mut e = site_engine("katlumaja", &[(7, 3.0), (8, 2.0), (9, 4.0), (10, 5.0)], &[]);
+    let changes = pin_changes(&mut e, vec![(0.0, Action::Trigger(5, true))], 20 * 60);
+    let starts: Vec<f64> = changes.iter().filter(|c| c.2).map(|c| c.0).collect();
+    // On 3 min, off 2, on 4, off 5, and the second round's first "on" is 3 min again
+    // (PHP's second round lost it). A tick per change: +1 s each.
+    assert_eq!(starts, vec![0.0, 302.0, 844.0, 1146.0]);
+    assert_eq!(changes.iter().find(|c| c.0 > 844.0).map(|c| c.0), Some(1025.0));
+
+    let mut e = site_engine("katlumaja", &[(3, 5.0)], &[("28-00000458876f", 40.0), ("28-000004598c80", 20.0), ("28-000004aa6574", 26.0)]);
+    let actions = vec![(0.0, Action::Trigger(1, true)), (0.0, Action::Pin(11, true)), (0.0, Action::Trigger(2, true)), (10.0, Action::Trigger(2, false))];
+    let changes = pin_changes(&mut e, actions, 20);
+    assert_eq!(changes, vec![(0.0, 11, true), (0.0, 12, true), (10.0, 12, false)]);
+}
+
+#[test]
+fn griezeejs_steps_stop_on_their_switch_and_the_cycle_stays_off() {
+    let mut e = site_engine("griezeejs", &[(1, 2.0), (2, 1.0), (6, 0.7), (7, 1.0)], &[]);
+    let actions = vec![
+        (0.0, Action::Trigger(2, true)),
+        (0.6, Action::Input(13, true)),
+        (5.0, Action::Trigger(5, true)),
+        (5.0, Action::Input(15, true)), // the run button: PHP never read it
+    ];
+    let journal = journal_of(&mut e, actions, 20);
+    assert_eq!(
+        changes_by(&journal),
+        vec![(0.0, 16, true, By::Rules), (0.6, 16, false, By::Input), (1.0, 32, true, By::Pulse), (1.7, 32, false, By::Pulse)]
+    );
+    assert!(!e.trigger_on(2), "a step switches its trigger off");
+    assert!(e.trigger_on(5));
+}

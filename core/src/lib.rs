@@ -4,6 +4,7 @@ pub mod config;
 pub mod engine;
 pub mod hardware;
 pub mod history;
+pub mod inputs;
 pub mod monitor;
 pub mod run;
 pub mod sensor_log;

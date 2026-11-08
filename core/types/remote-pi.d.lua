@@ -64,6 +64,47 @@ function pins_off(pins) end
 ---@param ms number
 function pulse(pin, ms) end
 
+---Lock a pin (the app shows its switch greyed out) or unlock it. Only pins in
+---device.toml. A trigger with `locks = { ... }` does this itself while it is on.
+---@param pin integer
+---@param locked boolean|0|1
+function lock_pin(pin, locked) end
+
+---Lock or unlock several pins.
+---@param pins integer[]
+---@param locked boolean
+function lock_pins(pins, locked) end
+
+---An input pin's level ([inputs.N] in device.toml): true is high. nil if it has
+---not been read (watch-only mode, or the inputs could not be opened).
+---@param pin integer
+---@return boolean?
+function input(pin) end
+
+---Run when an input pin changes level (after its debounce_ms).
+---@param pins integer|integer[]
+---@param fn fun(pin: integer, high: boolean)
+function on_input(pins, fn) end
+
+---Run `fn` once, `seconds` from now (fractions too). Returns an id for cancel().
+---Timers are dropped when the rules stop or the core restarts.
+---@param seconds number
+---@param fn fun()
+---@return integer
+function after(seconds, fn) end
+
+---Cancel an after() timer that has not run yet.
+---@param id integer?
+function cancel(id) end
+
+---Switch `pin` on until `input` reads high (or low, with high = false), for
+---`seconds` at most. The core watches the input every 5 ms and switches the pin
+---off itself. If the input already reads so, the pin is not switched on and
+---run_until returns false. `done(elapsed)` runs once the pin is off again.
+---@param o { pin: integer, input: integer, seconds: number|ParamRef, high?: boolean, done?: fun(elapsed: number) }
+---@return boolean
+function run_until(o) end
+
 ---@param id integer
 ---@return boolean
 function trigger_on(id) end
@@ -95,6 +136,7 @@ function round(x) end
 ---@field on_start? fun(state: TriggerState, id: integer)
 ---@field tick? fun(state: TriggerState, id: integer)
 ---@field on_stop? fun(state: TriggerState, id: integer)
+---@field locks? integer[] pins locked while the trigger is on (the helpers take `locks` too)
 
 ---Define what a trigger does. A function runs every second while the trigger is on.
 ---@param id integer

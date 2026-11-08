@@ -1,0 +1,30 @@
+# b_fabrika-2's hardware (from custom_configuration/b_fabrika-2). Pins are header
+# pins (BOARD numbering, as in the PHP backend).
+#
+# No max_on_minutes: the cooler and heater run for hours while drying.
+
+[gpio]
+# notes.txt: "pin config - inverted"; the relay board switches on with a low signal.
+active_low = true
+
+[pins.12]
+name = "GPIO pin #18 (12) - dzesētājs"
+
+[pins.16]
+# In the database: "nav pievienots" (not connected). PHP switched it off for 3 s
+# to restart the DHT22 when it stopped answering, and on when drying stopped.
+name = "GPIO pin #23 (16) - DHT22 barošana?"
+
+[pins.18]
+name = "GPIO pin #24 (18) - sildītājs"
+
+[pins.22]
+name = "GPIO pin #25 (22) - nav pievienots"
+
+[sensors]
+ds18b20 = true
+
+# notes.txt: DHT22 on D13 (GPIO13, header pin 33): dtoverlay=dht11,gpiopin=13 in site.env.
+[[sensors.dht]]
+temperature = "dht_temperature"
+humidity = "dht_humidity"

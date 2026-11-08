@@ -99,6 +99,8 @@ pub struct Runner {
     mode: Mode,
     store: Option<Store>,
     names: BTreeMap<u16, String>,
+    /// Output and input names, for the log.
+    labels: BTreeMap<u16, String>,
     triggers: BTreeSet<u32>,
     db: Option<Snapshot>,
     db_error: Option<String>,
@@ -125,9 +127,21 @@ impl Runner {
     pub fn start(
         site: &Site,
         mode: Mode,
+        store: Option<Store>,
+        outputs: impl Fn() -> Box<dyn Outputs>,
+        clock: Clock,
+    ) -> Result<(Runner, Vec<String>), String> {
+        Self::start_with_inputs(site, mode, store, outputs, clock, &[])
+    }
+
+    /// As start(), with the input pins' levels read before the rules start.
+    pub fn start_with_inputs(
+        site: &Site,
+        mode: Mode,
         mut store: Option<Store>,
         outputs: impl Fn() -> Box<dyn Outputs>,
         clock: Clock,
+        inputs: &[(u16, bool)],
     ) -> Result<(Runner, Vec<String>), String> {
         let mut lines = Vec::new();
         let (mut engine, load_error) = match Engine::new(site, outputs(), clock.now) {
@@ -141,6 +155,9 @@ impl Runner {
             }
         };
         engine.set_clock(clock.wall, clock.utc_offset, clock.synced);
+        for &(pin, high) in inputs {
+            engine.preset_input(pin, high);
+        }
 
         let snapshot = match store.as_mut().map(Store::read) {
             Some(Ok(snapshot)) => Some(snapshot),
@@ -158,6 +175,8 @@ impl Runner {
         }
 
         let names: BTreeMap<u16, String> = engine.pins().into_iter().collect();
+        let mut labels = names.clone();
+        labels.extend(site.inputs.iter().map(|(&pin, i)| (pin, i.name.clone())));
         let triggers: BTreeSet<u32> = engine.defined_triggers().into_iter().collect();
         engine.startup();
         if let Some(message) = load_error {
@@ -169,6 +188,7 @@ impl Runner {
             mode,
             store,
             names,
+            labels,
             triggers,
             db: None,
             db_error: None,
@@ -181,6 +201,11 @@ impl Runner {
         };
         lines.extend(runner.journal());
 
+        if let (Mode::Live, Some(store)) = (mode, runner.store.as_mut()) {
+            if let Err(e) = store.unlock_all() {
+                lines.push(format!("cannot unlock the pins in the settings database: {e}"));
+            }
+        }
         if let Some(s) = &snapshot {
             match mode {
                 Mode::Live => {
@@ -234,9 +259,17 @@ impl Runner {
         self.mode
     }
 
-    /// Ends pulses that are due before the next tick.
+    /// Ends pulses and runs timers that are due before the next tick.
     pub fn advance(&mut self, now: f64) -> Vec<String> {
         self.engine.advance_to(now);
+        self.journal()
+    }
+
+    /// Input pins that changed level (from the input thread).
+    pub fn set_inputs(&mut self, changes: &[(u16, bool)]) -> Vec<String> {
+        for &(pin, high) in changes {
+            self.engine.set_input(pin, high);
+        }
         self.journal()
     }
 
@@ -457,6 +490,7 @@ impl Runner {
                     let saved = match entry.what {
                         What::Pin { pin, on, .. } => store.write_pin(pin, on).map_err(|e| (Thing::Pin(pin), e)),
                         What::Trigger { id, on, .. } => store.write_trigger(id, on).map_err(|e| (Thing::Trigger(id), e)),
+                        What::Lock { pin, locked } => store.write_lock(pin, locked).map_err(|e| (Thing::Pin(pin), e)),
                         _ => Ok(()),
                     };
                     if let Err((thing, e)) = saved {
@@ -464,7 +498,7 @@ impl Runner {
                     }
                 }
             }
-            if let Some(text) = describe(&entry.what, &self.names) {
+            if let Some(text) = describe(&entry.what, &self.labels) {
                 lines.push(text);
             }
         }
@@ -553,8 +587,8 @@ pub fn run_forever(
     let mut next_tick = start_now.floor() + 1.0;
     let mut readings_due = next_tick;
     while !STOP.load(Ordering::SeqCst) {
-        // Sleep until the next tick or the end of a pulse, whichever is first.
-        let wake = runner.engine.next_pulse_end().map_or(next_tick, |end| end.min(next_tick));
+        // Sleep until the next tick, the end of a pulse or an after() timer, whichever is first.
+        let wake = runner.engine.next_event().map_or(next_tick, |at| at.min(next_tick));
         let wait = wake - now();
         if wait > 0.0 {
             let wait = Duration::from_secs_f64(wait.min(1.0));

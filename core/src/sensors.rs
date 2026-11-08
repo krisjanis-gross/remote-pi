@@ -92,6 +92,37 @@ pub fn read_all(config: &SensorConfig, w1_dir: &Path, iio_dir: &Path) -> Vec<(St
     out
 }
 
+/// Drops a reading that jumps more than `max_change` from the last one kept, as
+/// mazais-pagrabs' validate_temp_reading() did in PHP: a 1-wire glitch is ignored,
+/// but a real change is accepted once it has been seen more than `max_rejects`
+/// times in a row.
+pub struct ChangeFilter {
+    max_change: f64,
+    max_rejects: u32,
+    /// Per sensor: the last value kept, and how many in a row were dropped since.
+    kept: BTreeMap<String, (f64, u32)>,
+}
+
+impl ChangeFilter {
+    pub fn new(max_change: f64, max_rejects: u32) -> ChangeFilter {
+        ChangeFilter { max_change, max_rejects, kept: BTreeMap::new() }
+    }
+
+    /// Whether to use this reading.
+    pub fn accept(&mut self, id: &str, value: f64) -> bool {
+        match self.kept.get_mut(id) {
+            Some((last, rejects)) if (value - *last).abs() > self.max_change && *rejects < self.max_rejects => {
+                *rejects += 1;
+                false
+            }
+            _ => {
+                self.kept.insert(id.to_string(), (value, 0));
+                true
+            }
+        }
+    }
+}
+
 struct Latest {
     values: BTreeMap<String, (f64, Instant)>,
     /// Sensors whose last read failed, so each failure is logged once.
@@ -113,6 +144,7 @@ impl Sensors {
         if !config.ds18b20 && config.dht.is_empty() {
             return sensors;
         }
+        let mut filter = config.max_change.map(|max| ChangeFilter::new(max, config.max_change_rejects));
         thread::Builder::new()
             .name("sensors".into())
             .spawn(move || loop {
@@ -122,6 +154,12 @@ impl Sensors {
                 {
                     let mut l = latest.lock().unwrap_or_else(|e| e.into_inner());
                     for (id, result) in results {
+                        if let (Ok(value), Some(f)) = (&result, filter.as_mut()) {
+                            if !f.accept(&id, *value) {
+                                l.messages.push(format!("sensor {id}: ignored {value}, too far from the last reading"));
+                                continue;
+                            }
+                        }
                         match result {
                             Ok(value) => {
                                 l.values.insert(id.clone(), (value, now));
@@ -171,6 +209,20 @@ mod tests {
         assert_eq!(parse_w1_slave(&ok.replace("23125", "85000")), None);
         assert_eq!(parse_w1_slave(&ok.replace("23125", "-1250")), Some(-1.3));
         assert_eq!(parse_w1_slave(""), None);
+    }
+
+    #[test]
+    fn change_filter_drops_glitches_but_follows_real_changes() {
+        let mut f = ChangeFilter::new(1.0, 2);
+        assert!(f.accept("a", 5.0)); // the first reading is kept
+        assert!(f.accept("a", 5.8));
+        assert!(!f.accept("a", 30.0)); // a glitch
+        assert!(f.accept("a", 6.0)); // back to normal; compared with 5.8
+        assert!(!f.accept("a", 9.0));
+        assert!(!f.accept("a", 9.1));
+        assert!(f.accept("a", 9.2)); // seen more than twice in a row: real
+        assert!(f.accept("a", 9.5));
+        assert!(f.accept("b", -3.0)); // per sensor
     }
 
     #[test]

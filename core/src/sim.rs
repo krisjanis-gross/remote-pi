@@ -9,11 +9,14 @@ pub enum Action {
     Pin(u16, bool),
     Sensor(String, Option<f64>),
     Param(u32, f64),
+    /// An input pin's level: input:11=1.
+    Input(u16, bool),
 }
 
 /// Runs `seconds` of 1-second ticks. `actions` are (seconds from start, action)
-/// and happen just before the tick at that second. `each_tick` sees the engine
-/// after every tick with the seconds since the start.
+/// and happen at that moment (fractions too); one at a whole second happens just
+/// before that second's tick. `each_tick` sees the engine after every tick with
+/// the seconds since the start.
 pub fn run(
     engine: &mut Engine,
     mut actions: Vec<(f64, Action)>,
@@ -24,11 +27,12 @@ pub fn run(
     let start = engine.now();
     let mut next = 0;
     for second in 0..=seconds {
-        engine.advance_to(start + second as f64);
         while next < actions.len() && actions[next].0 <= second as f64 {
+            engine.advance_to(start + actions[next].0);
             apply(engine, &actions[next].1);
             next += 1;
         }
+        engine.advance_to(start + second as f64);
         engine.tick();
         each_tick(engine, second);
     }
@@ -44,6 +48,7 @@ pub fn apply(engine: &mut Engine, action: &Action) {
         }
         Action::Sensor(id, value) => engine.set_sensor(id, *value),
         Action::Param(id, value) => engine.set_param(*id, *value),
+        Action::Input(pin, high) => engine.set_input(*pin, *high),
     }
 }
 
@@ -76,13 +81,14 @@ pub fn parse_duration(text: &str) -> Result<f64, String> {
     Ok(total)
 }
 
-/// "trigger:5=on", "pin:11=off", "sensor:surf_hum_1=40", "sensor:x=none", "param:7=20".
+/// "trigger:5=on", "pin:11=off", "sensor:surf_hum_1=40", "sensor:x=none", "param:7=20",
+/// "input:11=1" (or high/low, on/off).
 pub fn parse_action(text: &str) -> Result<Action, String> {
     let (kind, rest) = text.split_once(':').ok_or_else(|| format!("'{text}': expected kind:id=value"))?;
     let (id, value) = rest.split_once('=').ok_or_else(|| format!("'{text}': expected kind:id=value"))?;
     let on = || match value {
-        "on" | "1" | "true" => Ok(true),
-        "off" | "0" | "false" => Ok(false),
+        "on" | "1" | "true" | "high" => Ok(true),
+        "off" | "0" | "false" | "low" => Ok(false),
         _ => Err(format!("'{text}': use on or off")),
     };
     let number = |what: &str| -> Result<f64, String> {
@@ -94,13 +100,22 @@ pub fn parse_action(text: &str) -> Result<Action, String> {
         "sensor" if value == "none" => Ok(Action::Sensor(id.to_string(), None)),
         "sensor" => Ok(Action::Sensor(id.to_string(), Some(number("the reading")?))),
         "param" => Ok(Action::Param(id.parse().map_err(|_| format!("'{text}': bad parameter id"))?, number("the value")?)),
-        _ => Err(format!("'{text}': kind must be trigger, pin, sensor or param")),
+        "input" => Ok(Action::Input(id.parse().map_err(|_| format!("'{text}': bad input pin"))?, on()?)),
+        _ => Err(format!("'{text}': kind must be trigger, pin, sensor, param or input")),
     }
 }
 
+/// HH:MM:SS, with tenths when the time is not a whole second (sub-second rules).
 pub fn clock(seconds: f64) -> String {
-    let s = seconds.max(0.0).round() as u64;
-    format!("{:02}:{:02}:{:02}", s / 3600, (s / 60) % 60, s % 60)
+    let seconds = seconds.max(0.0);
+    let tenths = (seconds * 10.0).round() as u64;
+    let s = tenths / 10;
+    let hms = format!("{:02}:{:02}:{:02}", s / 3600, (s / 60) % 60, s % 60);
+    if tenths.is_multiple_of(10) {
+        hms
+    } else {
+        format!("{hms}.{}", tenths % 10)
+    }
 }
 
 pub fn format_readings(readings: &BTreeMap<String, f64>) -> String {

@@ -2,6 +2,7 @@ use clap::{Parser, Subcommand};
 use remote_pi_core::engine::{self, format_number, Engine, Entry, NoHardware};
 use remote_pi_core::sim::{self, Action};
 use remote_pi_core::hardware::Pinctrl;
+use remote_pi_core::inputs::Inputs;
 use remote_pi_core::api::{self, Context};
 use remote_pi_core::config::{self, Config};
 use remote_pi_core::monitor;
@@ -51,7 +52,8 @@ enum Command {
         /// A sensor reading from the start: surf_hum_1=40.
         #[arg(long, value_name = "ID=VALUE")]
         sensor: Vec<String>,
-        /// Anything at a given time: --at 10m sensor:surf_hum_1=70.
+        /// Anything at a given time: --at 10m sensor:surf_hum_1=70, --at 2.5s input:11=1.
+        /// Input pins start high with pull = "up", else low.
         #[arg(long, num_args = 2, value_names = ["WHEN", "KIND:ID=VALUE"])]
         at: Vec<String>,
         /// Also print the rules' published readings this often: 5m.
@@ -140,11 +142,16 @@ fn describe_site(site: &Site, engine: &Engine) -> String {
             None => id.to_string(),
         })
         .collect();
-    format!(
+    let mut text = format!(
         "triggers: {}\npins: {}",
         if triggers.is_empty() { "none".into() } else { triggers.join(", ") },
         pins.join(", ")
-    )
+    );
+    if !site.inputs.is_empty() {
+        let inputs: Vec<String> = site.inputs.keys().map(u16::to_string).collect();
+        text.push_str(&format!("\ninputs: {}", inputs.join(", ")));
+    }
+    text
 }
 
 fn check(site_dir: PathBuf) -> Result<ExitCode, String> {
@@ -190,6 +197,10 @@ fn simulate(
     for s in &sensors {
         sim::apply(&mut engine, &sim::parse_action(&format!("sensor:{s}"))?);
     }
+    // Inputs start at the level their pull resistor gives them (low without one).
+    for (&pin, input) in &site.inputs {
+        engine.preset_input(pin, input.pull == remote_pi_core::site::Pull::Up);
+    }
     let mut actions = Vec::new();
     for t in &triggers {
         actions.push(shortcut("trigger", t)?);
@@ -205,7 +216,8 @@ fn simulate(
     println!("{}", describe_site(&site, &engine));
     println!("simulating {} from {start} (times below are clock times)\n", sim::clock(seconds as f64));
 
-    let names: std::collections::BTreeMap<u16, String> = engine.pins().into_iter().collect();
+    let mut names: std::collections::BTreeMap<u16, String> = engine.pins().into_iter().collect();
+    names.extend(site.inputs.iter().map(|(&pin, i)| (pin, i.name.clone())));
     let mut all: Vec<Entry> = Vec::new();
     let print = |entries: Vec<Entry>, all: &mut Vec<Entry>| {
         for entry in entries {
@@ -331,7 +343,24 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
             Err(e) => print(&format!("cannot prepare the settings database: {e}")),
         }
     }
-    let (mut runner, lines) = Runner::start(&site, mode, db.as_deref().map(Store::new), outputs, clock)?;
+    // Input pins (live mode). In watch-only mode PHP's scripts may hold them.
+    let mut inputs = None;
+    let mut levels = Vec::new();
+    if !site.inputs.is_empty() {
+        if mode == Mode::WatchOnly {
+            print("inputs: not read in watch-only mode (input() is nil)");
+        } else {
+            match Inputs::open(&site.inputs).and_then(|i| Ok((i.read()?, i))) {
+                Ok((now, opened)) => {
+                    levels = now;
+                    inputs = Some(opened);
+                }
+                Err(e) => print(&format!("inputs: off, input() is nil: {e}")),
+            }
+        }
+    }
+    let (mut runner, lines) =
+        Runner::start_with_inputs(&site, mode, db.as_deref().map(Store::new), outputs, clock, &levels)?;
     runner.keep_copies(config.data_dir.clone(), config.settings.save_delay_seconds);
     print(&describe_site(&site, &runner.engine));
     for line in lines {
@@ -365,13 +394,24 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
         }
     }
 
+    // Changes from the API and the inputs run on the loop's thread, between ticks.
+    let (sender, receiver) = mpsc::channel::<run::Job>();
+    if let Some(inputs) = inputs {
+        let jobs = sender.clone();
+        inputs.watch(
+            levels,
+            move |changes| {
+                let _ = jobs.send(Box::new(move |runner: &mut Runner| runner.set_inputs(&changes)));
+            },
+            print,
+        );
+    }
+
     // The app's API, if configured. A problem with it is logged and the rules keep running.
-    let mut jobs = None;
     if let Some(api_config) = &config.api {
         match api_config.api_key() {
             Err(e) => print(&format!("api: off: {e}")),
             Ok(key) => {
-                let (sender, receiver) = mpsc::channel();
                 let context = Context {
                     key,
                     api: api_config.clone(),
@@ -380,13 +420,12 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
                     runtime_dir: config.runtime_dir.clone(),
                     data_dir: config.data_dir.clone(),
                     live: live.clone(),
-                    jobs: sender,
+                    jobs: sender.clone(),
                     watch_only,
                     sensor_log: sensor_log.as_ref().map(|log| log.sender()),
                 };
-                match api::serve(Arc::new(context)) {
-                    Ok(()) => jobs = Some(receiver),
-                    Err(e) => print(&format!("api: off: {e}")),
+                if let Err(e) = api::serve(Arc::new(context)) {
+                    print(&format!("api: off: {e}"));
                 }
             }
         }
@@ -398,7 +437,8 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
         sensor_config.dht.clear();
     }
     let sensors = Sensors::start(sensor_config, sensors::W1_DIR.into(), sensors::IIO_DIR.into());
-    let loop_options = LoopOptions { clock_flag: &clock_flag, readings_every, jobs, live: Some(live), sensor_log };
+    drop(sender);
+    let loop_options = LoopOptions { clock_flag: &clock_flag, readings_every, jobs: Some(receiver), live: Some(live), sensor_log };
     run::run_forever(runner, || (sensors.current(), sensors.take_messages()), loop_options, print);
     stop_monitor.store(true, std::sync::atomic::Ordering::SeqCst);
     Ok(ExitCode::SUCCESS)

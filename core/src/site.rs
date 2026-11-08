@@ -21,6 +21,31 @@ pub struct PinConfig {
     pub max_on_minutes: Option<f64>,
 }
 
+/// The pull resistor on an input pin.
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum Pull {
+    /// No pull resistor, as RPi.GPIO's GPIO.setup(pin, GPIO.IN) left it.
+    #[default]
+    None,
+    Up,
+    Down,
+}
+
+/// A header pin the rules read: a button, a limit switch, a sensor's output.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InputConfig {
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub pull: Pull,
+    /// A new level counts once it has held this long (contact bounce of a button).
+    /// 0: at once, for a limit switch that must stop its relay without delay.
+    #[serde(default)]
+    pub debounce_ms: f64,
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GpioConfig {
@@ -55,6 +80,15 @@ pub struct SensorConfig {
     /// How often the sensors are read. A DS18B20 takes about 0.75 s per reading.
     #[serde(default = "default_interval")]
     pub interval_seconds: f64,
+    /// Ignore a reading this far from the last one kept (a 1-wire glitch), until
+    /// it has been seen more than max_change_rejects times in a row.
+    pub max_change: Option<f64>,
+    #[serde(default = "default_max_change_rejects")]
+    pub max_change_rejects: u32,
+}
+
+fn default_max_change_rejects() -> u32 {
+    10
 }
 
 fn default_interval() -> f64 {
@@ -63,7 +97,13 @@ fn default_interval() -> f64 {
 
 impl Default for SensorConfig {
     fn default() -> Self {
-        SensorConfig { ds18b20: false, dht: Vec::new(), interval_seconds: default_interval() }
+        SensorConfig {
+            ds18b20: false,
+            dht: Vec::new(),
+            interval_seconds: default_interval(),
+            max_change: None,
+            max_change_rejects: default_max_change_rejects(),
+        }
     }
 }
 
@@ -121,6 +161,8 @@ struct DeviceFile {
     gpio: GpioConfig,
     pins: BTreeMap<String, PinConfig>,
     #[serde(default)]
+    inputs: BTreeMap<String, InputConfig>,
+    #[serde(default)]
     sensors: SensorConfig,
     #[serde(default)]
     log: LogConfig,
@@ -132,6 +174,8 @@ pub struct Site {
     pub rules: String,
     pub gpio: GpioConfig,
     pub pins: BTreeMap<u16, PinConfig>,
+    /// Header pins read as inputs.
+    pub inputs: BTreeMap<u16, InputConfig>,
     pub sensors: SensorConfig,
     pub log: LogConfig,
 }
@@ -169,7 +213,26 @@ impl Site {
             }
             pins.insert(pin, config);
         }
+        let mut inputs = BTreeMap::new();
+        for (key, config) in file.inputs {
+            let pin: u16 = key.parse().map_err(|_| format!("input '{key}' is not a number"))?;
+            if pin > LAST_HEADER_PIN || board_to_bcm(pin).is_none() {
+                return Err(format!("input {pin} must be a GPIO pin on the header (BOARD numbering)"));
+            }
+            if pins.contains_key(&pin) {
+                return Err(format!("pin {pin} is both an output ([pins.{pin}]) and an input ([inputs.{pin}])"));
+            }
+            if !(0.0..=1000.0).contains(&config.debounce_ms) {
+                return Err(format!("input {pin}: debounce_ms must be 0-1000"));
+            }
+            inputs.insert(pin, config);
+        }
         let sensors = file.sensors;
+        if let Some(max) = sensors.max_change {
+            if !max.is_finite() || max <= 0.0 {
+                return Err("sensors.max_change must be above 0".into());
+            }
+        }
         if !(1.0..=3600.0).contains(&sensors.interval_seconds) {
             return Err("sensors.interval_seconds must be 1-3600".into());
         }
@@ -194,6 +257,6 @@ impl Site {
         if values.iter().any(|v| !v.is_finite() || *v <= 0.0) {
             return Err("every [log] value must be above 0".into());
         }
-        Ok(Site { rules_path: PathBuf::from("rules.lua"), rules: rules.to_string(), gpio: file.gpio, pins, sensors, log })
+        Ok(Site { rules_path: PathBuf::from("rules.lua"), rules: rules.to_string(), gpio: file.gpio, pins, inputs, sensors, log })
     }
 }
