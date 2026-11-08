@@ -195,6 +195,23 @@ fn install_copy(source: &Path, target: &Path) -> Result<(), String> {
     fs::rename(&partial, target).map_err(|e| format!("{}: {e}", target.display()))
 }
 
+/// Names given in the app (sensor_names), by sensor id. Empty if unreadable.
+pub fn sensor_names(path: &Path) -> BTreeMap<String, String> {
+    let Ok(db) = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX) else {
+        return BTreeMap::new();
+    };
+    let _ = db.busy_timeout(Duration::from_secs(5));
+    let text = |v: Value| match v {
+        Value::Text(t) => Some(t),
+        Value::Integer(i) => Some(i.to_string()),
+        Value::Real(r) => Some(crate::engine::format_number(r)),
+        _ => None,
+    };
+    let Ok(mut statement) = db.prepare("SELECT id, sensor_name FROM sensor_names") else { return BTreeMap::new() };
+    let rows = statement.query_map([], |row| Ok((row.get::<_, Value>(0)?, row.get::<_, Value>(1)?)));
+    rows.into_iter().flatten().flatten().filter_map(|(id, name)| Some((text(id)?, text(name)?))).collect()
+}
+
 /// Files in `dir` named <prefix><digits>.db, newest first (the digits are the time).
 pub fn numbered_files(dir: &Path, prefix: &str) -> Vec<PathBuf> {
     let mut names: Vec<String> = fs::read_dir(dir)

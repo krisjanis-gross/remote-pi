@@ -10,10 +10,10 @@ Each device's own logic is a short Lua file, `sites/<name>/rules/rules.lua`.
   - `remote-pi run`: GPIO through `pinctrl`, DS18B20 and DHT sensors, the settings
     database, and a watch-only mode that runs next to PHP;
   - the app's API (`json_API_v2.php`'s 17 actions, `json_ha.php`, `csv_export.php`) and
-    the built app, held to the same contract tests as PHP.
-- Not built yet:
-  - writing the sensor log, and monitor check-ins;
-  - the provisioning step that installs the core.
+    the built app, held to the same contract tests as PHP;
+  - the sensor log (save levels, moving it to `/data`, purging, backups) and monitor
+    check-ins.
+- Not built yet: the provisioning step that installs the core.
 
 The PHP backend is unchanged and still runs the devices.
 
@@ -168,8 +168,28 @@ Everything it does goes to the journal: `journalctl -u remote-pi-core`.
 - **Stopping:** on SIGTERM (`systemctl stop`) the core switches every output off.
 - **Rules that do not load:** the core still runs, with every output off, and logs the
   error.
+- **Sensor log (live mode):** as `read_sensor_data.php` did, in the same files:
+  - Each second's readings (the sensors' and the rules' published values) go to the RAM
+    log, `<runtime_dir>/sensor_log_tmp_db.db`, with a save level: 3 (long term) once per
+    long-term interval or when the rules call `save_now()`; else 2 once per mid-term
+    interval; else 1 once per all-data interval. The intervals and how long each level is
+    kept are in `device.toml`'s `[log]`.
+  - Every `log_flush_interval_seconds` (an hour) the RAM log moves to the newest
+    `<data_dir>/sensor_log<YYYYmmddHHMMSS>.db` in one transaction. A power cut loses at most
+    that much; the core moves it also when it stops and before the app reboots the device.
+  - Once that file is `log_backup_interval_seconds` old (a day), old readings are purged by
+    level and a new file is started from a copy; the newest 10 are kept.
+  - Nothing is logged until the clock has been synced, and it all runs on its own thread,
+    so a slow SD card cannot delay the loop.
+- **Monitor check-ins (live mode):** with a `[monitor]` section, the latest readings go to
+  the monitor every `interval_seconds` (60), as `functions_monitor.php` did: the key as a
+  Bearer token (and in the body, unless `legacy_body_key = false`), backing off after
+  failures, and only every 10 minutes after a rejected key. The system's `curl` makes the
+  request, so TLS gets the OS's security updates; the key goes to curl on stdin, never on
+  its command line. `remote-pi monitor` sends one check-in without readings, to check the
+  address and key.
 - **Watch-only:** for trying the core next to the PHP backend before switching over.
-  - It switches nothing and writes nothing.
+  - It switches nothing and writes nothing; PHP keeps the sensor log and the check-ins.
   - It follows what PHP writes to the database: pins and triggers switched from the app,
     and parameter changes.
   - It runs its own rules on that, and logs `DIFFERS:` when its pins or triggers disagree
@@ -186,6 +206,8 @@ data_dir = "/data/sqlite"        # copies that survive a reboot
 
 [settings]
 save_delay_seconds = 60          # copy the settings to data_dir this long after a change
+log_flush_interval_seconds = 3600     # move the sensor log from RAM to data_dir
+log_backup_interval_seconds = 86400   # purge it and start a new file
 
 [api]
 listen = ["0.0.0.0:80"]
@@ -194,6 +216,13 @@ ui_dir = "/opt/remote-pi/ui"            # the built app
 # cors_allowed_origins = ["capacitor://localhost", "ionic://localhost", "http://localhost", "https://localhost"]
 # reboot_command = ["sudo", "-n", "/usr/bin/systemctl", "reboot"]
 # shutdown_command = ["sudo", "-n", "/usr/bin/systemctl", "poweroff"]
+
+[monitor]
+url = "https://<monitor>/checkin"
+node_id = "pi-laistisana"
+key_file = "/etc/remote-pi/monitor-api-key"   # or key = "..."
+# legacy_body_key = true    # also send the key in the body, for the older server
+# interval_seconds = 60     # 30-120
 ```
 
 ### The app's API
@@ -221,11 +250,12 @@ How it works:
   are, and the restored database is corrected to match them.
 - **Watch-only mode:** the API only reads; any change gets `503`.
 
-The tests in `tests/test_api.py` and `tests/test_contract.py` run against either backend:
+The tests in `tests/test_api.py`, `test_contract.py` and `test_timezone.py` run against
+either backend (a few PHP-only ones are skipped for the core):
 
 ```bash
 docker run --rm -v "$PWD/..:/app" -w /app/tests -e REMOTE_PI_CORE=/app/core/target-linux/release/remote-pi \
-  remote-pi-tests python3 -m unittest test_api test_contract
+  remote-pi-tests python3 -m unittest test_api test_contract test_timezone
 ```
 
 (`remote-pi-tests` is built from `tests/Dockerfile`; build the core for Linux into
@@ -256,7 +286,7 @@ docker run --rm -v "$PWD:/work" -w /work -v remote-pi-cargo:/usr/local/cargo/reg
 ```
 
 Measured on pi-laistisana (Pi 2):
-- 2.1 MB binary, with Lua, SQLite and the HTTP server built in (1.8 MB before the API).
+- 2.2 MB binary, with Lua, SQLite and the HTTP server built in (1.8 MB before the API).
 - With the API, read-only, next to PHP (2026-11-08): 6.1 MB of memory, 11 threads. The
   answers matched PHP's on the device's real data: pins, triggers, readings, sparklines,
   and history from an hour to a month. Middle of 5 calls:
@@ -282,9 +312,9 @@ Today PHP-FPM and the Python worker use about 136 MB.
 2. **JSON API:** done, and read-only on pi-laistisana next to PHP. Not tried yet: changes
    from the app in live mode on a device. Open for step 4: the reboot and shutdown
    commands use `sudo`, which the unit's `NoNewPrivileges` blocks.
-3. **Logging and monitoring:** writing the sensor log with its save levels, moving it to
-   `/data`, purging and backups, as `read_sensor_data.php` does now; monitor check-ins.
-   After that, nginx, PHP and the Python worker are no longer needed.
+3. **Logging and monitoring:** done. The core now does everything PHP, nginx and the
+   Python worker did. Checked by PHP's timezone tests and a check-in from the Pi through
+   its sandbox (to example.com, not the real monitor); not yet run in live mode on a device.
 4. **Provisioning:** CI builds the ARM binary; the installer puts it in place with its
    systemd unit and removes PHP-FPM, the Python worker and phpLiteAdmin. `remote-pi-doctor`
    checks the new service.

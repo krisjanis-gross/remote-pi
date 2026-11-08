@@ -4,6 +4,7 @@ use remote_pi_core::sim::{self, Action};
 use remote_pi_core::hardware::Pinctrl;
 use remote_pi_core::api::{self, Context};
 use remote_pi_core::config::{self, Config};
+use remote_pi_core::monitor;
 use remote_pi_core::run::{self, Clock, Live, LoopOptions, Mode, Runner};
 use remote_pi_core::sensors::{self, Sensors};
 use remote_pi_core::site::Site;
@@ -57,6 +58,14 @@ enum Command {
         #[arg(long, value_name = "INTERVAL")]
         readings: Option<String>,
     },
+    /// Send one check-in to the monitor in core.toml, without readings, and show the answer.
+    ///
+    /// For checking a device's monitor address and key.
+    Monitor {
+        /// [default: /etc/remote-pi/core.toml]
+        #[arg(long, value_name = "FILE")]
+        config: Option<PathBuf>,
+    },
     /// Run the device: GPIO, sensors, the rules and the app's API, until stopped.
     ///
     /// Example: remote-pi run /opt/remote-pi/site/rules --watch-only
@@ -99,6 +108,7 @@ fn main() -> ExitCode {
         Command::Sim { site, duration, start, trigger, pin, param, sensor, at, readings } => {
             simulate(site, &duration, &start, trigger, pin, param, sensor, at, readings)
         }
+        Command::Monitor { config } => monitor_once(config),
         Command::Run { site, watch_only, config, db, no_db, no_sensors, pinctrl, clock_flag, log_readings } => {
             let options = RunOptions { watch_only, config, db, no_db, no_sensors, pinctrl, clock_flag, log_readings };
             run_device(site, options)
@@ -249,6 +259,16 @@ fn describe(entry: &Entry, names: &std::collections::BTreeMap<u16, String>) -> O
     engine::describe(&entry.what, names).map(|text| format!("{}  {text}", sim::clock(entry.time)))
 }
 
+fn monitor_once(config: Option<PathBuf>) -> Result<ExitCode, String> {
+    let path = config.unwrap_or_else(|| PathBuf::from(config::DEFAULT_PATH));
+    let config = Config::load(&path, true)?;
+    let settings = monitor::Settings::from_config(config.monitor.as_ref().ok_or("no [monitor] section")?)?;
+    let json = monitor::payload(&settings, Vec::new())?;
+    let outcome = monitor::send(&settings, &json, remote_pi_core::clock::wall_now());
+    println!("{}: HTTP {}, curl exit code {}", settings.url, outcome.status, outcome.error);
+    Ok(if outcome.error == 0 && (200..300).contains(&outcome.status) { ExitCode::SUCCESS } else { ExitCode::FAILURE })
+}
+
 struct RunOptions {
     watch_only: bool,
     config: Option<PathBuf>,
@@ -264,7 +284,9 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
     let RunOptions { watch_only, config, db, no_db, no_sensors, pinctrl, clock_flag, log_readings } = options;
     let readings_every = log_readings.map(|r| sim::parse_duration(&r)).transpose()?.map(|s| s.max(1.0));
     // Lines go to stdout, which systemd sends to the journal with a timestamp.
-    let print = |line: &str| println!("{line}");
+    fn print(line: &str) {
+        println!("{line}");
+    }
     let config = match &config {
         Some(path) => Config::load(path, true)?,
         None => Config::load(Path::new(config::DEFAULT_PATH), false)?,
@@ -307,31 +329,53 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
         print(&line);
     }
 
+    // The latest readings, shared with the API and the monitor.
+    let live = Arc::new(Mutex::new(Live::default()));
+    let static_db = db.clone().unwrap_or_else(|| config.static_db());
+
+    // Live mode writes the sensor log and checks in with the monitor; in
+    // watch-only mode PHP still does both.
+    let sensor_log = (mode == Mode::Live).then(|| {
+        let paths = remote_pi_core::sensor_log::Paths {
+            runtime_dir: config.runtime_dir.clone(),
+            data_dir: config.data_dir.clone(),
+            flush_every: config.settings.log_flush_interval_seconds,
+            backup_every: config.settings.log_backup_interval_seconds,
+        };
+        remote_pi_core::sensor_log::Handle::start(paths, site.log.clone(), print)
+    });
+    let stop_monitor = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    if let (Mode::Live, Some(monitor_config)) = (mode, &config.monitor) {
+        match monitor::Settings::from_config(monitor_config) {
+            Ok(settings) => {
+                print(&format!("monitor: checking in every {} s as {}", settings.interval, settings.node));
+                monitor::start(settings, live.clone(), static_db.clone(), stop_monitor.clone(), print);
+            }
+            Err(e) => print(&format!("monitor: off: {e}")),
+        }
+    }
+
     // The app's API, if configured. A problem with it is logged and the rules keep running.
     let mut jobs = None;
-    let mut live = None;
     if let Some(api_config) = &config.api {
         match api_config.api_key() {
             Err(e) => print(&format!("api: off: {e}")),
             Ok(key) => {
                 let (sender, receiver) = mpsc::channel();
-                let shared = Arc::new(Mutex::new(Live::default()));
                 let context = Context {
                     key,
                     api: api_config.clone(),
                     log: site.log.clone(),
-                    static_db: db.clone().unwrap_or_else(|| config.static_db()),
+                    static_db: static_db.clone(),
                     runtime_dir: config.runtime_dir.clone(),
                     data_dir: config.data_dir.clone(),
-                    live: shared.clone(),
+                    live: live.clone(),
                     jobs: sender,
                     watch_only,
+                    sensor_log: sensor_log.as_ref().map(|log| log.sender()),
                 };
                 match api::serve(Arc::new(context)) {
-                    Ok(()) => {
-                        jobs = Some(receiver);
-                        live = Some(shared);
-                    }
+                    Ok(()) => jobs = Some(receiver),
                     Err(e) => print(&format!("api: off: {e}")),
                 }
             }
@@ -344,7 +388,8 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
         sensor_config.dht.clear();
     }
     let sensors = Sensors::start(sensor_config, sensors::W1_DIR.into(), sensors::IIO_DIR.into());
-    let loop_options = LoopOptions { clock_flag: &clock_flag, readings_every, jobs, live };
+    let loop_options = LoopOptions { clock_flag: &clock_flag, readings_every, jobs, live: Some(live), sensor_log };
     run::run_forever(runner, || (sensors.current(), sensors.take_messages()), loop_options, print);
+    stop_monitor.store(true, std::sync::atomic::Ordering::SeqCst);
     Ok(ExitCode::SUCCESS)
 }

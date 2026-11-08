@@ -1,9 +1,9 @@
 name: Core (Rust + Lua rules)
 on:
   push:
-    paths: ["core/**", "sites/*/rules/**", "api/**", "tests/test_api.py", "tests/test_contract.py", ".github/workflows/core.yml"]
+    paths: ["core/**", "sites/*/rules/**", "api/**", "tests/test_api.py", "tests/test_contract.py", "tests/test_timezone.py", ".github/workflows/core.yml"]
   pull_request:
-    paths: ["core/**", "sites/*/rules/**", "api/**", "tests/test_api.py", "tests/test_contract.py", ".github/workflows/core.yml"]
+    paths: ["core/**", "sites/*/rules/**", "api/**", "tests/test_api.py", "tests/test_contract.py", "tests/test_timezone.py", ".github/workflows/core.yml"]
 permissions:
   contents: read
 jobs:
@@ -25,4 +25,4 @@ jobs:
         run: |
           sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends python3-jsonschema
           cargo build --locked --release
-          cd ../tests && REMOTE_PI_CORE="$PWD/../core/target/release/remote-pi" python3 -m unittest -v test_api test_contract
+          cd ../tests && REMOTE_PI_CORE="$PWD/../core/target/release/remote-pi" python3 -m unittest -v test_api test_contract test_timezone

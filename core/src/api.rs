@@ -100,6 +100,8 @@ pub struct Context {
     pub live: Arc<Mutex<Live>>,
     pub jobs: Sender<Job>,
     pub watch_only: bool,
+    /// The sensor log writer, to save it before a reboot (live mode).
+    pub sensor_log: Option<std::sync::mpsc::SyncSender<crate::sensor_log::Message>>,
 }
 
 /// An HTTP request, apart from the server library.
@@ -343,23 +345,8 @@ fn sql_flag(value: &Sql) -> i64 {
     i64::from(on)
 }
 
-fn sql_id(value: &Sql) -> Option<String> {
-    match value {
-        Sql::Integer(i) => Some(i.to_string()),
-        Sql::Text(t) => Some(t.clone()),
-        Sql::Real(r) => Some(format_number(*r)),
-        _ => None,
-    }
-}
-
-/// Names given in the app (sensor_names), by sensor id.
 fn sensor_names(ctx: &Context) -> BTreeMap<String, String> {
-    let Ok(db) = static_db(ctx) else { return BTreeMap::new() };
-    rows(&db, "SELECT id, sensor_name FROM sensor_names", [])
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|row| Some((sql_id(&row[0])?, sql_id(&row[1])?)))
-        .collect()
+    crate::store::sensor_names(&ctx.static_db)
 }
 
 fn name_of(names: &BTreeMap<String, String>, id: &str) -> String {
@@ -596,7 +583,11 @@ fn power(ctx: &Context, what: &str, command: &[String]) -> Result<Value, ApiErro
         return Err(ApiError::watch_only());
     }
     log(&format!("device {what} requested from the app"));
+    // Save the settings and the sensor log first, as the power goes.
     run(ctx, |r| r.api_prepare_power_off())?;
+    if let Some(sensor_log) = &ctx.sensor_log {
+        crate::sensor_log::flush_and_wait(sensor_log, Duration::from_secs(20));
+    }
     let (program, args) = command.split_first().ok_or_else(|| ApiError::failed("no command configured"))?;
     let output = std::process::Command::new(program)
         .args(args)
@@ -916,6 +907,7 @@ mod tests {
         let live = Arc::new(Mutex::new(Live {
             timestamp: Some("2026-11-08 09:10:11".into()),
             readings: vec![("28-0415a86c92ff".into(), 7.3), ("fan_limit".into(), 22.0)],
+            sampled_at: Some(1000.0),
         }));
         let ctx = Context {
             key: KEY.into(),
@@ -927,6 +919,7 @@ mod tests {
             live,
             jobs: sender,
             watch_only: mode == Mode::WatchOnly,
+            sensor_log: None,
         };
         Fixture { ctx, dir }
     }

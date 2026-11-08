@@ -41,6 +41,8 @@ pub struct Live {
     pub timestamp: Option<String>,
     /// Sensor readings, then the rules' published values.
     pub readings: Vec<(String, f64)>,
+    /// Wall clock of the last tick (seconds since the epoch).
+    pub sampled_at: Option<f64>,
 }
 
 /// Copies of the settings in the data folder (live mode).
@@ -108,6 +110,8 @@ pub struct Runner {
     clock_synced: bool,
     /// Log lines from API jobs.
     messages: Vec<String>,
+    /// The rules called save_now() since the last tick's sample.
+    save_now: bool,
 }
 
 fn on_off(on: bool) -> &'static str {
@@ -173,6 +177,7 @@ impl Runner {
             copies: None,
             clock_synced: clock.synced,
             messages: Vec::new(),
+            save_now: false,
         };
         lines.extend(runner.journal());
 
@@ -298,6 +303,11 @@ impl Runner {
     /// Copies any unsaved settings now: before a reboot, and when the core stops.
     pub fn save_now(&mut self) -> Vec<String> {
         self.save_copy(wall_now(), true)
+    }
+
+    /// Whether the rules asked for the readings to be kept (save_now) since the last call.
+    pub fn take_save_now(&mut self) -> bool {
+        std::mem::take(&mut self.save_now)
     }
 
     /// Log lines from the API jobs that ran since the last call.
@@ -439,6 +449,9 @@ impl Runner {
     fn journal(&mut self) -> Vec<String> {
         let mut lines = Vec::new();
         for entry in self.engine.take_journal() {
+            if entry.what == What::SaveNow {
+                self.save_now = true;
+            }
             if self.mode == Mode::Live {
                 if let Some(store) = self.store.as_mut() {
                     let saved = match entry.what {
@@ -509,8 +522,10 @@ pub struct LoopOptions<'a> {
     pub readings_every: Option<f64>,
     /// Changes from the API.
     pub jobs: Option<Receiver<Job>>,
-    /// Where the latest readings go, for the API.
+    /// Where the latest readings go, for the API and the monitor.
     pub live: Option<Arc<Mutex<Live>>>,
+    /// The sensor log writer (live mode).
+    pub sensor_log: Option<crate::sensor_log::Handle>,
 }
 
 /// Runs until SIGTERM or SIGINT. `sensors` gives the latest readings and any
@@ -521,7 +536,7 @@ pub fn run_forever(
     options: LoopOptions,
     print: impl Fn(&str),
 ) {
-    let LoopOptions { clock_flag, readings_every, jobs, live } = options;
+    let LoopOptions { clock_flag, readings_every, jobs, live, sensor_log } = options;
     // SAFETY: the handler only stores to an atomic.
     unsafe {
         libc::signal(libc::SIGTERM, request_stop as libc::sighandler_t);
@@ -569,15 +584,20 @@ pub fn run_forever(
         }
         let mut shown = readings_every.filter(|_| next_tick >= readings_due).map(|_| readings.clone());
         let tick_clock = clock();
-        let current = live.as_ref().map(|_| readings.clone());
+        let current = readings.clone();
         for line in runner.tick(tick_clock, readings) {
             print(&line);
         }
-        if let (Some(live), Some(current)) = (&live, current) {
-            let mut readings: Vec<(String, f64)> = current.into_iter().collect();
-            readings.extend(runner.engine.published());
+        // This second's readings: the sensors', then the rules' published values.
+        let mut all: Vec<(String, f64)> = current.into_iter().collect();
+        all.extend(runner.engine.published());
+        let save_now = runner.take_save_now();
+        if let Some(log) = &sensor_log {
+            log.sample(crate::sensor_log::Sample { wall: tick_clock.wall, synced: tick_clock.synced, readings: all.clone(), save_now });
+        }
+        if let Some(live) = &live {
             let mut live = live.lock().unwrap_or_else(|e| e.into_inner());
-            *live = Live { timestamp: Some(local_datetime(tick_clock.wall)), readings };
+            *live = Live { timestamp: Some(local_datetime(tick_clock.wall)), readings: all, sampled_at: Some(tick_clock.wall) };
         }
         if let (Some(all), Some(every)) = (shown.as_mut(), readings_every) {
             all.extend(runner.engine.published());
@@ -594,6 +614,9 @@ pub fn run_forever(
         for line in runner.save_now() {
             print(&line);
         }
+    }
+    if let Some(log) = sensor_log {
+        log.stop();
     }
     print("stopped");
 }

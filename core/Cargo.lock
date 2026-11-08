@@ -425,6 +425,7 @@ name = "remote-pi-core"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "httpdate",
  "libc",
  "mlua",
  "rusqlite",

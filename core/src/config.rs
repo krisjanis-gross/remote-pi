@@ -31,6 +31,8 @@ pub struct Config {
     #[serde(default)]
     pub settings: SettingsConfig,
     pub api: Option<ApiConfig>,
+    /// Check-ins to the monitor (live mode).
+    pub monitor: Option<crate::monitor::MonitorConfig>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -40,6 +42,13 @@ pub struct SettingsConfig {
     /// unchanged this long. Fewer SD card writes when pins switch often.
     #[serde(default = "default_save_delay")]
     pub save_delay_seconds: f64,
+    /// Move the sensor log from RAM to data_dir this often. A power cut loses
+    /// at most this much; shorter means more SD card writes.
+    #[serde(default = "default_log_flush")]
+    pub log_flush_interval_seconds: f64,
+    /// Start a new sensor log file (a copy) this often, purging old readings first.
+    #[serde(default = "default_log_backup")]
+    pub log_backup_interval_seconds: f64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -73,6 +82,12 @@ fn default_data_dir() -> PathBuf {
 }
 fn default_save_delay() -> f64 {
     60.0
+}
+fn default_log_flush() -> f64 {
+    3600.0
+}
+fn default_log_backup() -> f64 {
+    86_400.0
 }
 fn default_listen() -> Vec<String> {
     vec!["0.0.0.0:80".into()]
@@ -120,6 +135,17 @@ impl Config {
         let config: Config = toml::from_str(text).map_err(|e| e.to_string())?;
         if !(0.0..=86_400.0).contains(&config.settings.save_delay_seconds) {
             return Err("settings.save_delay_seconds must be 0-86400".into());
+        }
+        if !(60.0..=86_400.0).contains(&config.settings.log_flush_interval_seconds) {
+            return Err("settings.log_flush_interval_seconds must be 60-86400".into());
+        }
+        if !(3600.0..=2_592_000.0).contains(&config.settings.log_backup_interval_seconds) {
+            return Err("settings.log_backup_interval_seconds must be 3600-2592000".into());
+        }
+        if let Some(monitor) = &config.monitor {
+            if monitor.key.is_some() == monitor.key_file.is_some() {
+                return Err("[monitor] needs exactly one of key or key_file".into());
+            }
         }
         if let Some(api) = &config.api {
             if api.listen.is_empty() {
