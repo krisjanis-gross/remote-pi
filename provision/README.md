@@ -7,6 +7,28 @@ model. The script can be re-run at any time; each step converges to the same sta
 > **Status:** Phase 0 run on pi-laistisana (Pi 2, Lite 32-bit Trixie, 2026-11-02);
 > only the 24-hour check below is still open.
 
+## Backends
+
+`BACKEND` in `site.env` chooses what runs the device:
+
+| `BACKEND` | What runs |
+|---|---|
+| `php` (default) | the PHP backend: nginx, PHP-FPM and the Python worker |
+| `php+watch` | the PHP backend, with the core (`core/`, Rust + Lua) next to it in watch-only mode: it switches nothing and writes nothing, and logs `DIFFERS:` where it would have acted differently (`journalctl -u remote-pi-core`). Its read-only API answers on `127.0.0.1:8081` |
+| `core` | the core alone (`remote-pi-core.service`): rules, GPIO, sensors, sensor log, monitor check-ins and the app; nginx, PHP and the worker are removed. About 130 MB less memory |
+
+`php+watch` and `core` need the site's `rules/` (`rules.lua`, `device.toml`; see
+`core/README.md`), and Docker on the computer that runs `deploy.sh`: it builds the core for
+the Pi (ARMv6, so it runs on every model) with `core/build/pi.sh`. The data in
+`/data/sqlite` is the same for every backend, so a device keeps its settings and history
+when it changes backend, and the API key stays the same. Going back from `core` to `php`
+is a deploy with `BACKEND="php"`; it reinstalls PHP and nginx.
+
+The tables below describe `php`; with `core`, `remote-pi-core` takes the place of nginx,
+PHP-FPM and the worker, and `www-data` has no sudo rights: the app's restart and shutdown
+reach root through `remote-pi-power@reboot.path` and `@poweroff.path` (the core touches
+`/run/remote-pi/reboot-request`).
+
 ## What you get
 
 | Area | Result |
@@ -30,9 +52,10 @@ model. The script can be re-run at any time; each step converges to the same sta
 | `/opt/remote-pi/app/` | PHP code (`server_www/`), reached only through the PHP endpoints | yes* |
 | `/opt/remote-pi/site/` | this site's `custom_*.php` (from `sites/<name>/php/`) | yes* |
 | `/opt/remote-pi/worker/worker.py` | Python worker: calls the sensor and monitor endpoints on 127.0.0.1 | yes* |
+| `/opt/remote-pi/core/` | the core: `remote-pi` and this site's `rules/` (`php+watch`, `core`) | yes* |
 | `/opt/remote-pi/bin/` | `remote-pi-doctor`, `-maintenance`, `-update`, linked from `/usr/local/sbin` | yes* |
 | `/opt/remote-pi/src/` | the repository copy and site folder `deploy.sh` last sent (root only) | yes* |
-| `/etc/remote-pi/` | generated `app.php` (API key, paths), `monitor.php`, `monitor-api-key` | yes* |
+| `/etc/remote-pi/` | `api-key`, `monitor-api-key`; generated `app.php` and `monitor.php` (PHP), `core.toml` (the core) | yes* |
 | `/data/sqlite/` | settings (`static_data_<time>.db`, last 20 kept) and sensor log (`sensor_log<time>.db`) | yes |
 | `/run/remote-pi/` | working copies of the databases in RAM, saved to `/data` periodically | no |
 | `/var/log/remote-pi-install.log` | installer output | yes* |
@@ -47,7 +70,8 @@ Each device has a folder `sites/<name>/` in this repository:
 | Path | What | In git |
 |---|---|---|
 | `site.env` | settings, copied from `provision/site.env.example` | yes |
-| `php/` | `custom_*.php`: sensors, triggers, GPIO hooks, startup script | yes |
+| `php/` | `custom_*.php`: sensors, triggers, GPIO hooks, startup script (PHP backend) | yes |
+| `rules/` | `rules.lua` and `device.toml`, for the core (`BACKEND="php+watch"` or `"core"`) | yes |
 | `secrets/` | key files, e.g. `monitor-api-key` | no |
 | `ui/` | optional prebuilt app, used only with `UI_SOURCE="ui"`; by default `deploy.sh` builds `client/` | no |
 
@@ -69,7 +93,7 @@ Sites in `custom_configuration/` still call the old Python scripts and need port
    `--import-data` copies the newest intact databases from an old device's `sqlite_data` folder.
    The script copies everything to the device, runs the installer there, reboots and
    runs `remote-pi-doctor`. Note the API key in the output (enter it in the app; later:
-   `sudo sed -n "s/^\$config_API_KEY = '\(.*\)';/\1/p" /etc/remote-pi/app.php`).
+   `sudo cat /etc/remote-pi/api-key`).
 
 Without a computer that can run `deploy.sh`: copy the repository and the site folder to
 the Pi, run `sudo remote-pi/provision/install.sh --site-config <site folder>/site.env`, then reboot.

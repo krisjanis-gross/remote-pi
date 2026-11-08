@@ -5,10 +5,12 @@
 # 2. copies this repository and the site folder to /opt/remote-pi/src on the device,
 # 3. runs the installer there through remote-pi-update (it keeps going if SSH drops),
 # 4. reboots into the read-only root and runs remote-pi-doctor.
-# SITE_DIR holds site.env, php/, secrets/ and optionally ui/ (see provision/README.md). The
-# device is SSH_TARGET from site.env (default ADMIN_USER@DEVICE_HOSTNAME.local); set
+# SITE_DIR holds site.env, php/, rules/, secrets/ and optionally ui/ (see provision/README.md).
+# The device is SSH_TARGET from site.env (default ADMIN_USER@DEVICE_HOSTNAME.local); set
 # SSH="ssh -F FILE" for other ssh options. With UI_SOURCE="client" (the default) the app in
-# client/ is built here first, which needs Node.js. Written for the bash 3.2 that macOS ships.
+# client/ is built here first, which needs Node.js. With BACKEND="php+watch" or "core" the
+# core is built for the Pi first (core/build/pi.sh), which needs Docker.
+# Written for the bash 3.2 that macOS ships.
 set -euo pipefail
 
 die() { printf '\033[31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -38,6 +40,8 @@ site=$(basename "$site_dir")
 target=$(set +u; . "$site_dir/site.env"; echo "${SSH_TARGET:-${ADMIN_USER:-pi}@${DEVICE_HOSTNAME}.local}")
 # shellcheck disable=SC1091
 ui_source=$(set +u; . "$site_dir/site.env"; echo "${UI_SOURCE:-client}")
+# shellcheck disable=SC1091
+backend=$(set +u; . "$site_dir/site.env"; echo "${BACKEND:-php}")
 ssh_cmd=${SSH:-ssh}
 src=/opt/remote-pi/src
 install_log=/var/log/remote-pi-install.log
@@ -73,6 +77,15 @@ if [ "$ui_source" = client ]; then
 	[ -f "$client/www/index.html" ] || die "the build left no client/www/index.html"
 fi
 
+core_binary=""
+if [ "$backend" != php ]; then
+	log "Building the core for the Pi (core/build/pi.sh)"
+	if [ ! -f "$site_dir/rules/rules.lua" ] || [ ! -f "$site_dir/rules/device.toml" ]; then
+		die "BACKEND=$backend needs $site_dir/rules/rules.lua and device.toml"
+	fi
+	core_binary=$("$repo/core/build/pi.sh") || die "building the core failed"
+fi
+
 log "Checking $target"
 boot=$(boot_id) || die "cannot reach $target over SSH"
 if [ "$(remote findmnt -no FSTYPE /)" = overlay ]; then
@@ -93,10 +106,14 @@ if [ "$ui_source" = client ]; then
 	rsync -a "$repo/client/www" "$stage/client/"
 fi
 mkdir -p "$stage/sites/$site"
-for part in site.env php secrets ui; do
+for part in site.env php rules secrets ui; do
 	if [ -e "$site_dir/$part" ]; then rsync -a --exclude .DS_Store "$site_dir/$part" "$stage/sites/$site/"; fi
 done
 if [ -n "$import_data" ]; then rsync -a "$import_data"/ "$stage/import-data"/; fi
+if [ -n "$core_binary" ]; then
+	mkdir -p "$stage/core-bin"
+	cp "$core_binary" "$stage/core-bin/remote-pi"
+fi
 printf '%s\n' "$rev" >"$stage/REVISION"
 
 remote sudo install -d -m 0700 "$src"

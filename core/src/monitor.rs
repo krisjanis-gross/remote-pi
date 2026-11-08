@@ -235,15 +235,33 @@ pub fn send(settings: &Settings, json: &str, now: f64) -> Outcome {
     outcome
 }
 
+/// Where the check-ins go and where their state is kept.
+pub struct Paths {
+    /// The settings database, for the sensor names.
+    pub static_db: PathBuf,
+    /// {"failures", "last_success", "next_attempt"} after each attempt, for remote-pi-doctor.
+    pub state_file: Option<PathBuf>,
+}
+
+/// Records the outcome for remote-pi-doctor, through a temporary file so it is never half-written.
+fn save_state(path: &std::path::Path, failures: u32, last_success: Option<f64>, next_attempt: f64) {
+    let state = serde_json::json!({ "failures": failures, "last_success": last_success.map(|t| t as i64), "next_attempt": next_attempt as i64 });
+    let partial = path.with_extension("partial");
+    if std::fs::write(&partial, state.to_string()).is_ok() {
+        let _ = std::fs::rename(&partial, path);
+    }
+}
+
 /// Checks in until `stop` is set: every interval, with the latest readings.
-pub fn start(settings: Settings, live: Arc<Mutex<Live>>, static_db: PathBuf, stop: Arc<AtomicBool>, print: fn(&str)) {
+pub fn start(settings: Settings, live: Arc<Mutex<Live>>, paths: Paths, stop: Arc<AtomicBool>, print: fn(&str)) {
     thread::Builder::new()
         .name("monitor".into())
-        .spawn(move || run(settings, live, static_db, stop, print))
+        .spawn(move || run(settings, live, paths, stop, print))
         .expect("cannot start the monitor thread");
 }
 
-fn run(settings: Settings, live: Arc<Mutex<Live>>, static_db: PathBuf, stop: Arc<AtomicBool>, print: fn(&str)) {
+fn run(settings: Settings, live: Arc<Mutex<Live>>, paths: Paths, stop: Arc<AtomicBool>, print: fn(&str)) {
+    let mut last_success = None;
     let mut failures = 0;
     let mut next_attempt = 0.0;
     let mut reported_left_out = false;
@@ -260,7 +278,7 @@ fn run(settings: Settings, live: Arc<Mutex<Live>>, static_db: PathBuf, stop: Arc
             next_attempt = now + 2.0;
             continue;
         }
-        let names = crate::store::sensor_names(&static_db);
+        let names = crate::store::sensor_names(&paths.static_db);
         let json = readings(&sample.readings, &names).and_then(|(readings, left_out)| {
             if left_out > 0 && !reported_left_out {
                 print(&format!("monitor: left out {left_out} invalid or duplicate readings"));
@@ -281,6 +299,12 @@ fn run(settings: Settings, live: Arc<Mutex<Live>>, static_db: PathBuf, stop: Arc
         let delay;
         (failures, delay) = next(outcome, failures, settings.interval, jitter);
         next_attempt = crate::clock::wall_now() + delay;
+        if failures == 0 {
+            last_success = Some(now);
+        }
+        if let Some(path) = &paths.state_file {
+            save_state(path, failures, last_success, next_attempt);
+        }
         if failures > 0 {
             print(&format!("monitor: check-in failed: HTTP {}, curl exit code {}", outcome.status, outcome.error));
         } else if was_failing {

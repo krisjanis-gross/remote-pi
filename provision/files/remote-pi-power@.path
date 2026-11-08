@@ -1,0 +1,13 @@
+# Managed by remote-pi provision/install.sh
+# Reboot or power off when the core asks (the app's restart and shutdown buttons):
+# remote-pi-core touches /run/remote-pi/<reboot|poweroff>-request. Enabled as
+# remote-pi-power@reboot.path and remote-pi-power@poweroff.path, with BACKEND=core only.
+[Unit]
+Description=Remote PI: %i when the app asks
+
+[Path]
+PathExists=@RUNTIME_DIR@/%i-request
+Unit=remote-pi-power@%i.service
+
+[Install]
+WantedBy=multi-user.target

@@ -13,7 +13,8 @@ Each device's own logic is a short Lua file, `sites/<name>/rules/rules.lua`.
     the built app, held to the same contract tests as PHP;
   - the sensor log (save levels, moving it to `/data`, purging, backups) and monitor
     check-ins.
-- Not built yet: the provisioning step that installs the core.
+- The installer sets it up (`BACKEND` in `site.env`, see `provision/README.md`): next to
+  PHP in watch-only mode, or alone in place of PHP, nginx and the Python worker.
 
 The PHP backend is unchanged and still runs the devices.
 
@@ -214,8 +215,8 @@ listen = ["0.0.0.0:80"]
 key_file = "/etc/remote-pi/api-key"     # or key = "..."; at least 16 characters
 ui_dir = "/opt/remote-pi/ui"            # the built app
 # cors_allowed_origins = ["capacitor://localhost", "ionic://localhost", "http://localhost", "https://localhost"]
-# reboot_command = ["sudo", "-n", "/usr/bin/systemctl", "reboot"]
-# shutdown_command = ["sudo", "-n", "/usr/bin/systemctl", "poweroff"]
+reboot_command = ["/usr/bin/touch", "/run/remote-pi/reboot-request"]      # the installer's
+shutdown_command = ["/usr/bin/touch", "/run/remote-pi/poweroff-request"]  # (default: sudo)
 
 [monitor]
 url = "https://<monitor>/checkin"
@@ -263,9 +264,12 @@ docker run --rm -v "$PWD/..:/app" -w /app/tests -e REMOTE_PI_CORE=/app/core/targ
 
 ### The systemd unit
 
-`provision/files/remote-pi-core.service`:
+`provision/files/remote-pi-core.service`, installed by `provision/steps/65-core.sh`:
 - It runs as `www-data` in the `gpio` group, and may bind port 80.
 - It can write only to `/run/remote-pi` and `/data/sqlite`.
+- It cannot gain privileges, so no sudo: for the app's restart and shutdown it touches
+  `/run/remote-pi/reboot-request` (or `poweroff-request`), and root's
+  `remote-pi-power@reboot.path` (`@poweroff.path`) acts on it.
 
 ## Build
 
@@ -274,19 +278,20 @@ cargo test
 cargo clippy --all-targets
 ```
 
-For the Pi 2 (32-bit ARM), from the `core/` folder:
+For the Pi, from anywhere (needs Docker; `provision/deploy.sh` runs it too):
 
 ```bash
-docker run --rm -v "$PWD:/work" -w /work -v remote-pi-cargo:/usr/local/cargo/registry \
-  -e CARGO_TARGET_DIR=/work/target-armv7 \
-  -e CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc \
-  -e CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc \
-  rust:1.90-bookworm bash -c 'apt-get update -qq && apt-get install -y -qq gcc-arm-linux-gnueabihf libc6-dev-armhf-cross >/dev/null &&
-    rustup target add armv7-unknown-linux-gnueabihf && cargo build --release --target armv7-unknown-linux-gnueabihf'
+core/build/pi.sh    # -> core/target-pi/arm-unknown-linux-gnueabihf/release/remote-pi
 ```
 
+The binary is ARMv6 with hardware floating point, the 32-bit OS's ABI, so it runs on every
+Pi model, the Pi 1 and Zero included. Debian's armhf cross-compiler mixes in ARMv7 code,
+so the build uses an image whose whole toolchain targets ARMv6 (`build/pi.Dockerfile`), and
+`pi.sh` refuses a binary whose ELF attributes say anything newer. CI also runs it on an
+emulated Pi 1 CPU (ARM1176); there it gave the same simulation output as a native build.
+
 Measured on pi-laistisana (Pi 2):
-- 2.2 MB binary, with Lua, SQLite and the HTTP server built in (1.8 MB before the API).
+- 2.6 MB binary (ARMv6), with Lua, SQLite and the HTTP server built in.
 - With the API, read-only, next to PHP (2026-11-08): 6.1 MB of memory, 11 threads. The
   answers matched PHP's on the device's real data: pins, triggers, readings, sparklines,
   and history from an hour to a month. Middle of 5 calls:
@@ -310,14 +315,14 @@ Today PHP-FPM and the Python worker use about 136 MB.
 1. **Device loop:** done. Still to do: a watch-only trial of a few days on pi-laistisana,
    including some watering from the app, with no unexplained `DIFFERS` lines.
 2. **JSON API:** done, and read-only on pi-laistisana next to PHP. Not tried yet: changes
-   from the app in live mode on a device. Open for step 4: the reboot and shutdown
-   commands use `sudo`, which the unit's `NoNewPrivileges` blocks.
+   from the app in live mode on a device.
 3. **Logging and monitoring:** done. The core now does everything PHP, nginx and the
    Python worker did. Checked by PHP's timezone tests and a check-in from the Pi through
    its sandbox (to example.com, not the real monitor); not yet run in live mode on a device.
-4. **Provisioning:** CI builds the ARM binary; the installer puts it in place with its
-   systemd unit and removes PHP-FPM, the Python worker and phpLiteAdmin. `remote-pi-doctor`
-   checks the new service.
+4. **Provisioning:** done: `BACKEND` in `site.env` (`php`, `php+watch`, `core`);
+   `deploy.sh` builds the ARMv6 binary; the installer puts in place the core, its config and
+   the reboot/power-off units, and with `core` removes PHP, nginx and the worker;
+   `remote-pi-doctor` checks each backend.
 5. **Switch pi-laistisana over:** test the valves for real first, and keep the PHP version
    ready to roll back to for a while.
 6. **Port the other sites:** move the sites in `custom_configuration/` to

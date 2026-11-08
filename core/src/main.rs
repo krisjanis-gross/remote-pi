@@ -314,6 +314,15 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
     if !clock.synced {
         print("the clock is not synced yet: time_of_day() may be wrong until it is");
     }
+    // Watch-only: after a boot PHP creates its settings database on its first cycle.
+    if let (Mode::WatchOnly, Some(db)) = (mode, &db) {
+        if !db.exists() {
+            print(&format!("waiting for the PHP backend to create {}", db.display()));
+            while !db.exists() {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+            }
+        }
+    }
     // After a reboot the settings in RAM are gone: start from the saved copy.
     if let (Mode::Live, Some(db)) = (mode, &db) {
         match store::ensure_db(db, &config.data_dir) {
@@ -349,7 +358,8 @@ fn run_device(site_dir: PathBuf, options: RunOptions) -> Result<ExitCode, String
         match monitor::Settings::from_config(monitor_config) {
             Ok(settings) => {
                 print(&format!("monitor: checking in every {} s as {}", settings.interval, settings.node));
-                monitor::start(settings, live.clone(), static_db.clone(), stop_monitor.clone(), print);
+                let paths = monitor::Paths { static_db: static_db.clone(), state_file: Some(config.runtime_dir.join("monitor.json")) };
+                monitor::start(settings, live.clone(), paths, stop_monitor.clone(), print);
             }
             Err(e) => print(&format!("monitor: off: {e}")),
         }
