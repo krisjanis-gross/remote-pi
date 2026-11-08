@@ -131,10 +131,12 @@ systemctl reload-or-restart nginx
 # ==== end of the PHP backend ====
 else
 	# BACKEND=core: the core serves the app and the API; PHP, nginx and their files go.
-	for unit in nginx $(systemctl list-unit-files --no-legend 'php*-fpm.service' 2>/dev/null | awk '{print $1}'); do
+	# systemctl fails when no unit matches (PHP already removed): no error for that.
+	for unit in nginx $({ systemctl list-unit-files --no-legend 'php*-fpm.service' 2>/dev/null || true; } | awk '{print $1}'); do
 		systemctl disable --now "$unit" 2>/dev/null || true
 	done
-	php_packages=$(dpkg-query -W -f='${db:Status-Status} ${Package}\n' 'php*' 'nginx*' 2>/dev/null | awk '$1 == "installed" {print $2}' | xargs)
+	# dpkg-query fails when no package matches, as on a device already moved to the core.
+	php_packages=$({ dpkg-query -W -f='${db:Status-Status} ${Package}\n' 'php*' 'nginx*' 2>/dev/null || true; } | awk '$1 == "installed" {print $2}' | xargs)
 	if [[ -n "$php_packages" ]]; then
 		info "removing $php_packages"
 		# shellcheck disable=SC2086 # one argument per package

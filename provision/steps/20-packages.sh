@@ -34,6 +34,9 @@ for timer in apt-daily.timer apt-daily-upgrade.timer man-db.timer; do
 	systemctl disable --now "$timer" 2>/dev/null || true
 done
 
-PHP_VERSION=$(php_version)
-export PHP_VERSION
-info "PHP $PHP_VERSION"
+# With BACKEND=core PHP is gone after the first install, so only ask where PHP runs.
+if uses_php; then
+	PHP_VERSION=$(php_version)
+	export PHP_VERSION
+	info "PHP $PHP_VERSION"
+fi
