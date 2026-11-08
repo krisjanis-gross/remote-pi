@@ -1,0 +1,43 @@
+# Remote PI core (Rust + Lua): the rules, the GPIO outputs and the sensors.
+# Not installed by provision/install.sh yet; see core/README.md.
+#
+# --watch-only runs next to the PHP backend: it switches nothing and writes
+# nothing, and logs where it would have acted differently (journalctl -u remote-pi-core).
+# Without it the core switches the pins: stop remote-pi-worker first, or both
+# will drive them.
+[Unit]
+Description=Remote PI core: rules, GPIO and sensors
+After=local-fs.target
+
+[Service]
+ExecStart=@CORE_BIN@ run @SITE_RULES@ --watch-only
+User=www-data
+Group=www-data
+# pinctrl writes the GPIO registers through /dev/gpiomem.
+SupplementaryGroups=gpio
+Restart=always
+RestartSec=5
+# On stop the core switches every output off (live mode).
+TimeoutStopSec=10
+MemoryMax=64M
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+# The settings database (static_data.db) is kept in RAM here.
+ReadWritePaths=/run/remote-pi
+ProtectHome=yes
+PrivateTmp=yes
+# No network until the core serves the app's API.
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+DevicePolicy=closed
+DeviceAllow=/dev/gpiomem rw
+DeviceAllow=/dev/gpiomem0 rw
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

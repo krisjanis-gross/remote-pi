@@ -86,7 +86,8 @@ log "Copying version $rev and site $site to $src"
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
 # client/ (sources and node_modules) stays here; only its built www/ goes to the device.
-rsync -a --exclude .git --exclude /sites/ --exclude /client/ --exclude /test-results/ --exclude .DS_Store --exclude __pycache__ "$repo"/ "$stage"/
+# core/target*/ is Rust build output (hundreds of MB).
+rsync -a --exclude .git --exclude /sites/ --exclude /client/ --exclude /test-results/ --exclude '/core/target*/' --exclude .DS_Store --exclude __pycache__ "$repo"/ "$stage"/
 if [ "$ui_source" = client ]; then
 	mkdir -p "$stage/client"
 	rsync -a "$repo/client/www" "$stage/client/"

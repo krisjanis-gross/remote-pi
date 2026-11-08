@@ -1,0 +1,28 @@
+# pi-laistisana's hardware. Pins are header pins (1-40, BOARD numbering as in
+# the PHP backend); higher numbers are virtual pins without hardware.
+# The core refuses any pin not listed here and switches a pin off after
+# max_on_minutes, whatever the rules or the app say.
+
+[gpio]
+# The relay board switches a valve on when the signal is low.
+active_low = true
+
+[pins.11]
+name = "Varsts 1 - Tūjas"
+max_on_minutes = 60
+
+[pins.12]
+name = "Varsts 2 - Ielas puse"
+max_on_minutes = 60
+
+[pins.13]
+name = "Varsts 3 - A puses laistītājs"
+max_on_minutes = 60
+
+[pins.15]
+name = "Varsts 4 - pie terases un majas"
+max_on_minutes = 60
+
+[sensors]
+# Every DS18B20 on the 1-wire bus, named by its id (28-...).
+ds18b20 = true
