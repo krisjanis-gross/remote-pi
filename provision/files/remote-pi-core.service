@@ -1,0 +1,47 @@
+# Managed by remote-pi provision/install.sh (step 65-core, BACKEND=php+watch or core).
+# Remote PI core (Rust + Lua): the rules, the GPIO outputs, the sensors, the sensor
+# log, monitor check-ins and the app's API. See core/README.md.
+#
+# --watch-only (BACKEND=php+watch) runs next to the PHP backend: it switches nothing
+# and writes nothing, and logs where it would have acted differently
+# (journalctl -u remote-pi-core). Its API then only answers reads, on 127.0.0.1:8081.
+# Without it (BACKEND=core) the core switches the pins; the PHP worker must be gone.
+[Unit]
+Description=Remote PI core: rules, GPIO, sensors and the app's API
+After=local-fs.target network.target
+
+[Service]
+ExecStart=@CORE_BIN@ run @CORE_RULES@ --config /etc/remote-pi/core.toml @CORE_FLAGS@
+User=www-data
+Group=www-data
+# pinctrl writes the GPIO registers through /dev/gpiomem; inputs use /dev/gpiochipN.
+SupplementaryGroups=gpio
+# The API on port 80, without running as root.
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+Restart=always
+RestartSec=5
+# On stop the core switches every output off (live mode).
+TimeoutStopSec=10
+MemoryMax=64M
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+# The settings database and the sensor log in RAM, and their copies on /data.
+# "-": start even if /data did not mount (the valves still work; nothing is kept).
+ReadWritePaths=/run/remote-pi -/data/sqlite
+ProtectHome=yes
+PrivateTmp=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+DevicePolicy=closed
+DeviceAllow=/dev/gpiomem rw
+DeviceAllow=/dev/gpiomem0 rw
+# Input pins ([inputs] in device.toml) through the GPIO character device.
+DeviceAllow=char-gpiochip rw
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

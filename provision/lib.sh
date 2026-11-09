@@ -55,6 +55,11 @@ overlay_active() {
 	[[ "$(findmnt -no FSTYPE /)" == "overlay" ]]
 }
 
+# BACKEND (site.env): php = the PHP backend; php+watch = PHP, with the core next to it
+# in watch-only mode; core = the core alone, without PHP, nginx and the Python worker.
+uses_php() { [[ "${BACKEND:-php}" != core ]]; }
+uses_core() { [[ "${BACKEND:-php}" != php ]]; }
+
 php_version() {
 	php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;'
 }

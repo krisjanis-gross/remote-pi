@@ -8,10 +8,13 @@ test-results/
 .DS_Store
 .idea/
 server_www/.ftpconfig
-# Per-device site folders (provision/README.md): only site.env and php/ are committed;
+# Per-device site folders (provision/README.md): only site.env, php/ and rules/ are committed;
 # secrets/, the ui/ build, data copies and logs stay local.
 /sites/*/*
 !/sites/*/site.env
 !/sites/*/php/
+!/sites/*/rules/
 # written into the copy provision/deploy.sh sends
 /REVISION
+# Rust build output (target-armv7/ and target-linux/ are Docker builds)
+/core/target*/
