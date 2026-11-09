@@ -288,11 +288,9 @@ impl Runner {
                 }
                 self.apply_database(snapshot);
             }
-            Some(Err(e)) => {
-                if self.db_error.as_ref() != Some(&e) {
-                    lines.push(format!("cannot read the settings database: {e}"));
-                    self.db_error = Some(e);
-                }
+            Some(Err(e)) if self.db_error.as_ref() != Some(&e) => {
+                lines.push(format!("cannot read the settings database: {e}"));
+                self.db_error = Some(e);
             }
             _ => {}
         }
@@ -573,8 +571,8 @@ pub fn run_forever(
     let LoopOptions { clock_flag, readings_every, jobs, live, sensor_log } = options;
     // SAFETY: the handler only stores to an atomic.
     unsafe {
-        libc::signal(libc::SIGTERM, request_stop as libc::sighandler_t);
-        libc::signal(libc::SIGINT, request_stop as libc::sighandler_t);
+        libc::signal(libc::SIGTERM, request_stop as *const () as libc::sighandler_t);
+        libc::signal(libc::SIGINT, request_stop as *const () as libc::sighandler_t);
     }
     let started = Instant::now();
     let start_now = runner.engine.now();
