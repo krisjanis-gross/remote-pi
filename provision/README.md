@@ -69,6 +69,7 @@ Each device has a folder `sites/<name>/` in this repository:
 
 | Path | What | In git |
 |---|---|---|
+| `README.md` | what the site does, its differences from PHP, what to check before a deploy | yes |
 | `site.env` | settings, copied from `provision/site.env.example` | yes |
 | `php/` | `custom_*.php`: sensors, triggers, GPIO hooks, startup script (PHP backend) | yes |
 | `rules/` | `rules.lua` and `device.toml`, for the core (`BACKEND="php+watch"` or `"core"`) | yes |

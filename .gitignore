@@ -8,9 +8,10 @@ test-results/
 .DS_Store
 .idea/
 server_www/.ftpconfig
-# Per-device site folders (provision/README.md): only site.env, php/ and rules/ are committed;
+# Per-device site folders (provision/README.md): only README.md, site.env, php/ and rules/ are committed;
 # secrets/, the ui/ build, data copies and logs stay local.
 /sites/*/*
+!/sites/*/README.md
 !/sites/*/site.env
 !/sites/*/php/
 !/sites/*/rules/
