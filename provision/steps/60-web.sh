@@ -1,31 +1,36 @@
 # shellcheck shell=bash
 # Web app: code owned by root (the web server cannot change it), only the files the app
 # needs are installed, secrets and paths live in /etc/remote-pi.
+# The built app is installed for every BACKEND. The PHP code, PHP-FPM and nginx only where
+# PHP runs; with BACKEND=core they are removed, and the core serves the app (step 65).
 
+# --- the built app: /opt/remote-pi/ui --------------------------------------------
+stage=$(mktemp -d)
+mkdir -p "$stage/ui" "$stage/app" "$stage/site"
+
+# 1. User interface (prebuilt Ionic app)
+if [[ -d "$UI_SOURCE" ]]; then
+	ui_build=$UI_SOURCE
+elif [[ "$UI_SOURCE" != *://* && "$UI_SOURCE" != git@* ]]; then
+	die "UI folder $UI_SOURCE not found: install with provision/deploy.sh, which builds client/, or run npm run build in client/ first"
+else
+	git clone --quiet --depth 1 --branch "$UI_REF" "$UI_SOURCE" "$stage/ui-src"
+	ui_build="$stage/ui-src/$UI_SUBDIR"
+fi
+[[ -f "$ui_build/index.html" ]] || die "no index.html in UI source $ui_build"
+rsync -a --exclude '.*' --exclude '*.php' "$ui_build"/ "$stage/ui"/
+
+install -d -o root -g root -m 0755 "$INSTALL_DIR"
+rsync -a --delete --chown=root:root --chmod=D0755,F0644 "$stage/ui"/ "$UI_DIR"/
+
+# ==== The PHP backend (BACKEND=php or php+watch), down to "else" (not indented: long) ====
+if uses_php; then
 : "${PHP_VERSION:=$(php_version)}"
 export PHP_VERSION
 export PHP_SOCKET=/run/php/remote-pi.sock
 
-# Runtime directories in RAM, recreated at every boot.
-write_file /etc/tmpfiles.d/remote-pi.conf <<EOF
-# Managed by remote-pi provision/install.sh
-d $RUNTIME_DIR 0750 www-data www-data -
-d /run/remote-pi-monitor 0700 www-data www-data -
-EOF
-systemd-tmpfiles --create /etc/tmpfiles.d/remote-pi.conf
-
 # --- configuration in /etc/remote-pi -----------------------------------------
-install -d -o root -g www-data -m 0750 "$CONFIG_DIR"
-# shellcheck disable=SC2153 # API_KEY comes from the site file
-api_key=$API_KEY
-generated_key=no
-[[ -n "$api_key" ]] || api_key=$(php_config_value "$CONFIG_DIR/app.php" config_API_KEY)
-if [[ -z "$api_key" || "$api_key" == new-key ]]; then
-	api_key=$(php -r 'echo bin2hex(random_bytes(20));')
-	generated_key=yes
-fi
-[[ ${#api_key} -ge 16 ]] || die "API_KEY must be at least 16 characters"
-
+api_key=$(head -n 1 "$CONFIG_DIR/api-key")
 tmp_config=$(mktemp)
 API_KEY_VALUE=$api_key php -r '
 $origins = preg_split("/\s+/", trim(getenv("CORS_ALLOWED_ORIGINS")), -1, PREG_SPLIT_NO_EMPTY);
@@ -48,9 +53,6 @@ install -o root -g www-data -m 0640 "$tmp_config" "$CONFIG_DIR/app.php"
 rm -f "$tmp_config"
 
 if is_yes "$MONITOR_ENABLED"; then
-	if [[ -n "$MONITOR_KEY_FILE" ]]; then
-		install -o root -g www-data -m 0640 "$MONITOR_KEY_FILE" "$CONFIG_DIR/monitor-api-key"
-	fi
 	tmp_config=$(mktemp)
 	php -r '
 $settings = array(
@@ -71,23 +73,7 @@ else
 	rm -f "$CONFIG_DIR/monitor.php"
 fi
 
-# --- application files -----------------------------------------------------
-# ui/ is the only folder nginx serves; app/ and site/ are reached through PHP-FPM only.
-stage=$(mktemp -d)
-mkdir -p "$stage/ui" "$stage/app" "$stage/site"
-
-# 1. User interface (prebuilt Ionic app)
-if [[ -d "$UI_SOURCE" ]]; then
-	ui_build=$UI_SOURCE
-elif [[ "$UI_SOURCE" != *://* && "$UI_SOURCE" != git@* ]]; then
-	die "UI folder $UI_SOURCE not found: install with provision/deploy.sh, which builds client/, or run npm run build in client/ first"
-else
-	git clone --quiet --depth 1 --branch "$UI_REF" "$UI_SOURCE" "$stage/ui-src"
-	ui_build="$stage/ui-src/$UI_SUBDIR"
-fi
-[[ -f "$ui_build/index.html" ]] || die "no index.html in UI source $ui_build"
-rsync -a --exclude '.*' --exclude '*.php' "$ui_build"/ "$stage/ui"/
-
+# --- application files (PHP) ---------------------------------------------------
 # 2. Application code: an explicit list, nothing else from server_www is installed.
 app_files=(
 	bootstrap.php db_common.php db_app_data_functions.php db_sensor_log_functions.php
@@ -114,12 +100,9 @@ if [[ -n "$SITE_FILES_DIR" ]]; then
 fi
 [[ -f "$stage/site/custom_app_config.php" ]] || cp "$REPO_DIR/server_www/custom_app_config.php_template" "$stage/site/custom_app_config.php"
 
-install -d -o root -g root -m 0755 "$INSTALL_DIR"
-rsync -a --delete --chown=root:root --chmod=D0755,F0644 "$stage/ui"/ "$UI_DIR"/
 rsync -a --delete --chown=root:root --chmod=D0755,F0644 "$stage/app"/ "$APP_DIR"/
 # Site scripts may hold legacy monitor credentials: readable by the web user only.
 rsync -a --delete --chown=root:www-data --chmod=D0750,F0640 "$stage/site"/ "$SITE_DIR"/
-rm -rf "$stage"
 # Layout before 2026-11: everything in one web root.
 rm -rf /var/www/remote-pi
 
@@ -145,8 +128,22 @@ rm -f /etc/nginx/sites-enabled/default
 nginx -t
 systemctl enable nginx
 systemctl reload-or-restart nginx
-
-if [[ "$generated_key" == yes ]]; then
-	log "New API key for this device (enter it in the app; stored in $CONFIG_DIR/app.php):"
-	printf '    %s\n' "$api_key"
+# ==== end of the PHP backend ====
+else
+	# BACKEND=core: the core serves the app and the API; PHP, nginx and their files go.
+	# systemctl fails when no unit matches (PHP already removed): no error for that.
+	for unit in nginx $({ systemctl list-unit-files --no-legend 'php*-fpm.service' 2>/dev/null || true; } | awk '{print $1}'); do
+		systemctl disable --now "$unit" 2>/dev/null || true
+	done
+	# dpkg-query fails when no package matches, as on a device already moved to the core.
+	php_packages=$({ dpkg-query -W -f='${db:Status-Status} ${Package}\n' 'php*' 'nginx*' 2>/dev/null || true; } | awk '$1 == "installed" {print $2}' | xargs)
+	if [[ -n "$php_packages" ]]; then
+		info "removing $php_packages"
+		# shellcheck disable=SC2086 # one argument per package
+		apt-get purge -y $php_packages
+		apt-get autoremove -y
+	fi
+	rm -rf "$APP_DIR" "$SITE_DIR" /etc/nginx /etc/php /run/remote-pi-monitor
+	rm -f "$CONFIG_DIR/app.php" "$CONFIG_DIR/monitor.php"
 fi
+rm -rf "$stage"

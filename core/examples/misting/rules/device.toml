@@ -1,0 +1,6 @@
+[pins.11]
+name = "Mist valve"
+max_on_minutes = 2
+
+[pins.12]
+name = "Lights"

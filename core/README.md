@@ -1,0 +1,373 @@
+# Remote PI core (Rust + Lua) — prototype
+
+A single program that is meant to replace the PHP backend and the Python worker.
+The core owns the outputs and the 1-second loop, and it enforces the safety limits.
+Each device's own logic is a short Lua file, `sites/<name>/rules/rules.lua`.
+
+**Status:**
+- Done and tested:
+  - the rules engine and the simulator;
+  - `remote-pi run`: GPIO through `pinctrl`, DS18B20 and DHT sensors, the settings
+    database, and a watch-only mode that runs next to PHP;
+  - the app's API (`json_API_v2.php`'s 17 actions, `json_ha.php`, `csv_export.php`) and
+    the built app, held to the same contract tests as PHP;
+  - the sensor log (save levels, moving it to `/data`, purging, backups) and monitor
+    check-ins.
+- The installer sets it up (`BACKEND` in `site.env`, see `provision/README.md`): next to
+  PHP in watch-only mode, or alone in place of PHP, nginx and the Python worker.
+
+pi-laistisana runs on the core (`BACKEND="core"`) since 2026-11-08. The six other sites
+have their rules too (`sites/<name>/rules`, step 6), checked in the simulator against what
+their PHP did; on their devices they still run the PHP backend.
+
+## A site's rules
+
+```
+sites/laistisana/rules/
+  rules.lua      what to do
+  device.toml    the hardware: pins the rules may switch, their hard limits, the sensors
+```
+
+`device.toml`:
+
+```toml
+[gpio]
+active_low = true     # relay boards that switch on when the signal is low ($GPIO_reverse in PHP)
+
+[pins.11]             # header pin 11 (BOARD numbering, as in PHP); pins above 40 are virtual
+name = "Varsts 1 - Tūjas"
+max_on_minutes = 60   # the core switches it off after this, whatever the rules or the app do
+
+[inputs.15]           # a header pin the rules read: a button, a limit switch
+name = "button"
+pull = "up"           # "up", "down" or "none" (default, as RPi.GPIO's GPIO.setup(pin, GPIO.IN))
+debounce_ms = 50      # a new level counts once it has held this long (default 0: at once)
+
+[sensors]
+ds18b20 = true        # every DS18B20 on the 1-wire bus (dtoverlay=w1-gpio), as "28-..."
+interval_seconds = 5  # default
+max_change = 1.0      # optional: ignore a reading this far from the last one kept (a glitch)...
+max_change_rejects = 10   # ...until it has come up more than this many times in a row
+[[sensors.dht]]       # the kernel's dht11 driver (dtoverlay=dht11,gpiopin=N), also for DHT22
+device = "iio:device0"
+temperature = "DHT11_TEMP"
+humidity = "DHT11_HUMIDITY"
+
+[log]                 # how long readings are kept ($allDataSaveHours etc. in PHP); defaults:
+all_data_save_hours = 3              # every reading, one per all_data_save_interval_seconds (60)
+mid_term_save_days = 90              # then one per mid_term_save_interval_seconds (600)
+long_term_save_days = 365            # then one per long_term_save_interval_seconds (3600)
+```
+
+A sensor that stops answering for three read intervals (at least 30 s) reads as nil.
+
+`rules.lua`. This is the whole laistisana port; it replaces about 250 lines of PHP:
+
+```lua
+local VALVES = { 11, 12, 13, 15 }
+
+-- Trigger 3: whenever a valve opens, close them all after parameter 4 minutes.
+on_pin(VALVES, function(pin, on) if on then start_trigger(3) end end)
+trigger(3, auto_off { pins = VALVES, minutes = param_ref(4, 5), reading = "Laistisanas_timer" })
+
+-- Trigger 5: each valve in turn for its own minutes (0 skips it), then stop.
+trigger(5, sequence {
+	reading = "Laistisanas_combined_timer_",
+	{ pin = 13, minutes = param_ref(7, 5) },
+	{ pin = 12, minutes = param_ref(8, 5) },
+	{ pin = 15, minutes = param_ref(9, 5) },
+	{ pin = 11, minutes = param_ref(10, 5) },
+})
+```
+
+Anything the helpers don't cover is plain Lua:
+
+```lua
+trigger(2, function(state)          -- runs every second while trigger 2 is on
+	local h = reading("surf_hum_1")
+	if h and h < param(3, 60) and now() - (state.last or 0) > param(5, 30) then
+		pulse(11, param(4, 1000))     -- ms; the core ends the pulse, the loop isn't blocked
+		state.last = now()
+	end
+end)
+```
+
+### What rules can use
+
+| | |
+|---|---|
+| `trigger(id, fn)` or `trigger(id, { on_start, tick, on_stop })` | What a trigger does. `tick` runs every second while it is on. Each handler gets `state`, a fresh table each time the trigger starts, with `state.started = now()` |
+| `every_tick(fn(state))` | Runs every second, whatever the triggers are doing |
+| `on_pin(pins, fn(pin, on))` | Runs when a pin changes, from the app, the rules or a limit |
+| `on_startup(fn)` | Runs once, after the core has switched every output off |
+| `reading(id)` → number or nil | A sensor reading, or a value published earlier in this second |
+| `publish(id, value)` | Shows a value in the app next to the readings |
+| `param(id, default)`, `param_ref(id, default)` | Trigger parameters set in the app. A `param_ref` is read again each time it is used |
+| `pin(n)`, `set_pin(n, on)`, `pins_off{...}`, `pulse(n, ms)` | Outputs. Only pins listed in `device.toml` |
+| `lock_pin(n, locked)`, `lock_pins{...}`, `locks = {...}` in a trigger | The app shows a locked pin's switch greyed out (PHP's `lock_pin`). A trigger with `locks` locks them while it is on. Every lock is cleared at startup and if the rules fail |
+| `input(n)` → true/false/nil, `on_input(pins, fn(pin, high))` | Input pins (`[inputs.N]`), read every 5 ms. nil if not read (watch-only mode) |
+| `run_until { pin, input, seconds, high, done }` | A pin on until an input reads high (or low), for `seconds` at most; the core switches it off within about 5 ms. `done(elapsed)` runs once the pin is off |
+| `after(seconds, fn)`, `cancel(id)` | Runs `fn` once, later (fractions of a second too) |
+| `trigger_on(id)`, `start_trigger(id)`, `stop_trigger(id)` | Starting a trigger that is already on restarts it, as in PHP |
+| `now()`, `time_of_day()`, `clock_synced()` | Seconds for measuring durations; local time in hours (6.5 = 06:30); whether the clock has been synced since boot |
+| `log(...)` / `print(...)` | Writes to the device log |
+| `save_now()` | Stores this moment's readings in the long-term log |
+| Helpers | `auto_off`, `sequence`, `daily`, `pulse_below` (see `src/prelude.lua`) |
+
+Editor support: the repository's `.luarc.json` points the VS Code "Lua" extension (LuaLS)
+at `types/remote-pi.d.lua`. That gives autocomplete and warnings for everything above.
+
+### Safety, whatever the rules do
+
+- Every output is off at startup.
+- A pin not in `device.toml` cannot be switched, and `max_on_minutes` is always enforced.
+- Durations use a clock that only moves at the real rate. The Pi has no clock battery, so
+  its clock jumps when it syncs after boot; that cannot stretch or cut short an on-time.
+  `daily` switches nothing until the clock has been synced.
+- Rules run in a sandbox:
+  - no `io`, `os`, `require` or `load`, so no files, shell or network;
+  - 16 MB of memory at most;
+  - about 5 million Lua instructions per call at most.
+- If the rules fail, for example with an error, an endless loop or pins switching each other
+  back and forth:
+  - every output goes off, every trigger stops, and pending `after()` timers and
+    `run_until()` waits are dropped; locked pins are unlocked;
+  - the error is logged with its line number;
+  - the rules are not called again until they are reloaded.
+
+  The app can still switch pins by hand, within the limits.
+- `set_pin(11, 0)` means off. A bare `0` is true in Lua, so values other than true/false/1/0
+  are rejected rather than read as "on".
+
+## Simulator
+
+The simulator tests rules on a laptop with made-up sensors and time, much faster than real
+time:
+
+```bash
+cargo run -- sim ../sites/laistisana --trigger 5 --param 7=20 --param 8=30 --param 9=0 --param 10=30 --for 2h --readings 10m
+cargo run -- sim examples/misting --trigger 2 --trigger 4 --start 05:00 --for 3h \
+    --sensor surf_hum_1=50 --at 30m sensor:surf_hum_1=75
+cargo run -- sim ../sites/griezeejs --param 1=2 --trigger 1@1s --at 1.4s input:11=1 --for 5s
+cargo run -- check ../sites/laistisana    # load only: syntax, unknown pins, duplicate triggers
+```
+
+Inputs start at the level their pull resistor gives them (low without one); `--at` takes
+fractions of a second for them.
+
+Output is a timeline of every pin and trigger change, with who made it (app, rules, pulse,
+safety limit, failsafe). It ends with each pin's total on-time. The exit code is 1 if the
+rules stopped with an error.
+
+## On a device: `remote-pi run`
+
+```bash
+remote-pi run /opt/remote-pi/site/rules                 # live: switches the pins
+remote-pi run /opt/remote-pi/site/rules --watch-only    # next to PHP: switches nothing
+remote-pi run ... --log-readings 10m                    # also log the readings
+```
+
+Every second, the core:
+1. ends any pulses that are due;
+2. takes the latest sensor readings (read on their own thread);
+3. reads the settings database if it changed;
+4. enforces the limits and runs the rules.
+
+Everything it does goes to the journal: `journalctl -u remote-pi-core`.
+
+- **Settings:** the core uses the same `static_data.db` as PHP, by default
+  `/run/remote-pi/static_data.db`. It reads the trigger parameters, and the pin and trigger
+  states, from the tables `pins`, `triggers` and `trigger_parameters`.
+- **Live mode at startup:** every output is switched off. Triggers that were on start again
+  from the beginning.
+- **Live mode while running:** pin and trigger changes are written back to the database.
+  A minute after a change (`save_delay_seconds`), the database is copied to the data folder
+  as `static_data_<YYYYmmddHHMMSS>.db`; the newest 20 are kept, as PHP did. After a reboot
+  the core starts from the newest good copy, or from an empty database.
+- **Stopping:** on SIGTERM (`systemctl stop`) the core switches every output off.
+- **Rules that do not load:** the core still runs, with every output off, and logs the
+  error.
+- **Input pins (live mode):** read through the kernel's GPIO character device
+  (`/dev/gpiochipN`) every 5 ms on their own thread; a change reaches the rules at once,
+  between ticks. If a line is held by another program (an old Python script), the core
+  logs it and runs with `input()` nil. Watch-only mode does not read them: PHP's scripts
+  may be using them.
+- **Sensor log (live mode):** as `read_sensor_data.php` did, in the same files:
+  - Each second's readings (the sensors' and the rules' published values) go to the RAM
+    log, `<runtime_dir>/sensor_log_tmp_db.db`, with a save level: 3 (long term) once per
+    long-term interval or when the rules call `save_now()`; else 2 once per mid-term
+    interval; else 1 once per all-data interval. The intervals and how long each level is
+    kept are in `device.toml`'s `[log]`.
+  - Every `log_flush_interval_seconds` (an hour) the RAM log moves to the newest
+    `<data_dir>/sensor_log<YYYYmmddHHMMSS>.db` in one transaction. A power cut loses at most
+    that much; the core moves it also when it stops and before the app reboots the device.
+  - Once that file is `log_backup_interval_seconds` old (a day), old readings are purged by
+    level and a new file is started from a copy; the newest 10 are kept.
+  - Nothing is logged until the clock has been synced, and it all runs on its own thread,
+    so a slow SD card cannot delay the loop.
+- **Monitor check-ins (live mode):** with a `[monitor]` section, the latest readings go to
+  the monitor every `interval_seconds` (60), as `functions_monitor.php` did: the key as a
+  Bearer token (and in the body, unless `legacy_body_key = false`), backing off after
+  failures, and only every 10 minutes after a rejected key. The system's `curl` makes the
+  request, so TLS gets the OS's security updates; the key goes to curl on stdin, never on
+  its command line. `remote-pi monitor` sends one check-in without readings, to check the
+  address and key.
+- **Watch-only:** for trying the core next to the PHP backend before switching over.
+  - It switches nothing and writes nothing; PHP keeps the sensor log and the check-ins.
+  - It follows what PHP writes to the database: pins and triggers switched from the app,
+    and parameter changes.
+  - It runs its own rules on that, and logs `DIFFERS:` when its pins or triggers disagree
+    with PHP's for more than 5 seconds. It logs `agrees again` when they match.
+
+### Configuration: `/etc/remote-pi/core.toml`
+
+The installation's settings; it takes the place of PHP's `/etc/remote-pi/app.php`. Without
+the file the defaults apply and there is no API. `--config FILE` uses another file.
+
+```toml
+runtime_dir = "/run/remote-pi"   # static_data.db and the RAM sensor log
+data_dir = "/data/sqlite"        # copies that survive a reboot
+
+[settings]
+save_delay_seconds = 60          # copy the settings to data_dir this long after a change
+log_flush_interval_seconds = 3600     # move the sensor log from RAM to data_dir
+log_backup_interval_seconds = 86400   # purge it and start a new file
+
+[api]
+listen = ["0.0.0.0:80"]
+key_file = "/etc/remote-pi/api-key"     # or key = "..."; at least 16 characters
+ui_dir = "/opt/remote-pi/ui"            # the built app
+# cors_allowed_origins = ["capacitor://localhost", "ionic://localhost", "http://localhost", "https://localhost"]
+reboot_command = ["/usr/bin/touch", "/run/remote-pi/reboot-request"]      # the installer's
+shutdown_command = ["/usr/bin/touch", "/run/remote-pi/poweroff-request"]  # (default: sudo)
+
+[monitor]
+url = "https://<monitor>/checkin"
+node_id = "pi-laistisana"
+key_file = "/etc/remote-pi/monitor-api-key"   # or key = "..."
+# legacy_body_key = true    # also send the key in the body, for the older server
+# interval_seconds = 60     # 30-120
+```
+
+### The app's API
+
+The same contract as the PHP backend (`api/json_API_v2.schema.json`, version 0.5), so the
+app needs no changes:
+- `/json_API_v2.php`: the 17 actions, with the same key handling (the `X-API-Key` header,
+  or `API_key` in the body), CORS and origin rules, validation and error codes.
+- `/json_ha.php`: Home Assistant's RESTful switch.
+- `/csv_export.php`: the sensor log as CSV.
+- Any other path: the built app, as nginx served it. App routes such as `/home` get
+  `index.html`, and a missing file gets a 404.
+
+How it works:
+- **Reads** go straight to the databases, as PHP did: the settings in `static_data.db`, and
+  the sensor log (the RAM copy and the newest `sensor_log<time>.db` in the data folder).
+  History windows such as "the last day" count back from the core's local time.
+- **Changes** run on the rules' thread, between ticks. The rules see them at once, and the
+  core is the only writer.
+- **Pins:** a pin in `device.toml` goes through the rules and limits. A pin above 40 that
+  is not listed has no hardware and is only recorded, as PHP did. Any other header pin is
+  refused.
+- **Triggers:** switching a trigger the rules don't define only records its state, as PHP did.
+- **Restore:** the settings come back from `staticDataBackup.db`. The outputs stay as they
+  are, and the restored database is corrected to match them.
+- **Watch-only mode:** the API only reads; any change gets `503`.
+
+The tests in `tests/test_api.py`, `test_contract.py` and `test_timezone.py` run against
+either backend (a few PHP-only ones are skipped for the core):
+
+```bash
+docker run --rm -v "$PWD/..:/app" -w /app/tests -e REMOTE_PI_CORE=/app/core/target-linux/release/remote-pi \
+  remote-pi-tests python3 -m unittest test_api test_contract test_timezone
+```
+
+(`remote-pi-tests` is built from `tests/Dockerfile`; build the core for Linux into
+`core/target-linux` first. CI does the same with a native build.)
+
+### The systemd unit
+
+`provision/files/remote-pi-core.service`, installed by `provision/steps/65-core.sh`:
+- It runs as `www-data` in the `gpio` group, and may bind port 80. Its only devices are
+  `/dev/gpiomem*` (pinctrl) and `/dev/gpiochip*` (inputs).
+- It can write only to `/run/remote-pi` and `/data/sqlite`.
+- It cannot gain privileges, so no sudo: for the app's restart and shutdown it touches
+  `/run/remote-pi/reboot-request` (or `poweroff-request`), and root's
+  `remote-pi-power@reboot.path` (`@poweroff.path`) acts on it.
+
+## Build
+
+```bash
+cargo test
+cargo clippy --all-targets
+```
+
+For the Pi, from anywhere (needs Docker; `provision/deploy.sh` runs it too):
+
+```bash
+core/build/pi.sh    # -> core/target-pi/arm-unknown-linux-gnueabihf/release/remote-pi
+```
+
+The binary is ARMv6 with hardware floating point, the 32-bit OS's ABI, so it runs on every
+Pi model, the Pi 1 and Zero included. Debian's armhf cross-compiler mixes in ARMv7 code,
+so the build uses an image whose whole toolchain targets ARMv6 (`build/pi.Dockerfile`), and
+`pi.sh` refuses a binary whose ELF attributes say anything newer. CI also runs it on an
+emulated Pi 1 CPU (ARM1176); there it gave the same simulation output as a native build.
+
+Measured on pi-laistisana (Pi 2):
+- 2.6 MB binary (ARMv6), with Lua, SQLite and the HTTP server built in.
+- With the API, read-only, next to PHP (2026-11-08): 6.1 MB of memory, 11 threads. The
+  answers matched PHP's on the device's real data: pins, triggers, readings, sparklines,
+  and history from an hour to a month. Middle of 5 calls:
+
+  | | PHP | core |
+  |---|---|---|
+  | `get_GPIO_list` | 11 ms | 7 ms |
+  | `get_sensor_data_sparkline` | 13 ms | 9 ms |
+  | `get_historic_data`, day (881 points) | 94 ms | 31 ms |
+  | `get_historic_data`, month (1554 points) | 155 ms | 48 ms |
+- `remote-pi run --watch-only` as a service (2026-11-08): 3.6 MB of memory, and 127 s of
+  CPU in its first 8.4 hours (0.4% of one core). Most of that is probably the kernel's
+  DS18B20 driver, read every 5 s; a longer `interval_seconds` reduces it.
+- The simulator (2026-11-07): 16–49 µs per 1-second tick, under 0.01% CPU; the rules' Lua
+  state is about 40 KB.
+
+On pi-laistisana with `BACKEND="core"` (2026-11-08): the core uses 5 MB, and the Pi has
+126 MB of memory in use instead of 191 MB with nginx, PHP-FPM and the Python worker.
+
+## Next steps
+
+1. **Device loop:** done. Still to do: a watch-only trial of a few days on pi-laistisana,
+   including some watering from the app, with no unexplained `DIFFERS` lines.
+2. **JSON API:** done, and read-only on pi-laistisana next to PHP. Not tried yet: changes
+   from the app in live mode on a device.
+3. **Logging and monitoring:** done. The core now does everything PHP, nginx and the
+   Python worker did. Checked by PHP's timezone tests and a check-in from the Pi through
+   its sandbox (to example.com, not the real monitor); not yet run in live mode on a device.
+4. **Provisioning:** done: `BACKEND` in `site.env` (`php`, `php+watch`, `core`);
+   `deploy.sh` builds the ARMv6 binary; the installer puts in place the core, its config and
+   the reboot/power-off units, and with `core` removes PHP, nginx and the worker;
+   `remote-pi-doctor` checks each backend.
+5. **Switch pi-laistisana over:** done on 2026-11-08, with the valves disconnected:
+   - Before, with `php+watch`, a valve and the watering sequence switched through PHP: the
+     core followed, with one difference (below).
+   - With `BACKEND="core"`: valves on and off from the app at the right relay levels, the
+     safety timer, the sequence, settings, readings, sensor log, sparklines, history, CSV,
+     Home Assistant, the app on ports 80 and 1111, the monitor, and a reboot from the app
+     (the RAM sensor log and the settings were saved first; all relays off after it).
+   - Later the same day, with the valves connected again, the user confirmed that valve
+     control from the app works.
+   - Still to see: the daily sensor log backup on the device (tested in `sensor_log.rs`).
+   - Back to PHP if needed: `BACKEND="php"` in `sites/laistisana/site.env`, then deploy.
+
+   **Differs from PHP on purpose:** stopping the watering sequence (trigger 5) from the app
+   closes its open valve. PHP left it open, and once the 45-minute safety trigger was also
+   stopped, nothing closed it.
+6. **Port the other sites:** rules written for all six (`sites/fabrika-1`, `fabrika-2`,
+   `fabrika-3`, `mazais-pagrabs`, `katlumaja`, `griezeejs`) and checked in the simulator
+   against what their PHP did; `tests/rules.rs` keeps the main cases. Each site's
+   `README.md` lists its hardware, where it does something different from PHP (bugs
+   fixed), and what to check on the device before `BACKEND="core"`. New in the core for
+   them: input pins, `run_until`, `after`, pin locks, and the sensors' `max_change` filter.
+   Not yet on a device: each site needs a `site.env` (its address, network and DHT
+   overlay), then `php+watch` for a few days, then `core`.

@@ -18,6 +18,9 @@ Usage: sudo provision/install.sh --site-config FILE [options]
   --only STEP          run a single step, e.g. --only 60-web
   --skip-overlay       do everything except switching on the read-only root
   -h, --help           show this help
+
+With BACKEND=php+watch or core in the site file, the core binary must be at
+core-bin/remote-pi in this copy of the repository (provision/deploy.sh builds it).
 EOF
 }
 
@@ -47,6 +50,7 @@ source "$SITE_CONFIG"
 set +a
 
 # Defaults for anything the site file leaves out.
+: "${BACKEND:=php}"
 : "${DEVICE_HOSTNAME:=}"
 : "${TIMEZONE:=Europe/Riga}"
 : "${ADMIN_USER:=${SUDO_USER:-pi}}"
@@ -75,7 +79,7 @@ set +a
 : "${ENABLE_OVERLAY:=yes}"
 if is_yes "$SKIP_OVERLAY"; then ENABLE_OVERLAY=no; fi
 # Steps and templates read these from the environment.
-export DEVICE_HOSTNAME TIMEZONE ADMIN_USER LAN_CIDRS EXTRA_HTTP_PORTS ALLOW_INTERFACES NTP_SERVERS \
+export BACKEND DEVICE_HOSTNAME TIMEZONE ADMIN_USER LAN_CIDRS EXTRA_HTTP_PORTS ALLOW_INTERFACES NTP_SERVERS \
 	DATA_DEVICE DATA_CREATE_PARTITION ROOT_SIZE_GB SITE_FILES_DIR UI_SOURCE UI_REF UI_SUBDIR API_KEY \
 	CORS_ALLOWED_ORIGINS DTOVERLAYS RTC_MODULE PYTHON_GPIO DISABLE_BLUETOOTH MONITOR_ENABLED MONITOR_URL \
 	MONITOR_NODE_ID MONITOR_KEY_FILE MONITOR_LEGACY_BODY_KEY ENABLE_OVERLAY IMPORT_DATA
@@ -93,6 +97,10 @@ export APP_DIR=$INSTALL_DIR/app        # PHP code, run through PHP-FPM only
 export SITE_DIR=$INSTALL_DIR/site      # this site's custom_*.php
 export UI_DIR=$INSTALL_DIR/ui          # built Ionic app, the only folder nginx serves
 export WORKER_DIR=$INSTALL_DIR/worker
+export CORE_DIR=$INSTALL_DIR/core      # the core (Rust + Lua): remote-pi and this site's rules/
+# The site's rules and the binary deploy.sh built, for BACKEND=php+watch or core.
+export CORE_RULES_SOURCE=$SITE_CONFIG_DIR_BASE/rules
+export CORE_BINARY_SOURCE=$REPO_DIR/core-bin/remote-pi
 export BIN_DIR=$INSTALL_DIR/bin        # admin commands, linked from /usr/local/sbin
 export DATA_MOUNT=/data
 export DATA_DIR=/data/sqlite
@@ -121,6 +129,7 @@ write_version() {
 	write_file "$INSTALL_DIR/VERSION" <<EOF
 version=$REMOTE_PI_VERSION
 site=$SITE_NAME
+backend=$BACKEND
 installed=$(date -Is)
 state=$1
 EOF

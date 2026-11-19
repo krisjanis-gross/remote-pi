@@ -1,0 +1,67 @@
+# b_griezeejs' hardware (from custom_configuration/b_griezeejs): a fruit-cutting
+# machine. Pins are header pins (BOARD numbering, as in the PHP backend).
+
+[gpio]
+# The Python scripts (input_functions/) switched a relay on with a low signal.
+active_low = true
+
+# Every move takes seconds. A relay left on longer than this (from the app, say)
+# is switched off by the core; PHP had no limit.
+[pins.12]
+name = "Relejs 1 (#12)"
+max_on_minutes = 5
+
+[pins.16]
+name = "Relejs 2 (#16)"
+max_on_minutes = 5
+
+[pins.18]
+name = "Relejs 3 (#18)"
+max_on_minutes = 5
+
+[pins.22]
+name = "Relejs 4 (#22)"
+max_on_minutes = 5
+
+[pins.32]
+name = "Relejs 5 (#32)"
+max_on_minutes = 5
+
+[pins.36]
+name = "Relejs 6 (#36)"
+max_on_minutes = 5
+
+[pins.38]
+name = "Relejs 7 (#38)"
+max_on_minutes = 5
+
+[pins.40]
+name = "Relejs 8 (#40)"
+max_on_minutes = 5
+
+# The machine's switches and sensor. No pull resistor, as RPi.GPIO's
+# GPIO.setup(pin, GPIO.IN) left them; no debounce, so a move stops on the first
+# reading of its switch (the scripts read every 10 ms, the core every 5 ms).
+[inputs.11]
+name = "solis 1: uzdurts (relejs 1 lejā)"
+
+[inputs.13]
+name = "relejs 2 augšā"
+
+[inputs.15]
+name = "RUN poga"
+
+[inputs.29]
+name = "relejs 3: nostumts"
+
+[inputs.31]
+name = "solis 3: relejs 1 lejā"
+
+[inputs.33]
+name = "solis 5: relejs 2 pacelts, pagriezts"
+
+[inputs.35]
+name = "optiskais sensors"
+
+[log]
+all_data_save_hours = 6

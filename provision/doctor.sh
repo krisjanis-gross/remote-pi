@@ -25,11 +25,14 @@ http_code() { curl -s -o /dev/null -w '%{http_code}' --max-time 5 "http://127.0.
 
 echo "Installed"
 version_file=/opt/remote-pi/VERSION
-version_value() { sed -n "s/^$1=//p" "$version_file"; }
+version_value() { sed -n "s/^$1=//p" "$version_file" 2>/dev/null; }
+# php, php+watch or core (see site.env.example); installs before the core are php.
+BACKEND=$(version_value backend)
+: "${BACKEND:=php}"
 if [[ ! -r $version_file ]]; then
 	fail "no $version_file (installed before 2026-11, or install.sh never ran)"
 elif [[ $(version_value state) == complete ]]; then
-	pass "version $(version_value version), site $(version_value site), installed $(version_value installed | cut -c1-16 | tr T ' ')"
+	pass "version $(version_value version), site $(version_value site), backend $BACKEND, installed $(version_value installed | cut -c1-16 | tr T ' ')"
 elif [[ $PRE_REBOOT == yes && $(version_value state) == running ]]; then
 	note "version $(version_value version), site $(version_value site): this install is still running"
 else
@@ -66,10 +69,20 @@ else
 fi
 
 echo "Services"
-php_service="php$(php_version)-fpm"
-for unit in nginx "$php_service" remote-pi-worker nftables systemd-timesyncd; do
+units=(nftables systemd-timesyncd)
+if uses_php; then units+=(nginx "php$(php_version)-fpm" remote-pi-worker); fi
+if uses_core; then units+=(remote-pi-core); fi
+if [[ $BACKEND == core ]]; then units+=(remote-pi-power@reboot.path remote-pi-power@poweroff.path); fi
+for unit in "${units[@]}"; do
 	check "$unit running" systemctl is-active --quiet "$unit"
 done
+if [[ $BACKEND == core ]]; then
+	if command -v php >/dev/null || command -v nginx >/dev/null || systemctl is-active --quiet remote-pi-worker; then
+		fail "PHP, nginx or the PHP worker is still installed or running"
+	else
+		pass "PHP, nginx and the PHP worker are removed"
+	fi
+fi
 failed_units=$(systemctl --failed --no-legend --plain | awk '{print $1}' | xargs)
 if [[ -z "$failed_units" ]]; then pass "no failed systemd units"; else fail "failed units: $failed_units"; fi
 
@@ -79,6 +92,8 @@ check "SSH password login disabled" grep -qx 'passwordauthentication no' <<<"$ss
 check "SSH root login disabled" grep -qx 'permitrootlogin no' <<<"$sshd_settings"
 if sudo -l -U www-data 2>/dev/null | grep -qE 'python|\(ALL( : ALL)?\) NOPASSWD: ALL'; then
 	fail "www-data has broad sudo rights (python/ALL)"
+elif [[ $BACKEND == core ]]; then
+	if sudo -l -U www-data 2>/dev/null | grep -q 'NOPASSWD'; then fail "www-data has sudo rights (the core needs none)"; else pass "www-data has no sudo rights"; fi
 else
 	pass "www-data sudo limited to reboot/poweroff"
 fi
@@ -96,27 +111,52 @@ done
 
 echo "Application"
 check "app page served" test "$(http_code /)" = 200
-api_key=$(php_config_value /etc/remote-pi/app.php config_API_KEY)
-api() {
-	curl -s --max-time 10 -X POST -H 'Content-Type: application/x-www-form-urlencoded' \
-		--data "$(php -r 'echo json_encode(array("API_key" => $argv[1], "request_action" => $argv[2], "request_data" => ""));' "$api_key" "$1")" \
-		http://127.0.0.1/json_API_v2.php
+api_key=$(head -n 1 /etc/remote-pi/api-key 2>/dev/null)
+# The key goes to curl on stdin, not on its command line.
+api_at() {
+	printf 'header = "X-API-Key: %s"\n' "$api_key" |
+		curl -s --max-time 10 -K - -X POST -H 'Content-Type: application/json' \
+			--data "{\"request_action\":\"$2\",\"request_data\":\"\"}" "http://127.0.0.1$1/json_API_v2.php"
 }
+api() { api_at "" "$1"; }
 check "API answers with this device's key" grep -q '"response_code":"OK"' <<<"$(api version_check)"
 check "API rejects the old default key" test "$(curl -s -o /dev/null -w '%{http_code}' -X POST --data '{"API_key":"new-key","request_action":"version_check"}' http://127.0.0.1/json_API_v2.php)" = 403
-# The timestamp is device-local time (the app's time zone), so parse it in the system zone.
-sample_age=$(api get_sensor_data | php -d date.timezone="$(timedatectl show -p Timezone --value)" -r '$r = json_decode(stream_get_contents(STDIN), true); $t = $r["response_data"]["timestamp"] ?? null; echo $t ? time() - strtotime($t) : -1;')
+# The timestamp is device-local time; Python reads it in the system zone.
+sample_age=$(api get_sensor_data | python3 -c '
+import json, sys, time
+t = (json.load(sys.stdin).get("response_data") or {}).get("timestamp")
+print(int(time.time() - time.mktime(time.strptime(t, "%Y-%m-%d %H:%M:%S"))) if t else -1)' 2>/dev/null || echo -1)
 if [[ "$sample_age" -ge 0 && "$sample_age" -le 30 ]]; then pass "sensor loop is running (sample ${sample_age}s old)"; else fail "no fresh sensor sample (age: $sample_age)"; fi
-if [[ -f /etc/remote-pi/monitor.php ]]; then
-	state=/run/remote-pi-monitor/sender-state.json
-	monitor_failures=$(php -r 'echo json_decode((string)@file_get_contents($argv[1]), true)["failures"] ?? -1;' "$state" 2>/dev/null)
+
+if [[ $BACKEND == php+watch ]]; then
+	check "core's read-only API answers (127.0.0.1:8081)" grep -q '"response_code":"OK"' <<<"$(api_at :8081 version_check)"
+	differs=$(journalctl -u remote-pi-core -b --no-pager -o cat 2>/dev/null | grep -c '^DIFFERS:')
+	if [[ "$differs" == 0 ]]; then
+		pass "the core agrees with PHP since boot"
+	else
+		note "the core disagreed with PHP $differs time(s) since boot (journalctl -u remote-pi-core -g DIFFERS)"
+	fi
+fi
+
+# Monitor check-ins: PHP keeps its state in /run/remote-pi-monitor, the core in /run/remote-pi.
+monitor_state=""
+if [[ $BACKEND == core && -f /etc/remote-pi/monitor-api-key ]]; then
+	monitor_state=/run/remote-pi/monitor.json
+	monitor_log="journalctl -u remote-pi-core -g monitor"
+elif uses_php && [[ -f /etc/remote-pi/monitor.php ]]; then
+	monitor_state=/run/remote-pi-monitor/sender-state.json
+	monitor_log="journalctl -g 'Monitor check-in'"
+fi
+if [[ -n "$monitor_state" ]]; then
+	monitor_failures=$(python3 -c 'import json, sys; print(json.load(sys.stdin).get("failures", -1))' <"$monitor_state" 2>/dev/null || echo -1)
+	: "${monitor_failures:=-1}"
 	# A check-in times out now and then over weak Wi-Fi; the sender retries after 30 s, 60 s, 120 s.
 	if [[ "$monitor_failures" == 0 ]]; then
 		pass "monitor check-ins succeed"
 	elif [[ "$monitor_failures" == [12] ]]; then
-		note "last $monitor_failures monitor check-in(s) failed, retrying (journalctl -g 'Monitor check-in')"
+		note "last $monitor_failures monitor check-in(s) failed, retrying ($monitor_log)"
 	else
-		fail "monitor check-ins failing or not attempted yet (journalctl -g 'Monitor check-in')"
+		fail "monitor check-ins failing or not attempted yet ($monitor_log)"
 	fi
 fi
 

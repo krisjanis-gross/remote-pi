@@ -6,10 +6,11 @@ computed by SQLite in local time, two hours later, so they found no readings.
 """
 
 import json
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from test_api import ApiServerCase
+from test_api import CORE, ApiServerCase, php_only
 
 
 class SystemZoneTests(ApiServerCase):
@@ -20,6 +21,9 @@ class SystemZoneTests(ApiServerCase):
     apcu_prepend = "apcu_file.php"  # the latest reading must reach the next request
 
     def sample(self, count=3):
+        if CORE:  # the core samples once a second on its own
+            time.sleep(count + 0.5)
+            return
         for _ in range(count):
             self.assertEqual(self.request("read_sensor_data.php", method="GET")[0], 200)
 
@@ -52,6 +56,8 @@ class SystemZoneTests(ApiServerCase):
         self.assertTrue(series and all(s["data"] for s in series), series)
 
 
+# PHP's own time zone setting; the core always uses the system's, which provisioning sets.
+@php_only
 class ConfiguredZoneTests(SystemZoneTests):
     # Provisioning writes the site's TIMEZONE into app.php; it wins over the system zone.
     server_env = {"TZ": "UTC"}
@@ -59,6 +65,7 @@ class ConfiguredZoneTests(SystemZoneTests):
     zone = "Europe/Riga"
 
 
+@php_only
 class MismatchedZoneTests(SystemZoneTests):
     # PHP (configured zone) and the system (SQLite's 'localtime') disagree on purpose: time
     # windows must follow the clock that stamps the readings, not SQLite's.

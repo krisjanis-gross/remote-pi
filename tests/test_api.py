@@ -1,9 +1,15 @@
-"""HTTP tests for the PHP endpoints, served by PHP's built-in server."""
+"""HTTP tests for the device API endpoints.
+
+By default they run against the PHP backend in PHP's built-in server. With
+REMOTE_PI_CORE=<path to the remote-pi binary> they run against the Rust core
+(core/) instead, so both are held to the same contract.
+"""
 
 from contextlib import closing
 import json
 import os
 from pathlib import Path
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -15,6 +21,13 @@ import urllib.request
 
 ROOT = Path(__file__).resolve().parents[1]
 KEY = "0123456789abcdef0123"
+CORE = os.environ.get("REMOTE_PI_CORE")
+php_only = unittest.skipIf(CORE, "PHP backend only")
+
+# The rules and pins the core runs with: the pins in the PHP template database,
+# and a reading so the sensor lists are not empty.
+CORE_RULES = 'every_tick(function() publish("dummy_data", 42) end)\n'
+CORE_DEVICE = "".join(f'[pins.{pin}]\nname = "GPIO pin {pin}"\n' for pin in (11, 12, 13, 15, 16, 18, 22))
 
 
 def free_port():
@@ -24,7 +37,8 @@ def free_port():
 
 
 class ApiServerCase(unittest.TestCase):
-    """Runs json_API_v2.php and the other endpoints in PHP's built-in server for each test class."""
+    """Runs json_API_v2.php and the other endpoints for each test class: in PHP's
+    built-in server, or in the Rust core when REMOTE_PI_CORE is set."""
 
     # Subclasses can add settings to the generated app.php and variables to the server's environment.
     extra_config = ""
@@ -40,6 +54,45 @@ class ApiServerCase(unittest.TestCase):
             (tmp / name).mkdir()
         (tmp / "synced").touch()
         pinctrl = ROOT / "tests" / "fake-pinctrl"
+        cls.port = free_port()
+        cls.errors = open(tmp / "server.log", "w+")
+        cls.static_db = tmp / "run" / "static_data.db"
+        if CORE:
+            cls.start_core(tmp, pinctrl)
+        else:
+            cls.start_php(tmp, pinctrl)
+        for _ in range(100):
+            try:
+                socket.create_connection(("127.0.0.1", cls.port), timeout=0.1).close()
+                break
+            except OSError:
+                time.sleep(0.05)
+
+    @classmethod
+    def start_core(cls, tmp, pinctrl):
+        # PHP copies its template database on first use; the core starts from what is there.
+        shutil.copy(ROOT / "server_www" / "sqlite_db_templates" / "static_data.db", cls.static_db)
+        rules = tmp / "rules"
+        rules.mkdir()
+        (rules / "rules.lua").write_text(CORE_RULES)
+        (rules / "device.toml").write_text(CORE_DEVICE)
+        config = tmp / "core.toml"
+        config.write_text(
+            f'runtime_dir = "{tmp}/run"\n'
+            f'data_dir = "{tmp}/data"\n'
+            "[api]\n"
+            f'listen = ["127.0.0.1:{cls.port}"]\n'
+            f'key = "{KEY}"\n'
+        )
+        cls.server = subprocess.Popen(
+            [CORE, "run", str(rules), "--config", str(config), "--no-sensors",
+             "--pinctrl", str(pinctrl), "--clock-flag", str(tmp / "synced")],
+            env=dict(os.environ, **cls.server_env),
+            stdout=cls.errors, stderr=subprocess.STDOUT,
+        )
+
+    @classmethod
+    def start_php(cls, tmp, pinctrl):
         config = tmp / "app.php"
         config.write_text(
             "<?php\n"
@@ -52,8 +105,6 @@ class ApiServerCase(unittest.TestCase):
             f"$gpio_pinctrl_path = '{pinctrl}';\n"
             + cls.extra_config
         )
-        cls.port = free_port()
-        cls.errors = open(tmp / "server.log", "w+")
         cls.server = subprocess.Popen(
             ["php", "-d", f"auto_prepend_file={ROOT}/tests/{cls.apcu_prepend}", "-d", "error_reporting=E_ALL",
              "-d", "display_errors=stderr", "-S", f"127.0.0.1:{cls.port}", "-t", str(ROOT / "server_www")],
@@ -61,13 +112,6 @@ class ApiServerCase(unittest.TestCase):
                      **cls.server_env),
             stdout=subprocess.DEVNULL, stderr=cls.errors,
         )
-        for _ in range(100):
-            try:
-                socket.create_connection(("127.0.0.1", cls.port), timeout=0.1).close()
-                break
-            except OSError:
-                time.sleep(0.05)
-        cls.static_db = tmp / "run" / "static_data.db"
 
     @classmethod
     def tearDownClass(cls):
@@ -194,6 +238,7 @@ class ApiTests(ApiServerCase):
         self.assertEqual(status, 200)
         self.assertIn("text/csv", headers.get("Content-Type"))
 
+    @php_only
     def test_sensor_cycle_runs_cleanly(self):
         self.assertEqual(self.request("read_sensor_data.php", method="GET")[0], 200)
         self.errors.flush()

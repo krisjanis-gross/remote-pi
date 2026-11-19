@@ -1,0 +1,29 @@
+# b_fabrika-3's hardware (from custom_configuration/b_fabrika-3). Pins are header
+# pins (BOARD numbering, as in the PHP backend).
+#
+# No max_on_minutes: the cooler and heater run for hours while drying.
+
+[gpio]
+# The old control_pins.py switched a relay on with a high signal.
+active_low = false
+
+[pins.31]
+name = "Relay1"
+
+[pins.33]
+name = "Relay2"
+
+[pins.35]
+name = "Relay3 - sildītājs"
+
+[pins.37]
+name = "Relay4 - dzesētājs"
+
+[sensors]
+ds18b20 = true
+
+# The DHT22 (dtoverlay=dht11,gpiopin=N in site.env; the repository's
+# read_DHT_sensor.py used GPIO24, to be confirmed on the device).
+[[sensors.dht]]
+temperature = "dht_temperature"
+humidity = "dht_humidity"

@@ -24,8 +24,21 @@ id "$ADMIN_USER" >/dev/null 2>&1 || die "ADMIN_USER '$ADMIN_USER' does not exist
 admin_home=$(getent passwd "$ADMIN_USER" | cut -d: -f6)
 [[ -s "$admin_home/.ssh/authorized_keys" ]] || die "$ADMIN_USER has no SSH key in $admin_home/.ssh/authorized_keys; password login is about to be disabled"
 
-if [[ -n "$SITE_FILES_DIR" && ! -d "$SITE_FILES_DIR" ]]; then
+case "$BACKEND" in
+	php|php+watch|core) ;;
+	*) die "BACKEND must be php, php+watch or core, not '$BACKEND'" ;;
+esac
+if uses_php && [[ -n "$SITE_FILES_DIR" && ! -d "$SITE_FILES_DIR" ]]; then
 	die "SITE_FILES_DIR '$SITE_FILES_DIR' does not exist"
+fi
+if uses_core; then
+	[[ -f "$CORE_RULES_SOURCE/rules.lua" && -f "$CORE_RULES_SOURCE/device.toml" ]] ||
+		die "BACKEND=$BACKEND needs the site's rules in $CORE_RULES_SOURCE (rules.lua and device.toml)"
+	[[ -x "$CORE_BINARY_SOURCE" ]] ||
+		die "no core binary at $CORE_BINARY_SOURCE: install with provision/deploy.sh, which builds it (core/build/pi.sh)"
+	# The binary is 32-bit ARM (armhf, ARMv6: every Pi model), as the 32-bit OS is.
+	[[ "$(dpkg --print-architecture)" == armhf ]] ||
+		die "the core is built for the 32-bit OS (armhf), this is $(dpkg --print-architecture)"
 fi
 if is_yes "$MONITOR_ENABLED"; then
 	[[ -n "$MONITOR_URL" && -n "$MONITOR_NODE_ID" ]] || die "MONITOR_ENABLED=yes needs MONITOR_URL and MONITOR_NODE_ID"

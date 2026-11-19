@@ -7,8 +7,11 @@ dpkg --configure -a
 apt-get update
 apt-get -y full-upgrade
 apt-get install -y --no-install-recommends \
-	nginx php-fpm php-cli php-sqlite3 php-apcu php-curl \
 	sqlite3 nftables overlayroot rsync git ca-certificates python3 perl curl
+# The PHP backend; with BACKEND=core the core serves the app itself (step 60 removes these).
+if uses_php; then
+	apt-get install -y --no-install-recommends nginx php-fpm php-cli php-sqlite3 php-apcu php-curl
+fi
 
 # pinctrl drives the GPIO pins (part of Raspberry Pi OS; install if missing).
 command -v pinctrl >/dev/null || apt-get install -y --no-install-recommends raspi-utils
@@ -31,6 +34,9 @@ for timer in apt-daily.timer apt-daily-upgrade.timer man-db.timer; do
 	systemctl disable --now "$timer" 2>/dev/null || true
 done
 
-PHP_VERSION=$(php_version)
-export PHP_VERSION
-info "PHP $PHP_VERSION"
+# With BACKEND=core PHP is gone after the first install, so only ask where PHP runs.
+if uses_php; then
+	PHP_VERSION=$(php_version)
+	export PHP_VERSION
+	info "PHP $PHP_VERSION"
+fi

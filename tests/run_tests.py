@@ -13,7 +13,8 @@ print(f"{len(php_files)} PHP files lint clean")
 
 shell_files = [ROOT / "provision/install.sh", ROOT / "provision/doctor.sh", ROOT / "provision/lib.sh",
                ROOT / "provision/deploy.sh", ROOT / "provision/files/remote-pi-maintenance",
-               ROOT / "provision/files/remote-pi-update", *sorted(ROOT.glob("provision/steps/*.sh"))]
+               ROOT / "provision/files/remote-pi-update", ROOT / "core/build/pi.sh",
+               *sorted(ROOT.glob("provision/steps/*.sh"))]
 subprocess.run(["shellcheck", "-x", "--source-path=SCRIPTDIR", "--source-path", str(ROOT), *map(str, shell_files)],
                cwd=ROOT, check=True)
 print(f"{len(shell_files)} shell scripts pass shellcheck")

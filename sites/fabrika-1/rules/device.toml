@@ -1,0 +1,32 @@
+# b_fabrika-1's hardware (from custom_configuration/b_fabrika-1). Pins are header
+# pins (BOARD numbering, as in the PHP backend). Pin 51 ("Iestaadiit svaru nulli")
+# is a virtual pin: not listed, so the app's switch is only recorded, as in PHP.
+#
+# No max_on_minutes: the fan, cooler and heater run for hours while drying, and the
+# rules switch them; the PHP site had no limit either.
+
+[gpio]
+# The old control_pins.py switched a relay on with a high signal.
+active_low = false
+
+[pins.16]
+name = "Relejs 1 - ventilators"
+
+[pins.18]
+name = "Relejs 2 - apkure/ledusskapis"
+
+[pins.29]
+name = "Relejs 3 - dzeseetaajs"
+
+[pins.31]
+name = "Relejs 4 - sildiitaajs"
+
+[sensors]
+# Every DS18B20 on the 1-wire bus (dtoverlay=w1-gpio), named by its id (28-...).
+ds18b20 = true
+
+# The DHT (dtoverlay=dht11,gpiopin=N in site.env; N still to be confirmed on the
+# device), under the ids read_DHT_sensor.py gave it.
+[[sensors.dht]]
+temperature = "dht_temperature"
+humidity = "dht_humidity"

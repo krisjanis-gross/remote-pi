@@ -1,0 +1,10 @@
+# Managed by remote-pi provision/install.sh
+# Started by remote-pi-power@<reboot|poweroff>.path. Stopping remote-pi-core switches
+# every output off and saves the settings and the sensor log first.
+[Unit]
+Description=Remote PI: %i requested from the app
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rm -f @RUNTIME_DIR@/%i-request
+ExecStart=/usr/bin/systemctl %i
