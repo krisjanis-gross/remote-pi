@@ -38,14 +38,14 @@
     "zone.js": "~0.15.0"
   },
   "devDependencies": {
-    "@angular-devkit/build-angular": "^21.2.29",
+    "@angular-devkit/build-angular": "^22.3.0",
     "@angular-eslint/builder": "^21.4.0",
     "@angular-eslint/schematics": "^21.4.0",
     "@angular/cli": "^21.2.29",
     "@angular/compiler-cli": "^21.2.26",
     "@angular/language-service": "^21.2.26",
     "@capacitor/assets": "^4.0.0",
-    "@capacitor/cli": "~8.5.3",
+    "@capacitor/cli": "~8.6.2",
     "@ionic/angular-toolkit": "^13.0.0",
     "@types/jasmine": "~5.1.0",
     "ajv": "^8.18.0",
