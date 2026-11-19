@@ -291,12 +291,16 @@ export class HomePage {
   setRelayValue(relay: Relay) {
     // The toggle has not flipped the model yet: the new state is the opposite of the old one.
     const newState = relay.state ? 0 : 1;
+    // Keep the model in step with the toggle, so a refresh that brings back the old
+    // state (switch refused, or turned back by the device's rules) moves the toggle back.
+    relay.state = newState;
     this.track(
       this.api.setRelayState(this.device, relay.id, newState)
     ).subscribe({
+      next: () => this.refreshControls(),
       error: (err) => {
         this.showError('Relay not switched', err);
-        this.loadRelays().subscribe(); // put the toggle back to the real pin state
+        this.refreshControls(); // put the toggle back to the real pin state
       },
     });
   }
@@ -307,11 +311,23 @@ export class HomePage {
     this.track(
       this.api.toggleTriggerState(this.device, trigger.triggerID, newState)
     ).subscribe({
+      next: () => this.refreshControls(),
       error: (err) => {
         this.showError('Trigger not changed', err);
-        this.loadTriggers().subscribe();
+        this.refreshControls();
       },
     });
+  }
+
+  /**
+   * Reloads relays and triggers right after a change, instead of at the next poll:
+   * the device acts on a change at once (a trigger can switch or lock valves, and
+   * its rules can switch a relay back).
+   */
+  private refreshControls() {
+    forkJoin([this.loadRelays(), this.loadTriggers()])
+      .pipe(takeUntil(this.leave$))
+      .subscribe();
   }
 
   async changeParameterAlert(

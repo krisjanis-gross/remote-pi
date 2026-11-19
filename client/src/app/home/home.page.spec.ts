@@ -103,6 +103,38 @@ describe('HomePage', () => {
     discardPeriodicTasks();
   }));
 
+  it('reloads relays and triggers right after a trigger change', fakeAsync(() => {
+    enterAndConnect();
+    flushRound(20);
+    page.toggleTriggerState({ triggerID: 5, state: 1, description: 'Sequence', parameters: [] } as any);
+    pending('set_trigger_state').forEach(r => r.flush(ok(null)));
+    // Before the next poll: the trigger may have switched a valve.
+    const relays = pending('get_GPIO_list');
+    expect(relays.length).toBe(1);
+    expect(pending('get_Trigger_list').length).toBe(1);
+    expect(pending('get_sensor_data_sparkline').length).toBe(0);
+    relays[0].flush(ok([{ id: 11, state: 1, locked: 1, description: 'Pump' }]));
+    expect(page.relays[0].state).toBe(1);
+    expect(page.relays[0].locked).toBe(1);
+    page.ionViewDidLeave();
+    discardPeriodicTasks();
+  }));
+
+  it('moves a relay toggle back when the device turns the relay back off', fakeAsync(() => {
+    enterAndConnect();
+    flushRound(20);
+    page.setRelayValue(page.relays[0]);
+    expect(page.relays[0].state).withContext('model follows the toggle').toBe(1);
+    pending('set_GPIO_pin').forEach(r => r.flush(ok(null)));
+    pending('get_GPIO_list').forEach(r => r.flush(ok([{ id: 11, state: 0, locked: 0, description: 'Pump' }])));
+    pending('get_Trigger_list').forEach(r => r.flush(ok([])));
+    fixture.detectChanges();
+    const toggle = fixture.nativeElement.querySelector('ion-toggle');
+    expect(toggle.checked).withContext('toggle shows the real state').toBeFalse();
+    page.ionViewDidLeave();
+    discardPeriodicTasks();
+  }));
+
   it('reconnects when the device stops answering', fakeAsync(() => {
     enterAndConnect();
     for (const action of ['get_GPIO_list', 'get_Trigger_list', 'get_sensor_data_sparkline']) {
